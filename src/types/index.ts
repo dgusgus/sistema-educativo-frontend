@@ -158,14 +158,31 @@ export interface Pago {
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
+// Estructura real que devuelve GET /api/dashboard
 
-export interface DashboardIndicadores {
+export interface DashboardIndicadoresData {
   totalEstudiantes: number
   totalDocentes: number
   totalCursos: number
-  estudiantesConAlertaAsistencia: number  // asistencia < 80%
-  pagosDelMes: number
-  montoRecaudado: number
+  promedioGeneral: number
+  promedioAsistencia: number
+  estudiantesEnRiesgo: number
+  bajosRendimiento: number
+  totalRecaudado: number
+  pagosPendientes: number
+}
+
+export interface DashboardTrimestre {
+  numero: number
+  nombre: string
+  cerrado: boolean
+}
+
+export interface DashboardResponse {
+  gestion: { id: number; anio: number }
+  indicadores: DashboardIndicadoresData
+  trimestres: DashboardTrimestre[]
+  generadoEn: string
 }
 
 // ─── Helpers de API ──────────────────────────────────────────────────────────
