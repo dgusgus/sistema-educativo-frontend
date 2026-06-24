@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { useGestionStore } from '@/stores/gestion.store'
 
-const auth = useAuthStore()
-const route = useRoute()
+const auth    = useAuthStore()
+const route   = useRoute()
+const gestion = useGestionStore()
+
+// Carga la gestión activa una sola vez — todas las vistas hijas la usan
+onMounted(() => gestion.cargar())
 
 // ─── Menú según rol ───────────────────────────────────────────────────────────
 //
