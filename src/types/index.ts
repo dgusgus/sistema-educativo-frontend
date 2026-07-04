@@ -22,31 +22,41 @@ export interface Gestion {
   id: number
   anio: number
   activa: boolean
+  descripcion?: string
+  directorId?: number
+  director?: { id: number; nombre: string; apellido: string }
   cursos?: Curso[]
   trimestres?: Trimestre[]
+  _count?: { inscripciones: number; cursos: number; trimestres: number }
 }
 
 export interface Curso {
   id: number
-  nombre: string        // "1ro Sec A", "2do Sec B", etc.
+  nombre: string
+  nivel: string
+  paralelo: string
   gestionId: number
-  nivel?: string
+  gestion?: { id: number; anio: number }
+  _count?: { inscripciones: number; asignaciones: number }
 }
 
 export interface Materia {
   id: number
   nombre: string
-  codigo?: string
+  codigo: string
+  horasSemanales: number
+  _count?: { asignaciones: number }
 }
 
 export interface Trimestre {
   id: number
-  numero: number        // 1, 2 o 3
+  numero: number
   nombre: string
   cerrado: boolean
   gestionId: number
-  fechaInicio?: string
-  fechaFin?: string
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  _count?: { calificaciones: number }
 }
 
 // ─── Personas ────────────────────────────────────────────────────────────────
@@ -56,10 +66,11 @@ export interface Docente {
   nombre: string
   apellido: string
   ci: string
-  email?: string
-  telefono?: string
-  especialidad?: string
+  email?: string | null
+  telefono?: string | null
+  especialidad?: string | null
   activo: boolean
+  usuario?: { id: number; username: string; activo: boolean } | null
 }
 
 export interface Estudiante {
@@ -67,10 +78,15 @@ export interface Estudiante {
   nombre: string
   apellido: string
   ci: string
-  fechaNacimiento?: string
-  email?: string
-  telefono?: string
+  fechaNacimiento?: string | null
+  direccion?: string | null
   activo: boolean
+  // ¿Para qué "inscripciones"? Cuando llamamos GET /estudiantes/:id
+  // el backend incluye el historial de inscripciones del estudiante.
+  // La lista (GET /estudiantes) solo trae la última inscripción (take:1).
+  inscripciones?: Inscripcion[]
+  tutores?: Array<{ tutor: Tutor }>
+  usuario?: { id: number; username: string } | null
 }
 
 export interface Tutor {
@@ -78,19 +94,34 @@ export interface Tutor {
   nombre: string
   apellido: string
   ci: string
-  telefono?: string
-  email?: string
-  parentesco?: string
+  telefono?: string | null
+  email?: string | null
+  parentesco?: string | null
+  usuario?: { id: number; username: string; activo: boolean } | null
 }
+
+// ─── Inscripción ─────────────────────────────────────────────────────────────
+// ¿Por qué dos campos de resultado?
+// "estadoInscripcion" es el estado OPERATIVO (si el estudiante sigue activo,
+// se retiró, etc). "resultado" es la CALIFICACIÓN FINAL del año (PROMOVIDO
+// o REPROBADO). Son dos conceptos distintos que el backend maneja por separado.
+
+export type EstadoInscripcion = 'ACTIVA' | 'RETIRADA' | 'TRANSFERIDA' | 'CONCLUIDA'
+export type ResultadoFinal    = 'PENDIENTE' | 'PROMOVIDO' | 'REPROBADO'
 
 export interface Inscripcion {
   id: number
   estudianteId: number
   cursoId: number
   gestionId: number
+  estadoInscripcion: EstadoInscripcion  // ✅ antes era solo 'estado'
+  resultado: ResultadoFinal             // ✅ antes usaba 'APROBADO'/'EN_CURSO'
+  fechaRetiro?: string | null
+  observaciones?: string | null
   estudiante?: Estudiante
   curso?: Curso
-  resultado?: 'APROBADO' | 'REPROBADO' | 'EN_CURSO'
+  gestion?: Gestion
+  pagos?: Pago[]
 }
 
 // ─── Asistencia ──────────────────────────────────────────────────────────────
@@ -100,19 +131,21 @@ export type EstadoAsistencia = 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO'
 export interface RegistroAsistencia {
   id: number
   inscripcionId: number
+  docenteMateriaCursoId: number
   fecha: string
   estado: EstadoAsistencia
-  justificacion?: string
-  estudiante?: Estudiante
+  justificacion?: string | null
 }
 
 export interface ResumenAsistencia {
   inscripcionId: number
-  total: number
-  presentes: number
-  ausentes: number
-  justificados: number
-  porcentaje: number          // 0–100, alerta si < 80
+  docenteMateriaCursoId: number
+  trimestreId: number
+  totalClases: number
+  totalPresente: number
+  totalAusente: number
+  totalJustificado: number
+  porcentaje: number          // 0–100 — alerta si < 80
 }
 
 // ─── Calificaciones ──────────────────────────────────────────────────────────
@@ -123,14 +156,14 @@ export interface Calificacion {
   trimestreId: number
   docenteMateriaCursoId: number
   nota: number                // Escala 1–100 (Ley 070)
-  estudiante?: Estudiante
+  promedioTrimestral: number
 }
 
-export interface PlanillaNotas {
+export interface PromedioFinal {
+  inscripcionId: number
   docenteMateriaCursoId: number
-  materia: Materia
-  trimestre: Trimestre
-  notas: Calificacion[]
+  promedioFinal: number
+  aprobado: boolean           // true si promedioFinal >= 51
 }
 
 // ─── Pagos ───────────────────────────────────────────────────────────────────
@@ -140,8 +173,10 @@ export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ANULADO'
 
 export interface ConceptoPago {
   id: number
-  nombre: string              // "Matrícula", "Mensualidad Marzo", etc.
+  nombre: string
+  descripcion?: string | null
   monto: number
+  obligatorio: boolean
   gestionId: number
 }
 
@@ -152,13 +187,14 @@ export interface Pago {
   montoPagado: number
   metodoPago: MetodoPago
   estado: EstadoPago
-  nroRecibo?: string          // Auto-generado por el backend
-  fecha: string
-  concepto?: ConceptoPago
+  numeroRecibo: string | null   // ✅ antes era 'nroRecibo'
+  fechaPago: string
+  observaciones?: string | null
+  conceptoPago?: ConceptoPago
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
-// Estructura real que devuelve GET /api/dashboard
+// Estructura exacta que devuelve GET /api/dashboard
 
 export interface DashboardIndicadoresData {
   totalEstudiantes: number
@@ -187,15 +223,6 @@ export interface DashboardResponse {
 
 // ─── Helpers de API ──────────────────────────────────────────────────────────
 
-// Respuesta genérica cuando el backend devuelve { message: '...' }
 export interface MensajeResponse {
   message: string
-}
-
-// Para paginación futura
-export interface PaginatedResponse<T> {
-  data: T[]
-  total: number
-  page: number
-  limit: number
 }
