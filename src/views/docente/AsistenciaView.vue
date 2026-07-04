@@ -1,23 +1,40 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { asistenciaApi, type AsistenciaDiaResponse, type ListaItem } from '@/api/asistencia.api'
+import { ref, computed, onMounted } from 'vue'
+import { useDocenteStore, type Asignacion } from '@/stores/docente.store'
+import { asistenciaApi } from '@/api/asistencia.api'
 import type { EstadoAsistencia } from '@/types'
 
-const hoy = new Date().toISOString().split('T')[0]
-const fecha                 = ref(hoy)
-const docenteMateriaCursoId = ref<number | ''>('')
+const docenteStore = useDocenteStore()
 
-const respuesta  = ref<AsistenciaDiaResponse | null>(null)
-const cargando   = ref(false)
-const guardando  = ref(false)
-const error      = ref<string | null>(null)
-const exito      = ref(false)
+// ── Fecha ─────────────────────────────────────────────────────────────────────
+const hoy  = new Date().toISOString().split('T')[0]
+const fecha = ref(hoy)
 
-// Estado local: inscripcionId → EstadoAsistencia
+// ── Asignación seleccionada ───────────────────────────────────────────────────
+// Si el docente tiene varias materias/cursos, puede cambiar entre ellas
+const asignacion = computed({
+  get: () => docenteStore.asignacionActiva,
+  set: (a) => { if (a) docenteStore.seleccionar(a) },
+})
+
+// ── Datos del día ─────────────────────────────────────────────────────────────
+const respuesta   = ref<any | null>(null)
+const cargando    = ref(false)
+const guardando   = ref(false)
+const error       = ref<string | null>(null)
+const exito       = ref(false)
 const estadoLocal = ref<Record<number, EstadoAsistencia>>({})
 
+onMounted(async () => {
+  await docenteStore.cargar()
+  // Si ya hay una asignación activa, cargar la lista del día automáticamente
+  if (docenteStore.asignacionActiva) {
+    await cargar()
+  }
+})
+
 async function cargar() {
-  if (!docenteMateriaCursoId.value) { error.value = 'Ingresá el ID de asignación'; return }
+  if (!asignacion.value) return
   cargando.value = true
   error.value = null
   exito.value = false
@@ -25,24 +42,34 @@ async function cargar() {
 
   try {
     respuesta.value = await asistenciaApi.getDelDia(
-      Number(docenteMateriaCursoId.value), fecha.value
+      asignacion.value.docenteMateriaCursoId,
+      fecha.value,
     )
-    // Poblar estado local con lo que ya existe (null → PRESENTE por defecto)
     estadoLocal.value = {}
-    respuesta.value.lista.forEach(item => {
+    respuesta.value.lista.forEach((item: any) => {
       estadoLocal.value[item.inscripcionId] = item.estado ?? 'PRESENTE'
     })
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al cargar la lista'
+    error.value = e instanceof Error ? e.message : 'Error al cargar lista'
   } finally {
     cargando.value = false
   }
 }
 
+// Cuando cambia la asignación o la fecha, recargar
+async function cambiarAsignacion(asig: Asignacion) {
+  docenteStore.seleccionar(asig)
+  await cargar()
+}
+
+async function cambiarFecha() {
+  if (asignacion.value) await cargar()
+}
+
 async function guardar() {
-  if (!respuesta.value) return
+  if (!respuesta.value || !asignacion.value) return
   if (respuesta.value.yaRegistrado) {
-    error.value = 'Esta fecha ya fue registrada. Usá el botón "Corregir" para modificar entradas individuales.'
+    error.value = 'Ya registrado. Usá los botones de corrección individuales.'
     return
   }
   guardando.value = true
@@ -50,15 +77,14 @@ async function guardar() {
   exito.value = false
   try {
     await asistenciaApi.registrar({
-      docenteMateriaCursoId: Number(docenteMateriaCursoId.value),
+      docenteMateriaCursoId: asignacion.value.docenteMateriaCursoId,
       fecha: fecha.value,
-      registros: respuesta.value.lista.map(item => ({
+      registros: respuesta.value.lista.map((item: any) => ({
         inscripcionId: item.inscripcionId,
         estado: estadoLocal.value[item.inscripcionId] ?? 'PRESENTE',
       })),
     })
     exito.value = true
-    // Recargar para reflejar el estado guardado
     await cargar()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al guardar'
@@ -67,18 +93,15 @@ async function guardar() {
   }
 }
 
-// Corregir un registro ya guardado individualmente
 const corrigiendoId = ref<number | null>(null)
-async function corregir(item: ListaItem, nuevoEstado: EstadoAsistencia) {
+async function corregir(item: any, nuevoEstado: EstadoAsistencia) {
   if (!item.asistenciaId) return
   corrigiendoId.value = item.asistenciaId
   try {
     await asistenciaApi.actualizar(item.asistenciaId, nuevoEstado)
     estadoLocal.value[item.inscripcionId] = nuevoEstado
-    if (respuesta.value) {
-      const idx = respuesta.value.lista.findIndex(i => i.inscripcionId === item.inscripcionId)
-      if (idx !== -1) respuesta.value.lista[idx].estado = nuevoEstado
-    }
+    const idx = respuesta.value.lista.findIndex((i: any) => i.inscripcionId === item.inscripcionId)
+    if (idx !== -1) respuesta.value.lista[idx].estado = nuevoEstado
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al corregir'
   } finally {
@@ -93,8 +116,8 @@ const badgeClase: Record<EstadoAsistencia, string> = {
 }
 
 const stats = computed(() => {
-  if (!respuesta.value) return null
   const vals = Object.values(estadoLocal.value)
+  if (!vals.length) return null
   return {
     presente:    vals.filter(e => e === 'PRESENTE').length,
     ausente:     vals.filter(e => e === 'AUSENTE').length,
@@ -107,136 +130,158 @@ const stats = computed(() => {
   <div class="space-y-4">
     <h2 class="text-2xl font-bold">Registro de Asistencia</h2>
 
-    <!-- Selector -->
-    <div class="card bg-base-100 shadow">
-      <div class="card-body flex flex-col sm:flex-row gap-3 items-end">
-        <fieldset class="fieldset flex-1">
-          <legend class="fieldset-legend text-xs">ID Asignación (docenteMateriaCursoId)</legend>
-          <input v-model="docenteMateriaCursoId" type="number" min="1" placeholder="Ej: 4"
-            class="input input-bordered w-full" @keyup.enter="cargar" />
-        </fieldset>
-        <fieldset class="fieldset flex-1">
-          <legend class="fieldset-legend text-xs">Fecha</legend>
-          <input v-model="fecha" type="date" :max="hoy" class="input input-bordered w-full" />
-        </fieldset>
-        <button class="btn btn-primary" :disabled="cargando" @click="cargar">
-          <span v-if="cargando" class="loading loading-spinner loading-sm"></span>
-          Cargar lista
-        </button>
-      </div>
+    <!-- Cargando asignaciones -->
+    <div v-if="docenteStore.cargando" class="flex items-center gap-2 text-base-content/60">
+      <span class="loading loading-spinner loading-sm"></span>
+      Cargando tus asignaciones...
     </div>
 
-    <!-- Feedback -->
-    <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
-    <div v-if="exito" role="alert" class="alert alert-success"><span>Asistencia guardada correctamente</span></div>
+    <!-- Sin asignaciones -->
+    <div v-else-if="!docenteStore.tieneAsignaciones" role="alert" class="alert alert-warning">
+      <span>No tenés asignaciones activas en la gestión actual. Contactá al director.</span>
+    </div>
 
-    <template v-if="respuesta">
+    <template v-else>
 
-      <!-- Info de la asignación -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body py-3 flex flex-wrap gap-6 items-center">
-          <div><p class="text-xs text-base-content/50">Materia</p><p class="font-semibold">{{ respuesta.dmc.materia.nombre }}</p></div>
-          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ respuesta.dmc.curso.nombre }}</p></div>
-          <div><p class="text-xs text-base-content/50">Fecha</p><p class="font-semibold">{{ respuesta.fecha }}</p></div>
-          <div class="ml-auto">
-            <span class="badge" :class="respuesta.yaRegistrado ? 'badge-ghost' : 'badge-primary'">
-              {{ respuesta.yaRegistrado ? '✓ Ya registrado' : 'Nuevo registro' }}
-            </span>
+      <!-- Selector de asignación (solo si tiene más de una) -->
+      <div v-if="docenteStore.asignaciones.length > 1" class="card bg-base-100 shadow">
+        <div class="card-body py-3">
+          <p class="text-xs text-base-content/50 mb-2">Seleccioná tu materia/curso:</p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="asig in docenteStore.asignaciones"
+              :key="asig.docenteMateriaCursoId"
+              class="btn btn-sm"
+              :class="asignacion?.docenteMateriaCursoId === asig.docenteMateriaCursoId
+                ? 'btn-primary' : 'btn-ghost'"
+              @click="cambiarAsignacion(asig)"
+            >
+              {{ asig.materia.nombre }} — {{ asig.curso.nombre }}
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Alerta si ya fue registrado -->
-      <div v-if="respuesta.yaRegistrado" role="alert" class="alert alert-info text-sm">
-        <span>Esta fecha ya fue registrada. Podés corregir estados individuales usando los controles de la tabla.</span>
+      <!-- Info de la asignación activa -->
+      <div v-if="asignacion" class="card bg-base-100 shadow">
+        <div class="card-body py-3 flex flex-wrap gap-4 items-center">
+          <div><p class="text-xs text-base-content/50">Materia</p><p class="font-semibold">{{ asignacion.materia.nombre }}</p></div>
+          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ asignacion.curso.nombre }}</p></div>
+          <div><p class="text-xs text-base-content/50">Estudiantes</p><p class="font-semibold">{{ asignacion.totalEstudiantes }}</p></div>
+          <!-- Selector de fecha -->
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-base-content/50">Fecha:</label>
+            <input v-model="fecha" type="date" :max="hoy"
+              class="input input-bordered input-sm"
+              @change="cambiarFecha" />
+            <button class="btn btn-primary btn-sm" :disabled="cargando" @click="cargar">
+              <span v-if="cargando" class="loading loading-spinner loading-xs"></span>
+              <span v-else>Cargar</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Tabla -->
-      <div class="card bg-base-100 shadow overflow-x-auto">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Estudiante</th>
-              <th class="text-center">Presente</th>
-              <th class="text-center">Ausente</th>
-              <th class="text-center">Justificado</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) in respuesta.lista" :key="item.inscripcionId" class="hover">
-              <td class="text-base-content/40 text-sm">{{ idx + 1 }}</td>
-              <td class="font-medium">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
+      <!-- Feedback -->
+      <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
+      <div v-if="exito" role="alert" class="alert alert-success"><span>Asistencia guardada correctamente</span></div>
 
-              <!-- Si ya está registrado → botones de corrección -->
-              <template v-if="respuesta.yaRegistrado">
-                <td colspan="3" class="text-center">
-                  <div class="join">
-                    <button
-                      v-for="estado in (['PRESENTE','AUSENTE','JUSTIFICADO'] as EstadoAsistencia[])"
-                      :key="estado"
-                      class="join-item btn btn-xs"
-                      :class="estadoLocal[item.inscripcionId] === estado
-                        ? estado === 'PRESENTE' ? 'btn-success' : estado === 'AUSENTE' ? 'btn-error' : 'btn-warning'
-                        : 'btn-ghost'"
-                      :disabled="corrigiendoId === item.asistenciaId"
-                      @click="corregir(item, estado)"
-                    >
-                      {{ estado === 'PRESENTE' ? 'P' : estado === 'AUSENTE' ? 'A' : 'J' }}
-                    </button>
-                  </div>
-                </td>
-              </template>
+      <!-- Lista de estudiantes -->
+      <template v-if="respuesta">
+        <div v-if="respuesta.yaRegistrado" role="alert" class="alert alert-info text-sm">
+          <span>Ya registrado para esta fecha. Podés corregir estados individuales.</span>
+        </div>
 
-              <!-- Primer registro → radios -->
-              <template v-else>
-                <td class="text-center">
-                  <input type="radio" class="radio radio-success radio-sm"
-                    :name="`estado-${item.inscripcionId}`"
-                    :checked="estadoLocal[item.inscripcionId] === 'PRESENTE'"
-                    @change="estadoLocal[item.inscripcionId] = 'PRESENTE'" />
-                </td>
-                <td class="text-center">
-                  <input type="radio" class="radio radio-error radio-sm"
-                    :name="`estado-${item.inscripcionId}`"
-                    :checked="estadoLocal[item.inscripcionId] === 'AUSENTE'"
-                    @change="estadoLocal[item.inscripcionId] = 'AUSENTE'" />
-                </td>
-                <td class="text-center">
-                  <input type="radio" class="radio radio-warning radio-sm"
-                    :name="`estado-${item.inscripcionId}`"
-                    :checked="estadoLocal[item.inscripcionId] === 'JUSTIFICADO'"
-                    @change="estadoLocal[item.inscripcionId] = 'JUSTIFICADO'" />
-                </td>
-              </template>
+        <div class="card bg-base-100 shadow overflow-x-auto">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Estudiante</th>
+                <th class="text-center">P</th>
+                <th class="text-center">A</th>
+                <th class="text-center">J</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in respuesta.lista" :key="item.inscripcionId" class="hover">
+                <td class="text-base-content/40 text-sm">{{ Number(idx) + 1 }}</td>
+                <td class="font-medium">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
 
-              <td>
-                <span class="badge badge-sm" :class="badgeClase[estadoLocal[item.inscripcionId] ?? 'PRESENTE']">
-                  {{ estadoLocal[item.inscripcionId] ?? 'PRESENTE' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                <!-- Ya registrado → botones de corrección -->
+                <template v-if="respuesta.yaRegistrado">
+                  <td colspan="3" class="text-center">
+                    <div class="join">
+                      <button
+                        v-for="estado in (['PRESENTE','AUSENTE','JUSTIFICADO'] as EstadoAsistencia[])"
+                        :key="estado"
+                        class="join-item btn btn-xs"
+                        :class="estadoLocal[item.inscripcionId] === estado
+                          ? estado === 'PRESENTE' ? 'btn-success'
+                          : estado === 'AUSENTE' ? 'btn-error' : 'btn-warning'
+                          : 'btn-ghost'"
+                        :disabled="corrigiendoId === item.asistenciaId"
+                        @click="corregir(item, estado)"
+                      >
+                        {{ estado[0] }}
+                      </button>
+                    </div>
+                  </td>
+                </template>
 
-      <!-- Stats + guardar -->
-      <div class="flex flex-wrap items-center gap-3">
-        <span v-if="stats" class="badge badge-success badge-outline">Presentes: {{ stats.presente }}</span>
-        <span v-if="stats" class="badge badge-error badge-outline">Ausentes: {{ stats.ausente }}</span>
-        <span v-if="stats" class="badge badge-warning badge-outline">Justificados: {{ stats.justificado }}</span>
-        <button v-if="!respuesta.yaRegistrado" class="btn btn-primary ml-auto"
-          :disabled="guardando" @click="guardar">
-          <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
-          Guardar asistencia
-        </button>
+                <!-- Primer registro → radios -->
+                <template v-else>
+                  <td class="text-center">
+                    <input type="radio" class="radio radio-success radio-sm"
+                      :name="`e-${item.inscripcionId}`"
+                      :checked="estadoLocal[item.inscripcionId] === 'PRESENTE'"
+                      @change="estadoLocal[item.inscripcionId] = 'PRESENTE'" />
+                  </td>
+                  <td class="text-center">
+                    <input type="radio" class="radio radio-error radio-sm"
+                      :name="`e-${item.inscripcionId}`"
+                      :checked="estadoLocal[item.inscripcionId] === 'AUSENTE'"
+                      @change="estadoLocal[item.inscripcionId] = 'AUSENTE'" />
+                  </td>
+                  <td class="text-center">
+                    <input type="radio" class="radio radio-warning radio-sm"
+                      :name="`e-${item.inscripcionId}`"
+                      :checked="estadoLocal[item.inscripcionId] === 'JUSTIFICADO'"
+                      @change="estadoLocal[item.inscripcionId] = 'JUSTIFICADO'" />
+                  </td>
+                </template>
+
+                <td>
+                  <span class="badge badge-sm" :class="badgeClase[estadoLocal[item.inscripcionId] ?? 'PRESENTE']">
+                    {{ estadoLocal[item.inscripcionId] ?? 'PRESENTE' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Stats + guardar -->
+        <div class="flex flex-wrap items-center gap-3">
+          <template v-if="stats">
+            <span class="badge badge-success badge-outline">Presentes: {{ stats.presente }}</span>
+            <span class="badge badge-error badge-outline">Ausentes: {{ stats.ausente }}</span>
+            <span class="badge badge-warning badge-outline">Justificados: {{ stats.justificado }}</span>
+          </template>
+          <button v-if="!respuesta.yaRegistrado" class="btn btn-primary ml-auto"
+            :disabled="guardando" @click="guardar">
+            <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
+            Guardar asistencia del {{ fecha }}
+          </button>
+        </div>
+      </template>
+
+      <!-- Estado vacío -->
+      <div v-else-if="!cargando && asignacion" class="text-center text-base-content/40 py-8">
+        Seleccioná una fecha y presioná "Cargar"
       </div>
 
     </template>
-
-    <div v-else-if="!cargando" class="text-center text-base-content/40 py-12">
-      Ingresá el ID de asignación y la fecha para cargar la lista
-    </div>
   </div>
 </template>

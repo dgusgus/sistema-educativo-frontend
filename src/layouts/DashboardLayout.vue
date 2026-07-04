@@ -8,8 +8,16 @@ const auth    = useAuthStore()
 const route   = useRoute()
 const gestion = useGestionStore()
 
-// Carga la gestión activa una sola vez — todas las vistas hijas la usan
-onMounted(() => gestion.cargar())
+// Import condicional del store del docente
+import { useDocenteStore } from '@/stores/docente.store'
+const docenteStore = useDocenteStore()
+
+onMounted(() => {
+  // Siempre cargamos la gestión activa
+  gestion.cargar()
+  // Si es docente, cargamos sus asignaciones automáticamente
+  if (auth.esDocente) docenteStore.cargar()
+})
 
 // ─── Menú según rol ───────────────────────────────────────────────────────────
 //
