@@ -83,6 +83,11 @@ const router = createRouter({
           name: 'director-estructura',
           component: () => import('@/views/director/EstructuraView.vue'),
         },
+        {
+          path: 'gestiones',
+          name: 'director-gestiones',
+          component: () => import('@/views/director/GestionesView.vue'),
+        },
       ],
     },
 
