@@ -1,54 +1,40 @@
 <script setup lang="ts">
 /**
- * EstructuraView — ¿Para qué existe esta vista?
- *
- * Antes de que el sistema funcione, el Director debe configurar
- * la "estructura académica" del año: qué cursos existen, qué materias
- * se dictan y cuándo son los trimestres.
- *
- * Sin esta configuración, la Secretaria no puede inscribir estudiantes
- * (no hay cursos), el docente no puede pasar asistencia (no hay trimestres),
- * y los boletines no se pueden generar. Es el paso 0 de cada gestión.
- *
- * ¿Por qué tres tabs en una sola vista?
- * Cursos, materias y trimestres son conceptos relacionados pero independientes.
- * El Director configura los tres al inicio del año — tenerlos juntos
- * evita navegar a tres secciones distintas para una tarea que se hace junta.
+ * EstructuraView — configuración base de cada gestión: cursos, materias
+ * y trimestres. Sin esto, Secretaria no puede inscribir (no hay cursos),
+ * el docente no puede pasar asistencia (no hay trimestres), etc.
  */
-import { ref, computed, onMounted } from 'vue'
-import { cursoApi, materiaApi, trimestreApi, type Curso, type Materia, type Trimestre } from '@/api/estructura.api'
+import { ref, onMounted } from 'vue'
+import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
+import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
 import { useGestionStore } from '@/stores/gestion.store'
 
 const gestion = useGestionStore()
 
-// ─── Tab activo ───────────────────────────────────────────────────────────────
 type Tab = 'cursos' | 'materias' | 'trimestres'
 const tab = ref<Tab>('cursos')
 
-// ─── Datos ────────────────────────────────────────────────────────────────────
 const cursos     = ref<Curso[]>([])
 const materias   = ref<Materia[]>([])
 const trimestres = ref<Trimestre[]>([])
 const cargando   = ref(false)
 const error      = ref<string | null>(null)
 
-// ─── Modal compartido ─────────────────────────────────────────────────────────
-// ¿Por qué un solo modal para los tres tabs?
-// El patrón es siempre el mismo: abrir modal → completar form → guardar → cerrar.
-// Los campos cambian según el tab, pero la lógica es idéntica.
-// Un solo modal con v-if por tab es más mantenible que tres modales separados.
+// Un solo modal para los tres tabs — mismo patrón (abrir → completar → guardar)
 const modalAbierto = ref(false)
 const guardando    = ref(false)
 const errorModal   = ref<string | null>(null)
 const modoEdicion  = ref(false)
 const idEditando   = ref<number | null>(null)
 
-// Forms por tab
-const formCurso = ref({ nombre: '', nivel: '', paralelo: '' })
+// ✅ Curso real: nivel (PRIMARIA|SECUNDARIA) + grado (1–6) + paralelo + turno.
+// "nombre" ya NO es un campo editable — lo arma el backend con estos 4.
+const formCurso = ref<{ nivel: Nivel | ''; grado: number; paralelo: string; turno: Turno; capacidad: number | '' }>({
+  nivel: '', grado: 1, paralelo: '', turno: 'MANANA', capacidad: '',
+})
 const formMateria = ref({ nombre: '', codigo: '', horasSemanales: 4 })
 const formTrimestre = ref({ numero: 1, nombre: '', fechaInicio: '', fechaFin: '' })
 
-// ─── Carga inicial ────────────────────────────────────────────────────────────
 onMounted(async () => {
   await gestion.cargar()
   await Promise.all([cargarCursos(), cargarMaterias(), cargarTrimestres()])
@@ -57,10 +43,6 @@ onMounted(async () => {
 async function cargarCursos() {
   cargando.value = true
   try {
-    // Sin gestionId → el backend devuelve los de la gestión activa.
-    // ¿Por qué no pasamos gestion.gestionId explícitamente?
-    // Porque si la gestión aún no cargó, gestionId sería null y la llamada
-    // fallaría. El backend tiene el fallback "activa" para exactamente este caso.
     cursos.value = await cursoApi.getAll()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar cursos'
@@ -71,10 +53,6 @@ async function cargarCursos() {
 
 async function cargarMaterias() {
   try {
-    // ¿Por qué materias no necesita gestionId?
-    // Porque las materias son institucionales — "Matemáticas" existe siempre,
-    // independientemente del año. Lo que cambia cada año es la ASIGNACIÓN
-    // de un docente a esa materia (eso vive en DocenteMateriaCurso).
     materias.value = await materiaApi.getAll()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar materias'
@@ -89,19 +67,15 @@ async function cargarTrimestres() {
   }
 }
 
-// ─── Abrir modales ────────────────────────────────────────────────────────────
 function abrirCrear() {
   modoEdicion.value = false
   idEditando.value  = null
   errorModal.value  = null
   if (tab.value === 'cursos') {
-    formCurso.value = { nombre: '', nivel: '', paralelo: '' }
+    formCurso.value = { nivel: '', grado: 1, paralelo: '', turno: 'MANANA', capacidad: '' }
   } else if (tab.value === 'materias') {
     formMateria.value = { nombre: '', codigo: '', horasSemanales: 4 }
   } else {
-    // ¿Por qué sugerir el número del siguiente trimestre?
-    // El Director crea los 3 trimestres en orden — pre-llenar el número
-    // ahorra un click y evita errores de orden.
     const existentes = trimestres.value.length
     formTrimestre.value = {
       numero: Math.min(existentes + 1, 3),
@@ -119,7 +93,7 @@ function abrirEditar(item: Curso | Materia | Trimestre) {
   errorModal.value  = null
   if (tab.value === 'cursos') {
     const c = item as Curso
-    formCurso.value = { nombre: c.nombre, nivel: c.nivel, paralelo: c.paralelo }
+    formCurso.value = { nivel: c.nivel, grado: c.grado, paralelo: c.paralelo, turno: c.turno, capacidad: c.capacidad ?? '' }
   } else if (tab.value === 'materias') {
     const m = item as Materia
     formMateria.value = { nombre: m.nombre, codigo: m.codigo, horasSemanales: m.horasSemanales }
@@ -135,7 +109,6 @@ function abrirEditar(item: Curso | Materia | Trimestre) {
   modalAbierto.value = true
 }
 
-// ─── Guardar ──────────────────────────────────────────────────────────────────
 async function guardar() {
   guardando.value  = true
   errorModal.value = null
@@ -157,17 +130,32 @@ async function guardar() {
 
 async function guardarCurso() {
   const f = formCurso.value
-  if (!f.nombre || !f.nivel || !f.paralelo) throw new Error('Nombre, nivel y paralelo son obligatorios')
+  if (!f.nivel || !f.grado || !f.paralelo) throw new Error('Nivel, grado y paralelo son obligatorios')
   if (!gestion.gestionId) throw new Error('No hay gestión activa')
+
   if (modoEdicion.value && idEditando.value) {
-    const updated = await cursoApi.update(idEditando.value, f)
+    // "nivel" NO se puede editar (ver curso.controller.ts) — solo se manda
+    // lo que sí es editable
+    const updated = await cursoApi.update(idEditando.value, {
+      grado:      f.grado,
+      paralelo:   f.paralelo,
+      turno:      f.turno,
+      capacidad:  f.capacidad === '' ? undefined : f.capacidad,
+    })
     const idx = cursos.value.findIndex(c => c.id === idEditando.value)
     if (idx !== -1) cursos.value[idx] = updated
   } else {
-    const nuevo = await cursoApi.create({ ...f, gestionId: gestion.gestionId })
+    const nuevo = await cursoApi.create({
+      nivel:      f.nivel,
+      grado:      f.grado,
+      paralelo:   f.paralelo,
+      turno:      f.turno,
+      capacidad:  f.capacidad === '' ? undefined : f.capacidad,
+      gestionId:  gestion.gestionId,
+    })
     cursos.value.push(nuevo)
-    // Recargar el store de gestión para que los nuevos cursos
-    // aparezcan en el selector de inscripciones y asignaciones
+    // Recargar el store de gestión para que el nuevo curso aparezca en
+    // los selectores de inscripciones y asignaciones
     await gestion.recargar()
   }
 }
@@ -199,24 +187,19 @@ async function guardarTrimestre() {
     if (idx !== -1) trimestres.value[idx] = updated
   } else {
     const nuevo = await trimestreApi.create({
-      numero:      f.numero,
+      numero:      f.numero as 1 | 2 | 3,
       nombre:      f.nombre,
       gestionId:   gestion.gestionId,
       fechaInicio: f.fechaInicio || undefined,
       fechaFin:    f.fechaFin    || undefined,
     })
     trimestres.value.push(nuevo)
-    // Recargar el store para que trimestreActivo se actualice en
-    // AsistenciaView y CalificacionesView
     await gestion.recargar()
   }
 }
 
-// ─── Cerrar trimestre ─────────────────────────────────────────────────────────
-// ¿Por qué es una acción separada del editar?
-// Cerrar un trimestre es IRREVERSIBLE — bloquea todas las notas y asistencias
-// de ese período. No es un campo que se edita, es una acción que se confirma.
-// Por eso tiene su propio botón con confirmación explícita del usuario.
+// Irreversible — bloquea notas/asistencia del período. Acción separada,
+// con confirmación explícita.
 const cerrando = ref<number | null>(null)
 
 async function cerrarTrimestre(t: Trimestre) {
@@ -234,7 +217,6 @@ async function cerrarTrimestre(t: Trimestre) {
   }
 }
 
-// ─── Eliminar curso ───────────────────────────────────────────────────────────
 const eliminando = ref<number | null>(null)
 
 async function eliminarCurso(c: Curso) {
@@ -245,45 +227,38 @@ async function eliminarCurso(c: Curso) {
     cursos.value = cursos.value.filter(x => x.id !== c.id)
     await gestion.recargar()
   } catch (e) {
-    // ¿Por qué mostrar el error del backend directamente?
-    // El backend devuelve mensajes como "No se puede eliminar — el curso
-    // tiene 12 estudiantes inscritos". Es más útil que un mensaje genérico.
+    // El backend devuelve "No se puede eliminar — el curso tiene N
+    // estudiantes inscritos" — más útil que un mensaje genérico
     error.value = e instanceof Error ? e.message : 'Error al eliminar'
   } finally {
     eliminando.value = null
   }
 }
 
-// Niveles predefinidos según el sistema boliviano (secundaria)
-const NIVELES = [
-  'Primero Secundaria', 'Segundo Secundaria', 'Tercero Secundaria',
-  'Cuarto Secundaria',  'Quinto Secundaria',  'Sexto Secundaria',
-]
+const NIVELES: Nivel[] = ['PRIMARIA', 'SECUNDARIA']
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+const TURNOS: Turno[] = ['MANANA', 'TARDE', 'NOCHE']
+const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', NOCHE: 'Noche' }
 </script>
 
 <template>
   <div class="space-y-4">
 
-    <!-- Encabezado -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <div class="flex-1">
         <h2 class="text-2xl font-bold">Estructura académica</h2>
-        <p class="text-sm text-base-content/60">
-          Gestión {{ gestion.anio ?? '—' }}
-        </p>
+        <p class="text-sm text-base-content/60">Gestión {{ gestion.anio ?? '—' }}</p>
       </div>
       <button class="btn btn-primary btn-sm" @click="abrirCrear">
         + Nuevo {{ tab === 'cursos' ? 'curso' : tab === 'materias' ? 'materia' : 'trimestre' }}
       </button>
     </div>
 
-    <!-- Error -->
     <div v-if="error" role="alert" class="alert alert-error">
       <span>{{ error }}</span>
       <button class="btn btn-sm btn-ghost" @click="error = null">×</button>
     </div>
 
-    <!-- Tabs -->
     <div role="tablist" class="tabs tabs-boxed w-fit">
       <button role="tab" class="tab" :class="{ 'tab-active': tab === 'cursos' }" @click="tab = 'cursos'">
         Cursos <span class="ml-1 badge badge-xs badge-ghost">{{ cursos.length }}</span>
@@ -302,8 +277,7 @@ const NIVELES = [
         <thead>
           <tr>
             <th>Nombre</th>
-            <th>Nivel</th>
-            <th>Paralelo</th>
+            <th>Turno</th>
             <th>Inscritos</th>
             <th>Asignaciones</th>
             <th>Acciones</th>
@@ -311,17 +285,16 @@ const NIVELES = [
         </thead>
         <tbody>
           <tr v-if="cargando" v-for="i in 4" :key="i">
-            <td colspan="6"><div class="skeleton h-4 w-full"></div></td>
+            <td colspan="5"><div class="skeleton h-4 w-full"></div></td>
           </tr>
           <tr v-else-if="cursos.length === 0">
-            <td colspan="6" class="text-center text-base-content/40 py-8">
+            <td colspan="5" class="text-center text-base-content/40 py-8">
               No hay cursos — creá el primero para poder inscribir estudiantes.
             </td>
           </tr>
           <tr v-else v-for="c in cursos" :key="c.id" class="hover">
             <td class="font-medium">{{ c.nombre }}</td>
-            <td class="text-sm">{{ c.nivel }}</td>
-            <td class="text-center">{{ c.paralelo }}</td>
+            <td class="text-sm">{{ TURNO_TEXTO[c.turno] }}</td>
             <td class="text-center">
               <span class="badge badge-sm badge-ghost">{{ c._count?.inscripciones ?? 0 }}</span>
             </td>
@@ -416,13 +389,7 @@ const NIVELES = [
             </td>
             <td>
               <div class="flex gap-1">
-                <button
-                  class="btn btn-ghost btn-xs"
-                  :disabled="t.cerrado"
-                  @click="abrirEditar(t)"
-                >
-                  Editar
-                </button>
+                <button class="btn btn-ghost btn-xs" :disabled="t.cerrado" @click="abrirEditar(t)">Editar</button>
                 <button
                   v-if="!t.cerrado"
                   class="btn btn-ghost btn-xs text-error"
@@ -456,20 +423,38 @@ const NIVELES = [
 
         <!-- Form Curso -->
         <template v-if="tab === 'cursos'">
+          <p v-if="formCurso.nivel" class="text-xs text-base-content/50 -mt-1">
+            Vista previa: {{ nombreCurso({ nivel: formCurso.nivel, grado: formCurso.grado, paralelo: formCurso.paralelo || '?', turno: formCurso.turno }) }}
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Nivel *</legend>
+              <select v-model="formCurso.nivel" class="select select-bordered w-full" :disabled="guardando || modoEdicion">
+                <option value="" disabled>Seleccionar</option>
+                <option v-for="n in NIVELES" :key="n" :value="n">{{ NIVEL_TEXTO[n] }}</option>
+              </select>
+              <p v-if="modoEdicion" class="text-xs text-base-content/40 mt-1">No editable — crea un curso nuevo si cambia.</p>
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Grado * (1–6)</legend>
+              <input v-model.number="formCurso.grado" type="number" min="1" max="6" class="input input-bordered w-full" :disabled="guardando" />
+            </fieldset>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Paralelo * (ej: A, B, C)</legend>
+              <input v-model="formCurso.paralelo" type="text" maxlength="2" class="input input-bordered w-full uppercase" :disabled="guardando" />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Turno</legend>
+              <select v-model="formCurso.turno" class="select select-bordered w-full" :disabled="guardando">
+                <option v-for="t in TURNOS" :key="t" :value="t">{{ TURNO_TEXTO[t] }}</option>
+              </select>
+            </fieldset>
+          </div>
           <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Nombre * (ej: 1ro Sec A)</legend>
-            <input v-model="formCurso.nombre" type="text" class="input input-bordered w-full" :disabled="guardando" />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Nivel *</legend>
-            <select v-model="formCurso.nivel" class="select select-bordered w-full" :disabled="guardando">
-              <option value="" disabled>Seleccionar nivel</option>
-              <option v-for="n in NIVELES" :key="n" :value="n">{{ n }}</option>
-            </select>
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Paralelo * (ej: A, B, C)</legend>
-            <input v-model="formCurso.paralelo" type="text" maxlength="2" class="input input-bordered w-full uppercase" :disabled="guardando" />
+            <legend class="fieldset-legend text-xs">Capacidad (opcional)</legend>
+            <input v-model.number="formCurso.capacidad" type="number" min="1" class="input input-bordered w-full" :disabled="guardando" />
           </fieldset>
         </template>
 

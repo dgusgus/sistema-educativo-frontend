@@ -212,15 +212,6 @@ async function asignarDirector() {
 }
 
 // ─── Helpers de display ───────────────────────────────────────────────────────
-// ¿Para qué formatear la fecha aquí y no en el template?
-// Porque si fechaInicio es null, mostrar "—" directamente en el template
-// con {{ g.fechaInicio ?? '—' }} no formatea la fecha. Un computed o función
-// centraliza el formato para que sea consistente en toda la tabla.
-function formatFecha(fecha: string | null | undefined): string {
-  if (!fecha) return '—'
-  return new Date(fecha).toLocaleDateString('es-BO', { year: 'numeric', month: 'short' })
-}
-
 // Directores activos para el selector — ¿por qué filtrar inactivos?
 // No tiene sentido asignar como director a alguien que ya no trabaja
 // en la institución. Igual se muestran en la lista principal por historial.

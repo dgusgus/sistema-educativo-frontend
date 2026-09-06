@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { docenteApi, type DocentePayload, type AsignacionPayload } from '@/api/docente.api'
+import { docenteApi, type DocentePayload } from '@/api/docente.api'
 import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { materiaApi, type Materia } from '@/api/estructura.api'
 import type { Docente } from '@/types'
 
-// ¿Por qué necesitamos el gestionStore acá?
-// Para asignar materia+curso al docente necesitamos el gestionId activo
-// y la lista de cursos disponibles — el store ya los tiene cargados,
-// no hace falta otra llamada al backend.
+// El gestionStore ya tiene cargados gestionId y los cursos de la gestión
+// activa — evita un GET extra solo para el modal de asignación.
 const gestion = useGestionStore()
 
 // ─── Estado principal ─────────────────────────────────────────────────────────
@@ -32,13 +30,8 @@ const formVacio = (): DocentePayload => ({
 const form = ref<DocentePayload>(formVacio())
 
 // ─── Modal crear cuenta (con-perfil) ─────────────────────────────────────────
-// ¿Por qué este modal separado del de "crear perfil"?
-// Porque son dos flujos distintos:
-// 1. "Crear perfil" → registra los datos personales del docente sin acceso al sistema.
-//    Útil si el Director quiere tenerlo en el sistema antes de que el docente tenga
-//    computadora o necesite ingresar al sistema.
-// 2. "Crear con cuenta" → crea perfil + usuario en una sola transacción.
-//    Es el flujo normal cuando el docente va a usar el sistema desde el día 1.
+// 1. "Crear perfil" → solo datos personales, sin acceso al sistema.
+// 2. "Crear con cuenta" → perfil + usuario en una transacción (flujo normal).
 const modalConCuenta  = ref(false)
 const creandoCuenta   = ref(false)
 const errorCuenta     = ref<string | null>(null)
@@ -50,31 +43,20 @@ const formCuenta = ref({
   username: '', password: '',
 })
 
-// ─── Modal vincular cuenta existente ─────────────────────────────────────────
-// ¿Para qué vincular si ya existe "crear con cuenta"?
-// Escenario real: el Director crea el perfil del docente (datos personales),
-// pero la cuenta de usuario la crea la Secretaria semanas después.
-// O el docente ya tenía cuenta en el sistema de otro año y hay que reutilizarla.
-// En esos casos, no queremos crear un usuario duplicado — solo vincular el
-// usuario existente al perfil que ya está registrado.
+// ─── Modal vincular cuenta existente a un perfil ya registrado ───────────────
+// Escenario: el Director creó el perfil del docente (solo datos personales)
+// y ahora hay que darle acceso, SIN duplicar su Persona. El flujo real es:
+//   1. POST /usuarios — crea la cuenta sola (username+password, roles)
+//   2. PUT /usuarios/:id/vincular — la liga al docenteId ya existente
+// (createConPerfil NO sirve acá — crearía una Persona nueva.)
 const modalVincular      = ref(false)
 const vinculando         = ref(false)
 const errorVincular      = ref<string | null>(null)
 const docenteAVincular   = ref<Docente | null>(null)
 const usernameVincular   = ref('')
 const passwordVincular   = ref('')
-// ¿usuarioId o username+password? El backend acepta ambos:
-// - usuarioId: si ya sabemos el ID del usuario existente
-// - username+password: crea un usuario nuevo y lo vincula al docente
-// En la UI usamos username+password porque es más amigable que pedir un ID interno.
 
 // ─── Modal asignar materia+curso ──────────────────────────────────────────────
-// ¿Por qué asignar desde acá y no desde otra sección?
-// Porque la asignación (DocenteMateriaCurso) define todo:
-// - Qué materias puede ver el docente en AsistenciaView y CalificacionesView
-// - Qué estudiantes aparecen en su planilla
-// - Qué datos genera el boletin para ese curso
-// Sin asignación, el docente entra al sistema pero no ve nada útil.
 const modalAsignacion   = ref(false)
 const asignando         = ref(false)
 const errorAsignacion   = ref<string | null>(null)
@@ -188,22 +170,25 @@ async function crearConCuenta() {
   creandoCuenta.value = true
   errorCuenta.value   = null
   try {
+    // ✅ v6: roles[] + persona (no "perfil") + datosPorRol para lo
+    // específico de cada rol (especialidad va ahí, no dentro de persona)
     const payload: ConPerfilPayload = {
-      rol:      'DOCENTE',
+      roles:    ['DOCENTE'],
       username: formCuenta.value.username,
       password: formCuenta.value.password,
-      perfil: {
-        ci:           formCuenta.value.ci,
-        nombre:       formCuenta.value.nombre,
-        apellido:     formCuenta.value.apellido,
-        especialidad: formCuenta.value.especialidad || undefined,
-        email:        formCuenta.value.email        || undefined,
-        telefono:     formCuenta.value.telefono     || undefined,
+      persona: {
+        ci:       formCuenta.value.ci,
+        nombre:   formCuenta.value.nombre,
+        apellido: formCuenta.value.apellido,
+        email:    formCuenta.value.email    || undefined,
+        telefono: formCuenta.value.telefono || undefined,
+      },
+      datosPorRol: {
+        DOCENTE: { especialidad: formCuenta.value.especialidad || undefined },
       },
     }
     const resultado = await usuarioApi.createConPerfil(payload)
     credenciales.value = resultado.credenciales
-    // Recargar la lista para que aparezca el nuevo docente con su cuenta
     await cargar()
   } catch (e) {
     errorCuenta.value = e instanceof Error ? e.message : 'Error al crear docente'
@@ -231,23 +216,14 @@ async function vincular() {
   vinculando.value    = true
   errorVincular.value = null
   try {
-    // ¿Por qué usamos secretaria/con-cuenta en lugar de /usuarios/con-perfil?
-    // Para docentes sin cuenta usamos POST /docentes/:id/cuenta del backend,
-    // que acepta { username, password } y crea el usuario vinculado al docente.
-    // Equivalente al endpoint asignarCuentaDirector pero para docentes.
-    // En nuestro api layer usamos usuarioApi.createConPerfil con el docenteId del perfil existente.
-    // El backend también acepta vincular por username existente usando /usuarios/:id/vincular.
-    // Acá creamos uno nuevo para el docente que aún no tiene cuenta.
-    await usuarioApi.createConPerfil({
-      rol:      'DOCENTE',
+    // Paso 1: crear la cuenta SOLA (sin persona/perfil — el docente ya existe)
+    const usuario = await usuarioApi.create({
       username: usernameVincular.value,
       password: passwordVincular.value,
-      perfil: {
-        ci:      docenteAVincular.value.ci,
-        nombre:  docenteAVincular.value.nombre,
-        apellido: docenteAVincular.value.apellido,
-      },
+      roles:    ['DOCENTE'],
     })
+    // Paso 2: vincularla al perfil de Docente que ya está registrado
+    await usuarioApi.vincularPerfil(usuario.id, { docenteId: docenteAVincular.value.id })
     modalVincular.value = false
     await cargar()
   } catch (e) {
@@ -283,7 +259,6 @@ async function asignar() {
       gestionId: gestion.gestionId,
     })
     modalAsignacion.value = false
-    // Recargar para mostrar la nueva asignación en la tabla
     await cargar()
   } catch (e) {
     errorAsignacion.value = e instanceof Error ? e.message : 'Error al asignar'
@@ -292,9 +267,7 @@ async function asignar() {
   }
 }
 
-// ─── Helper: tiene cuenta vinculada ──────────────────────────────────────────
-// ¿Por qué? Necesitamos saber si mostrar el botón "Vincular cuenta" o no.
-// Si el docente ya tiene usuario, no tiene sentido mostrar ese botón.
+// ¿Ya tiene cuenta vinculada? — decide si mostrar el botón "Vincular cuenta"
 function tieneCuenta(d: Docente): boolean {
   return !!d.usuario
 }
@@ -357,10 +330,6 @@ function tieneCuenta(d: Docente): boolean {
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
             <td>
-              <!-- ¿Por qué mostrar el username aquí?
-                   El Director necesita saber rápidamente cuáles docentes
-                   ya tienen acceso al sistema y cuáles no, sin abrir
-                   el detalle de cada uno. -->
               <span v-if="tieneCuenta(d)" class="badge badge-sm badge-success">
                 {{ d.usuario?.username }}
               </span>
@@ -376,13 +345,9 @@ function tieneCuenta(d: Docente): boolean {
                 <button class="btn btn-ghost btn-xs" @click="abrirEditar(d)">
                   Editar
                 </button>
-                <!-- Asignar materia: siempre disponible porque las asignaciones
-                     cambian cada gestión — un docente activo siempre puede
-                     recibir nuevas asignaciones -->
                 <button class="btn btn-outline btn-xs btn-info" @click="abrirAsignacion(d)">
                   Asignar
                 </button>
-                <!-- Vincular cuenta: solo si el docente AÚN NO tiene cuenta -->
                 <button
                   v-if="!tieneCuenta(d)"
                   class="btn btn-outline btn-xs btn-warning"
@@ -465,7 +430,6 @@ function tieneCuenta(d: Docente): boolean {
         Crea el perfil y la cuenta de acceso en una sola operación.
       </p>
 
-      <!-- Pantalla de éxito: muestra las credenciales para compartir -->
       <div v-if="credenciales" class="space-y-4">
         <div role="alert" class="alert alert-success">
           <span>Docente creado correctamente</span>
@@ -485,7 +449,6 @@ function tieneCuenta(d: Docente): boolean {
         </div>
       </div>
 
-      <!-- Formulario -->
       <form v-else class="space-y-3" @submit.prevent="crearConCuenta">
         <div v-if="errorCuenta" role="alert" class="alert alert-error py-2 text-sm">
           <span>{{ errorCuenta }}</span>
@@ -610,7 +573,7 @@ function tieneCuenta(d: Docente): boolean {
         <div class="modal-action mt-6">
           <button type="button" class="btn btn-ghost" :disabled="asignando" @click="modalAsignacion = false">Cancelar</button>
           <button type="submit" class="btn btn-info" :disabled="asignando">
-            <span v-if="asignando" class="loading loading-spinner loading-sm"></span>
+            <span v-if="asignando" class="loading loading-spinner loading-xs"></span>
             Asignar
           </button>
         </div>

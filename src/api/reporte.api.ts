@@ -1,15 +1,20 @@
 import api from '@/api/axios'
-import type { DashboardResponse } from '@/types'
+import type { DashboardResponse, ResultadoFinal, EstadoInscripcion, Nivel, Turno } from '@/types'
 
+// ✅ el controller hace `{ ...inscripcion, estudiante: aplanarPersona(...) }`
+// — devuelve la Inscripcion COMPLETA, no un subconjunto. Faltaban
+// id/estadoInscripcion/resultado en la versión anterior de este tipo.
 export interface ReporteAcademicoDetalle {
   id:                 number
   estudianteId:       number
-  nombre:             string
-  apellido:           string
-  ci:                 string
-  curso:              { nivel: string; grado: number; paralelo: string }
+  cursoId:            number
+  gestionId:          number
+  estadoInscripcion:  EstadoInscripcion
+  resultado:          ResultadoFinal
+  estudiante:         { nombre: string; apellido: string; ci: string }
+  curso:              { nivel: Nivel; grado: number; paralelo: string; turno: Turno }
   calificaciones:     Array<{ promedioTrimestral: number | null; docenteMateriaCurso: { materia: { nombre: string } }; trimestre: { numero: number; nombre: string } }>
-  promediosFinales:   Array<{ promedioFinal: number; resultado: string; docenteMateriaCurso: { materia: { nombre: string } } }>
+  promediosFinales:   Array<{ promedioFinal: number; resultado: ResultadoFinal; docenteMateriaCurso: { materia: { nombre: string } } }>
   resumenAsistencias: Array<{ porcentaje: number; docenteMateriaCurso: { materia: { nombre: string } } }>
 }
 

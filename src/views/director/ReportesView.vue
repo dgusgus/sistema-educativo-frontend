@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useGestionStore } from '@/stores/gestion.store'
-import { reporteApi } from '@/api/reporte.api'
+import { reporteApi, type ReporteAcademicoResponse } from '@/api/reporte.api'
+import { nombreCurso } from '@/api/estructura.api'
 import { descargarBlob } from '@/api/boletin.api'
-import api from '@/api/axios'
+import type { Nivel, Turno } from '@/types'
 
 const gestion    = useGestionStore()
 const cursoId    = ref<number | ''>('')
-const reporte    = ref<any | null>(null)
+const reporte    = ref<ReporteAcademicoResponse | null>(null)
 const cargando   = ref(false)
 const descargando = ref(false)
 const error      = ref<string | null>(null)
@@ -36,7 +37,10 @@ async function descargarPdf() {
   descargando.value = true
   error.value = null
   try {
-    const blob = await reporteApi.getReporteAcademicoPdf(gestion.gestionId)
+    const blob = await reporteApi.getReporteAcademicoPdf({
+      gestionId: gestion.gestionId,
+      cursoId:   cursoId.value ? Number(cursoId.value) : undefined,
+    })
     descargarBlob(blob, `reporte_academico_${gestion.anio}.pdf`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al generar PDF'
@@ -49,6 +53,15 @@ function claseNota(nota: number): string {
   if (nota >= 71) return 'text-success font-bold'
   if (nota >= 51) return 'text-warning font-bold'
   return 'text-error font-bold'
+}
+
+// ✅ el curso dentro del detalle no trae "nombre" calculado — se arma acá
+function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string; turno: Turno }): string {
+  return nombreCurso(c)
+}
+
+function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>): number {
+  return promediosFinales.reduce((s, p) => s + p.promedioFinal, 0) / promediosFinales.length
 }
 </script>
 
@@ -129,29 +142,27 @@ function claseNota(nota: number): string {
           <tbody>
             <tr v-for="insc in reporte.detalle" :key="insc.id" class="hover">
               <td class="font-medium">{{ insc.estudiante.apellido }}, {{ insc.estudiante.nombre }}</td>
-              <td class="text-sm text-base-content/60">{{ insc.curso.nombre }}</td>
+              <td class="text-sm text-base-content/60">{{ nombreCursoCorto(insc.curso) }}</td>
               <td>
                 <div class="flex flex-wrap gap-1">
-                  <span v-for="pf in insc.promediosFinales" :key="pf.id"
-                    class="badge badge-xs" :class="pf.aprobado ? 'badge-success' : 'badge-error'"
-                    :title="pf.docenteMateriaCurso?.materia?.nombre">
-                    {{ pf.docenteMateriaCurso?.materia?.nombre?.substring(0,3) }}:{{ pf.promedioFinal?.toFixed(0) }}
+                  <span v-for="(pf, idx) in insc.promediosFinales" :key="idx"
+                    class="badge badge-xs" :class="pf.resultado === 'PROMOVIDO' ? 'badge-success' : 'badge-error'"
+                    :title="pf.docenteMateriaCurso.materia.nombre">
+                    {{ pf.docenteMateriaCurso.materia.nombre.substring(0,3) }}:{{ pf.promedioFinal.toFixed(0) }}
                   </span>
-                  <span v-if="!insc.promediosFinales?.length" class="text-xs text-base-content/40">Sin datos</span>
+                  <span v-if="!insc.promediosFinales.length" class="text-xs text-base-content/40">Sin datos</span>
                 </div>
               </td>
               <td>
-                <span v-if="insc.promediosFinales?.length" :class="claseNota(
-                  insc.promediosFinales.reduce((s: number, p: any) => s + p.promedioFinal, 0) / insc.promediosFinales.length
-                )">
-                  {{ (insc.promediosFinales.reduce((s: number, p: any) => s + p.promedioFinal, 0) / insc.promediosFinales.length).toFixed(1) }}
+                <span v-if="insc.promediosFinales.length" :class="claseNota(promedioFinalGeneral(insc.promediosFinales))">
+                  {{ promedioFinalGeneral(insc.promediosFinales).toFixed(1) }}
                 </span>
                 <span v-else class="text-base-content/40">—</span>
               </td>
               <td>
                 <span class="badge badge-sm"
                   :class="insc.resultado === 'PROMOVIDO' ? 'badge-success' : insc.resultado === 'REPROBADO' ? 'badge-error' : 'badge-ghost'">
-                  {{ insc.resultado ?? 'PENDIENTE' }}
+                  {{ insc.resultado }}
                 </span>
               </td>
             </tr>

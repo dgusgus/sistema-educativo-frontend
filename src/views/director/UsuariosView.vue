@@ -4,25 +4,10 @@ import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { docenteApi } from '@/api/docente.api'
 import { estudianteApi } from '@/api/estudiante.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import type { Rol } from '@/types'
-
-// ─── ¿Por qué esta vista existe? ──────────────────────────────────────────────
-// El Director es el administrador del sistema. Necesita poder:
-//   1. Ver quién tiene acceso al sistema y con qué rol
-//   2. Crear cuentas para cualquier rol (con o sin perfil)
-//   3. Desactivar cuentas sin borrarlas (conserva el historial)
-//   4. Resetear contraseñas cuando alguien se olvida
-//   5. Ver los perfiles aunque no tengan cuenta aún
-// Todo esto en un solo lugar, sin tener que navegar a 5 vistas distintas.
+import type { Rol, Nivel } from '@/types'
 
 const gestion = useGestionStore()
 
-// ─── Tab activo ───────────────────────────────────────────────────────────────
-// ¿Por qué tabs en lugar de 5 vistas separadas?
-// Los datos de cada tab son independientes — Directores no comparte nada
-// con Tutores. Pero el patrón de interacción es idéntico: lista, buscar,
-// crear, asignar cuenta. Un solo componente con tabs evita duplicar 5 veces
-// la misma lógica de modal y formulario.
 type TabRol = 'DIRECTOR' | 'SECRETARIA' | 'DOCENTE' | 'ESTUDIANTE' | 'TUTOR'
 const tabActivo = ref<TabRol>('DIRECTOR')
 
@@ -34,48 +19,41 @@ const tabs: Array<{ rol: TabRol; label: string }> = [
   { rol: 'TUTOR',      label: 'Tutores'     },
 ]
 
-// ─── Datos por tab ────────────────────────────────────────────────────────────
-// ¿Por qué un objeto indexado por rol en lugar de un array plano?
-// Porque al cambiar de tab no queremos recargar — si el Director ya vio
-// Docentes y luego va a Secretarias y vuelve, los docentes siguen ahí
-// sin otra llamada al backend. Cada tab tiene su propio estado cacheado.
+// Cada tab cachea su propio estado — cambiar de tab no recarga si ya se vio.
 interface PerfilItem {
   id: number
   nombre: string
   apellido: string
   ci: string
   activo?: boolean
-  especialidad?: string | null
-  parentesco?: string | null
+  especialidad?:     string | null   // DOCENTE
+  ocupacion?:        string | null   // TUTOR
+  gradoInstruccion?: string | null   // TUTOR
   telefono?: string | null
   email?: string | null
-  // activo es opcional porque Estudiante.usuario no siempre lo incluye
   usuario?: { id: number; username: string; activo?: boolean } | null
-  // Para estudiantes: última inscripción
-  inscripciones?: Array<{ curso?: { nombre: string }; estadoInscripcion: string }>
+  // ⚠️ Curso embebido sin "nombre" calculado — ver estudiante.controller.ts
+  // (select solo trae nivel/grado/paralelo, no turno ni conNombre())
+  inscripciones?: Array<{ curso?: { nivel: Nivel; grado: number; paralelo: string }; estadoInscripcion: string }>
 }
 
 const datos = ref<Record<TabRol, PerfilItem[]>>({
-  DIRECTOR:   [],
-  SECRETARIA: [],
-  DOCENTE:    [],
-  ESTUDIANTE: [],
-  TUTOR:      [],
+  DIRECTOR: [], SECRETARIA: [], DOCENTE: [], ESTUDIANTE: [], TUTOR: [],
 })
 const cargados = ref<Record<TabRol, boolean>>({
-  DIRECTOR: false, SECRETARIA: false,
-  DOCENTE: false, ESTUDIANTE: false, TUTOR: false,
+  DIRECTOR: false, SECRETARIA: false, DOCENTE: false, ESTUDIANTE: false, TUTOR: false,
 })
 const cargando  = ref(false)
 const error     = ref<string | null>(null)
 const busqueda  = ref('')
 
-// ─── Carga por tab ────────────────────────────────────────────────────────────
-// ¿Por qué cargar solo cuando el tab se activa y no todo de una?
-// Porque el Director puede que solo necesite ver Secretarias — no tiene
-// sentido traer 200 estudiantes si no los va a mirar. Carga bajo demanda.
+// ⚠️ Limitación real del backend: GET /estudiantes (lista) NO incluye
+// "usuario" en absoluto (solo GET /estudiantes/:id lo trae) — por eso en
+// el tab Estudiantes el badge de cuenta y "Reset pass" nunca se muestran,
+// aunque el estudiante SÍ tenga cuenta. Si hace falta, habría que agregar
+// `usuario: { select: {...} }` al include de getEstudiantes en el backend.
 async function cargarTab(rol: TabRol) {
-  if (cargados.value[rol]) return   // ya cargado, no repetir
+  if (cargados.value[rol]) return
   cargando.value = true
   error.value    = null
   busqueda.value = ''
@@ -86,10 +64,7 @@ async function cargarTab(rol: TabRol) {
     } else if (rol === 'ESTUDIANTE') {
       items = await estudianteApi.getAll()
     } else {
-      // Directores, Secretarias y Tutores se traen desde /usuarios?rol=X
-      // ¿Por qué? Porque no tienen endpoints propios de listado en el api layer
-      // (salvo /directores y /secretarias que solo el Director puede llamar,
-      //  pero el store de usuarios ya los agrupa). Usamos el endpoint unificado.
+      // Directores, Secretarias y Tutores vía el endpoint unificado
       const lista = await usuarioApi.getAll({ rol })
       items = lista.map(u => ({
         id:       u.perfil?.id      ?? u.id,
@@ -120,7 +95,6 @@ onMounted(async () => {
   await cargarTab('DIRECTOR')
 })
 
-// ─── Filtro local ─────────────────────────────────────────────────────────────
 const listaFiltrada = computed(() => {
   const q     = busqueda.value.toLowerCase().trim()
   const items = datos.value[tabActivo.value]
@@ -131,10 +105,6 @@ const listaFiltrada = computed(() => {
 })
 
 // ─── Modal crear con cuenta ───────────────────────────────────────────────────
-// ¿Por qué un solo modal para todos los roles?
-// El formulario base (nombre, apellido, CI, username, password) es igual
-// para todos. Solo cambian 1-2 campos extra según el rol.
-// Reutilizar el modal evita duplicar 5 modales casi idénticos.
 const modalConCuenta   = ref(false)
 const creandoCuenta    = ref(false)
 const errorCuenta      = ref<string | null>(null)
@@ -143,18 +113,19 @@ const credenciales     = ref<{ username: string; password: string } | null>(null
 const formCuenta = ref({
   ci: '', nombre: '', apellido: '',
   telefono: '', email: '',
-  // Campos específicos por rol
-  especialidad: '',    // DOCENTE
-  parentesco:   '',    // TUTOR
-  gestionId:    '' as number | '',  // DIRECTOR
-  // Cuenta
+  // Campos específicos por rol (✅ ocupacion/gradoInstruccion — parentesco
+  // NO va acá, vive en TutorEstudiante y se define al vincular un estudiante)
+  especialidad:     '',    // DOCENTE
+  ocupacion:        '',    // TUTOR
+  gradoInstruccion: '',    // TUTOR
+  gestionId:        '' as number | '',  // DIRECTOR
   username: '', password: '',
 })
 
 function abrirConCuenta() {
   formCuenta.value  = {
     ci: '', nombre: '', apellido: '', telefono: '', email: '',
-    especialidad: '', parentesco: '',
+    especialidad: '', ocupacion: '', gradoInstruccion: '',
     gestionId: gestion.gestionId ?? '',
     username: '', password: '',
   }
@@ -176,25 +147,26 @@ async function crearConCuenta() {
   creandoCuenta.value = true
   errorCuenta.value   = null
   try {
+    const rolActual: Rol = tabActivo.value
     const payload: ConPerfilPayload = {
-      rol:      tabActivo.value,
+      roles:    [rolActual],
       username: f.username,
       password: f.password,
-      perfil: {
-        ci:      f.ci,
-        nombre:  f.nombre,
+      persona: {
+        ci:       f.ci,
+        nombre:   f.nombre,
         apellido: f.apellido,
         telefono: f.telefono || undefined,
         email:    f.email    || undefined,
-        // Campos opcionales por rol
-        ...(tabActivo.value === 'DOCENTE'    && { especialidad: f.especialidad || undefined }),
-        ...(tabActivo.value === 'TUTOR'      && { parentesco:   f.parentesco   || undefined }),
-        ...(tabActivo.value === 'DIRECTOR'   && { gestionId:    f.gestionId    ? Number(f.gestionId) : undefined }),
+      },
+      datosPorRol: {
+        ...(rolActual === 'DOCENTE' && { DOCENTE: { especialidad: f.especialidad || undefined } }),
+        ...(rolActual === 'TUTOR'   && { TUTOR: { ocupacion: f.ocupacion || undefined, gradoInstruccion: f.gradoInstruccion || undefined } }),
+        ...(rolActual === 'DIRECTOR' && { DIRECTOR: { gestionId: f.gestionId ? Number(f.gestionId) : undefined } }),
       },
     }
     const resultado    = await usuarioApi.createConPerfil(payload)
     credenciales.value = resultado.credenciales
-    // Invalidar cache del tab actual para que recargue con el nuevo registro
     cargados.value[tabActivo.value] = false
     await cargarTab(tabActivo.value)
   } catch (e) {
@@ -205,10 +177,6 @@ async function crearConCuenta() {
 }
 
 // ─── Modal resetear contraseña ────────────────────────────────────────────────
-// ¿Por qué resetear y no "cambiar contraseña"?
-// PUT /auth/password requiere que el usuario sepa su contraseña actual.
-// PUT /usuarios/:id/resetear es para cuando alguien olvida su contraseña
-// y el Director le genera una nueva temporal — sin necesitar la anterior.
 const modalReset      = ref(false)
 const reseteando      = ref(false)
 const errorReset      = ref<string | null>(null)
@@ -241,11 +209,6 @@ async function resetear() {
 }
 
 // ─── Activar / desactivar cuenta ─────────────────────────────────────────────
-// ¿Por qué desactivar en lugar de eliminar?
-// Eliminar una cuenta borra el historial de quién hizo qué en el sistema
-// (quién registró tal asistencia, quién creó tal pago). Desactivar
-// conserva toda la auditoría pero impide el acceso. El backend lo maneja
-// con el campo "activo" en Usuario.
 const toggeandoActivo = ref<number | null>(null)
 
 async function toggleActivo(p: PerfilItem) {
@@ -254,7 +217,6 @@ async function toggleActivo(p: PerfilItem) {
   try {
     const estadoActual = p.usuario.activo ?? true
     await usuarioApi.update(p.usuario.id, { activo: !estadoActual })
-    // Actualizar localmente sin recargar toda la lista
     p.usuario.activo = !estadoActual
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cambiar estado'
@@ -264,29 +226,28 @@ async function toggleActivo(p: PerfilItem) {
 }
 
 // ─── Helpers de display ───────────────────────────────────────────────────────
-// ¿Para qué el label del tab activo?
-// Para mostrar en el encabezado de la tabla qué tipo de persona estamos viendo.
 const labelActivo = computed(() =>
   tabs.find(t => t.rol === tabActivo.value)?.label ?? ''
 )
 
-// ¿Para qué mostrar campo extra según el rol?
-// Docente tiene "especialidad", Tutor tiene "parentesco". En lugar de columnas
-// fijas que queden vacías para roles sin ese campo, mostramos una columna
-// dinámica con el dato relevante del rol activo.
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }): string {
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
+}
+
 function campoExtra(p: PerfilItem): string {
   if (tabActivo.value === 'DOCENTE') return p.especialidad ?? '—'
-  if (tabActivo.value === 'TUTOR')   return p.parentesco   ?? '—'
+  if (tabActivo.value === 'TUTOR')   return p.ocupacion ?? '—'
   if (tabActivo.value === 'ESTUDIANTE') {
     const insc = p.inscripciones?.[0]
-    return insc ? `${insc.curso?.nombre ?? '—'} · ${insc.estadoInscripcion}` : 'Sin inscripción'
+    return insc?.curso ? `${nombreCursoCorto(insc.curso)} · ${insc.estadoInscripcion}` : 'Sin inscripción'
   }
   return p.email ?? p.telefono ?? '—'
 }
 
 function labelCampoExtra(): string {
   if (tabActivo.value === 'DOCENTE')    return 'Especialidad'
-  if (tabActivo.value === 'TUTOR')      return 'Parentesco'
+  if (tabActivo.value === 'TUTOR')      return 'Ocupación'
   if (tabActivo.value === 'ESTUDIANTE') return 'Curso actual'
   return 'Contacto'
 }
@@ -298,8 +259,6 @@ function labelCampoExtra(): string {
     <!-- Encabezado -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <h2 class="text-2xl font-bold flex-1">Usuarios del sistema</h2>
-      <!-- Solo se puede crear desde tabs que tienen perfil propio.
-           Estudiantes los gestiona la Secretaria — el Director solo los ve. -->
       <button
         v-if="tabActivo !== 'ESTUDIANTE'"
         class="btn btn-primary btn-sm"
@@ -354,17 +313,14 @@ function labelCampoExtra(): string {
           </tr>
         </thead>
         <tbody>
-          <!-- Skeleton -->
           <tr v-if="cargando" v-for="i in 5" :key="i">
             <td colspan="6"><div class="skeleton h-4 w-full"></div></td>
           </tr>
-          <!-- Sin resultados -->
           <tr v-else-if="listaFiltrada.length === 0">
             <td colspan="6" class="text-center text-base-content/40 py-8">
               No se encontraron {{ labelActivo.toLowerCase() }}
             </td>
           </tr>
-          <!-- Filas -->
           <tr v-else v-for="p in listaFiltrada" :key="p.id" class="hover">
             <td class="font-medium">{{ p.apellido }}, {{ p.nombre }}</td>
             <td class="font-mono text-sm">{{ p.ci }}</td>
@@ -376,13 +332,6 @@ function labelCampoExtra(): string {
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
             <td>
-              <!-- ¿Por qué toggle en lugar de dropdown?
-                   Desactivar/activar es una acción binaria — un toggle
-                   es más rápido que abrir un menú para elegir entre dos opciones.
-                   Se deshabilita si no tiene cuenta porque sin cuenta no hay
-                   estado de acceso que cambiar. -->
-              <!-- activo ?? true: si no viene el campo asumimos activo
-                   para no mostrar el toggle apagado sin razón -->
               <input
                 v-if="p.usuario"
                 type="checkbox"
@@ -395,7 +344,6 @@ function labelCampoExtra(): string {
             </td>
             <td>
               <div class="flex gap-1">
-                <!-- Resetear contraseña: solo si tiene cuenta -->
                 <button
                   v-if="p.usuario"
                   class="btn btn-ghost btn-xs"
@@ -403,8 +351,6 @@ function labelCampoExtra(): string {
                 >
                   Reset pass
                 </button>
-                <!-- Los estudiantes los crea y edita la Secretaria —
-                     el Director solo puede ver y resetear su contraseña -->
                 <span v-if="tabActivo === 'ESTUDIANTE' && !p.usuario" class="text-xs text-base-content/30">
                   Gestionado por Secretaría
                 </span>
@@ -430,7 +376,6 @@ function labelCampoExtra(): string {
         Se crea el perfil y la cuenta de acceso en una sola operación.
       </p>
 
-      <!-- Pantalla de éxito con credenciales -->
       <div v-if="credenciales" class="space-y-4">
         <div role="alert" class="alert alert-success">
           <span>Creado correctamente</span>
@@ -446,7 +391,6 @@ function labelCampoExtra(): string {
         </div>
       </div>
 
-      <!-- Formulario -->
       <form v-else class="space-y-3" @submit.prevent="crearConCuenta">
         <div v-if="errorCuenta" role="alert" class="alert alert-error py-2 text-sm">
           <span>{{ errorCuenta }}</span>
@@ -487,12 +431,19 @@ function labelCampoExtra(): string {
           <input v-model="formCuenta.especialidad" type="text" placeholder="Ej: Matemáticas" class="input input-bordered w-full" :disabled="creandoCuenta" />
         </fieldset>
 
-        <fieldset v-if="tabActivo === 'TUTOR'" class="fieldset">
-          <legend class="fieldset-legend text-xs">Parentesco</legend>
-          <input v-model="formCuenta.parentesco" type="text" placeholder="Ej: Madre, Padre, Tutor legal" class="input input-bordered w-full" :disabled="creandoCuenta" />
-        </fieldset>
+        <!-- ✅ Tutor: ocupacion/gradoInstruccion (parentesco se define al
+             vincular un estudiante, no acá — ver tutor.controller.ts) -->
+        <div v-if="tabActivo === 'TUTOR'" class="grid grid-cols-2 gap-3">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Ocupación</legend>
+            <input v-model="formCuenta.ocupacion" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Grado de instrucción</legend>
+            <input v-model="formCuenta.gradoInstruccion" type="text" placeholder="Ej: Secundaria completa" class="input input-bordered w-full" :disabled="creandoCuenta" />
+          </fieldset>
+        </div>
 
-        <!-- Para Director: asignar a la gestión activa -->
         <fieldset v-if="tabActivo === 'DIRECTOR'" class="fieldset">
           <legend class="fieldset-legend text-xs">Gestión a cargo</legend>
           <select v-model="formCuenta.gestionId" class="select select-bordered w-full" :disabled="creandoCuenta">
