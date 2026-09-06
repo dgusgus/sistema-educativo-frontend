@@ -105,7 +105,7 @@ const router = createRouter({
         {
           path: 'inscripciones',
           name: 'secretaria-inscripciones',
-          component: () => import('@/views/secretaria/InscripcionesView.vue'),
+          component: () => import('@/views/secretaria/InscripcionesView.vue' ),
         },
         {
           path: 'pagos',
