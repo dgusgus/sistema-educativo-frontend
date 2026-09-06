@@ -1,89 +1,91 @@
 import api from '@/api/axios'
+import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
+
+// Helper de display — espeja curso.helper.ts → nombreCurso() del backend.
+// Úsalo donde el backend te devuelva un curso SIN pasar por conNombre()
+// (ej. los cursos embebidos dentro de Gestion — ver gestion.api.ts).
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', NOCHE: 'Noche' }
+export function nombreCurso(c: { nivel: Nivel; grado: number; paralelo: string; turno: Turno }): string {
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}" (${TURNO_TEXTO[c.turno]})`
+}
 
 // ── Cursos ────────────────────────────────────────────────────────────────────
-// ¿Por qué "nivel" y "paralelo" además de "nombre"?
-// El backend valida unicidad por nivel+paralelo+gestionId — no puede haber
-// dos cursos "Primero Secundaria A" en la misma gestión. El nombre es solo
-// un alias legible ("1ro A") para mostrar en la UI.
-export interface Curso {
-  id:        number
-  nombre:    string
-  nivel:     string
-  paralelo:  string
-  gestionId: number
-  gestion?:  { id: number; anio: number }
-  _count?:   { inscripciones: number; asignaciones: number }
+// ✅ v6: no existe Curso.nombre como campo editable — se identifica por
+// nivel+grado+paralelo+turno (único por gestión). El backend SIEMPRE
+// devuelve "nombre" ya calculado en las respuestas de este módulo
+// (curso.controller.ts sí llama a conNombre()).
+
+export interface CursoPayload {
+  nivel:      Nivel
+  grado:      number
+  paralelo:   string
+  turno?:     Turno       // default MANANA en el backend
+  capacidad?: number
+  gestionId:  number
+}
+
+export interface CursoUpdatePayload {
+  grado?:          number
+  paralelo?:       string
+  turno?:          Turno
+  capacidad?:      number
+  activo?:         boolean
+  tutorDocenteId?: number | null
+  // ⚠️ "nivel" NO se puede editar a propósito (rompería el historial
+  // académico si el curso ya tiene inscripciones) — crea un curso nuevo.
 }
 
 export const cursoApi = {
-  // GET /cursos — sin gestionId devuelve los de la gestión ACTIVA
+  // Sin gestionId devuelve los de la gestión ACTIVA
   getAll: (gestionId?: number) =>
     api.get<Curso[]>('/cursos', { params: gestionId ? { gestionId } : undefined }).then(r => r.data),
 
   getById: (id: number) =>
-    api.get<Curso>(`/cursos/${id}`).then(r => r.data),
+    api.get<Curso & {
+      inscripciones: Array<{ id: number; estudiante: { id: number; nombre: string; apellido: string } }>
+      asignaciones: Array<{ id: number; materia: { id: number; nombre: string }; docente: { id: number; nombre: string; apellido: string } }>
+    }>(`/cursos/${id}`).then(r => r.data),
 
-  create: (data: { nombre: string; nivel: string; paralelo: string; gestionId: number }) =>
+  create: (data: CursoPayload) =>
     api.post<Curso>('/cursos', data).then(r => r.data),
 
-  update: (id: number, data: { nombre?: string; nivel?: string; paralelo?: string }) =>
+  update: (id: number, data: CursoUpdatePayload) =>
     api.put<Curso>(`/cursos/${id}`, data).then(r => r.data),
 
-  // ¿Por qué el backend puede rechazar el delete?
-  // Si el curso tiene estudiantes inscritos, no se puede eliminar.
-  // El backend devuelve un 400 con el conteo de inscritos para que
-  // el frontend pueda mostrar un mensaje claro en vez de un error genérico.
+  // El backend rechaza el delete (400) si el curso tiene inscritos,
+  // devolviendo el conteo en el mensaje de error.
   delete: (id: number) =>
     api.delete(`/cursos/${id}`).then(r => r.data),
 }
 
 // ── Materias ──────────────────────────────────────────────────────────────────
-// ¿Por qué las materias no tienen gestionId?
-// Porque las materias son institucionales — "Matemáticas" existe siempre.
-// Lo que cambia cada gestión es la ASIGNACIÓN de un docente a esa materia
-// en un curso específico (DocenteMateriaCurso). Las materias en sí son fijas.
-export interface Materia {
-  id:             number
-  nombre:         string
-  codigo:         string    // ej: "MAT", "LEN", "FIS" — único en el sistema
-  horasSemanales: number
-  _count?:        { asignaciones: number }
-}
+// Institucionales — no llevan gestionId. Lo que cambia cada gestión es la
+// ASIGNACIÓN docente+materia+curso (DocenteMateriaCurso), no la materia en sí.
 
 export const materiaApi = {
   getAll: () =>
     api.get<Materia[]>('/materias').then(r => r.data),
 
   getById: (id: number) =>
-    api.get<Materia>(`/materias/${id}`).then(r => r.data),
+    api.get<Materia & {
+      asignaciones: Array<{ id: number; docente: { nombre: string; apellido: string }; curso: Curso; gestion: { id: number; anio: number } }>
+    }>(`/materias/${id}`).then(r => r.data),
 
-  create: (data: { nombre: string; codigo: string; horasSemanales?: number }) =>
+  create: (data: { nombre: string; codigo: string; horasSemanales?: number; campoSaberId?: number }) =>
     api.post<Materia>('/materias', data).then(r => r.data),
 
-  update: (id: number, data: { nombre?: string; horasSemanales?: number }) =>
+  update: (id: number, data: { nombre?: string; horasSemanales?: number; campoSaberId?: number; activo?: boolean }) =>
     api.put<Materia>(`/materias/${id}`, data).then(r => r.data),
 
+  // Rechaza el delete (400) si tiene asignaciones activas
   delete: (id: number) =>
     api.delete(`/materias/${id}`).then(r => r.data),
 }
 
 // ── Trimestres ────────────────────────────────────────────────────────────────
-// ¿Por qué numero va del 1 al 3 y no más?
-// El sistema boliviano divide el año en 3 trimestres (art. 32 del Reglamento
-// de Evaluación). El backend valida que número sea 1, 2 o 3.
-// ¿Qué significa "cerrado"?
-// Un trimestre cerrado bloquea la edición de notas y asistencias de ese período.
-// Es irreversible — protege la integridad del historial académico.
-export interface Trimestre {
-  id:          number
-  numero:      number
-  nombre:      string
-  cerrado:     boolean
-  gestionId:   number
-  fechaInicio: string | null
-  fechaFin:    string | null
-  _count?:     { calificaciones: number }
-}
+// numero: 1|2|3 (Reglamento de Evaluación boliviano). "cerrado" es
+// irreversible — bloquea edición de notas/asistencia de ese período.
 
 export const trimestreApi = {
   // Sin gestionId devuelve los de la gestión activa
@@ -93,25 +95,16 @@ export const trimestreApi = {
   getById: (id: number) =>
     api.get<Trimestre>(`/trimestres/${id}`).then(r => r.data),
 
-  create: (data: {
-    numero:      number
-    nombre:      string
-    gestionId:   number
-    fechaInicio?: string
-    fechaFin?:    string
-  }) => api.post<Trimestre>('/trimestres', data).then(r => r.data),
+  create: (data: { numero: 1 | 2 | 3; nombre: string; gestionId: number; fechaInicio?: string; fechaFin?: string }) =>
+    api.post<Trimestre>('/trimestres', data).then(r => r.data),
 
-  update: (id: number, data: {
-    nombre?:      string
-    fechaInicio?: string
-    fechaFin?:    string
-  }) => api.put<Trimestre>(`/trimestres/${id}`, data).then(r => r.data),
+  // No se puede editar un trimestre ya cerrado (400 del backend)
+  update: (id: number, data: { nombre?: string; fechaInicio?: string; fechaFin?: string }) =>
+    api.put<Trimestre>(`/trimestres/${id}`, data).then(r => r.data),
 
-  // POST /trimestres/:id/cerrar — acción irreversible
-  // ¿Por qué POST y no PUT?
-  // Cerrar un trimestre es una ACCIÓN, no una actualización de datos.
-  // Semánticamente POST /cerrar es más claro que PUT /trimestres/:id con { cerrado: true }.
-  // Además el backend hace validaciones extra antes de cerrar (todos con nota, etc.)
+  // Acción irreversible. El backend valida que TODAS las materias tengan
+  // promedio calculado para cada estudiante activo antes de dejarlo cerrar,
+  // y devuelve el detalle de lo que falta si rechaza.
   cerrar: (id: number) =>
-    api.post(`/trimestres/${id}/cerrar`).then(r => r.data),
+    api.post<{ message: string; trimestre: Trimestre }>(`/trimestres/${id}/cerrar`).then(r => r.data),
 }

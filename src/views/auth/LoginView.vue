@@ -20,7 +20,7 @@ const mostrarPassword = ref(false)
 // 1. Valida que los campos no estén vacíos
 // 2. Llama a auth.login() que internamente hace POST /api/auth/login
 // 3. Si hay sesión guardada con ?redirect=, vuelve ahí
-//    Si no, va al dashboard correspondiente al rol
+//    Si no, va al dashboard correspondiente al rol (o al primero, si tiene varios)
 
 async function handleLogin() {
   error.value = null
@@ -41,10 +41,10 @@ async function handleLogin() {
 
     if (redirect) {
       await router.push(redirect)
-    } else if (auth.rol) {
+    } else if (auth.roles.length > 0) {
       // Importamos el helper del router para saber a dónde ir
       const { homeSegunRol } = await import('@/router')
-      await router.push(homeSegunRol(auth.rol))
+      await router.push(homeSegunRol(auth.roles))
     }
   } catch (e) {
     // El interceptor de Axios ya extrajo el mensaje del backend

@@ -1,24 +1,33 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useDocenteStore, type Asignacion } from '@/stores/docente.store'
-import { asistenciaApi } from '@/api/asistencia.api'
-import type { EstadoAsistencia } from '@/types'
+import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores/docente.store'
+import { useGestionStore } from '@/stores/gestion.store'
+import { asistenciaApi, type AsistenciaDiaResponse, type ListaItem } from '@/api/asistencia.api'
+import type { EstadoAsistencia, Nivel } from '@/types'
 
 const docenteStore = useDocenteStore()
+const gestionStore = useGestionStore()
 
 // ── Fecha ─────────────────────────────────────────────────────────────────────
 const hoy  = new Date().toISOString().split('T')[0]
 const fecha = ref(hoy)
 
 // ── Asignación seleccionada ───────────────────────────────────────────────────
-// Si el docente tiene varias materias/cursos, puede cambiar entre ellas
 const asignacion = computed({
   get: () => docenteStore.asignacionActiva,
   set: (a) => { if (a) docenteStore.seleccionar(a) },
 })
 
+// ✅ el curso de la asignación (docente.store) no trae "nombre" calculado
+// (el backend no le corre conNombre() en este endpoint) — lo armamos acá
+// sin turno, que tampoco viene.
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function nombreCursoCorto(c: CursoAsignacion): string {
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
+}
+
 // ── Datos del día ─────────────────────────────────────────────────────────────
-const respuesta   = ref<any | null>(null)
+const respuesta   = ref<AsistenciaDiaResponse | null>(null)
 const cargando    = ref(false)
 const guardando   = ref(false)
 const error       = ref<string | null>(null)
@@ -27,7 +36,6 @@ const estadoLocal = ref<Record<number, EstadoAsistencia>>({})
 
 onMounted(async () => {
   await docenteStore.cargar()
-  // Si ya hay una asignación activa, cargar la lista del día automáticamente
   if (docenteStore.asignacionActiva) {
     await cargar()
   }
@@ -46,7 +54,7 @@ async function cargar() {
       fecha.value,
     )
     estadoLocal.value = {}
-    respuesta.value.lista.forEach((item: any) => {
+    respuesta.value.lista.forEach((item: ListaItem) => {
       estadoLocal.value[item.inscripcionId] = item.estado ?? 'PRESENTE'
     })
   } catch (e) {
@@ -56,7 +64,6 @@ async function cargar() {
   }
 }
 
-// Cuando cambia la asignación o la fecha, recargar
 async function cambiarAsignacion(asig: Asignacion) {
   docenteStore.seleccionar(asig)
   await cargar()
@@ -72,19 +79,31 @@ async function guardar() {
     error.value = 'Ya registrado. Usá los botones de corrección individuales.'
     return
   }
+  // ✅ trimestreId es obligatorio en v6 — lo tomamos del trimestre activo
+  // de la gestión (el que aún no está cerrado).
+  const trimestreId = gestionStore.trimestreActivo?.id
+  if (!trimestreId) {
+    error.value = 'No hay un trimestre activo en esta gestión'
+    return
+  }
+
   guardando.value = true
   error.value = null
   exito.value = false
   try {
-    await asistenciaApi.registrar({
+    const resultado = await asistenciaApi.registrar({
       docenteMateriaCursoId: asignacion.value.docenteMateriaCursoId,
+      trimestreId,
       fecha: fecha.value,
-      registros: respuesta.value.lista.map((item: any) => ({
+      registros: respuesta.value.lista.map((item: ListaItem) => ({
         inscripcionId: item.inscripcionId,
         estado: estadoLocal.value[item.inscripcionId] ?? 'PRESENTE',
       })),
     })
     exito.value = true
+    if (resultado.alertas.length > 0) {
+      error.value = `Atención: ${resultado.alertas.length} estudiante(s) por debajo del 80% de asistencia`
+    }
     await cargar()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al guardar'
@@ -94,14 +113,16 @@ async function guardar() {
 }
 
 const corrigiendoId = ref<number | null>(null)
-async function corregir(item: any, nuevoEstado: EstadoAsistencia) {
+async function corregir(item: ListaItem, nuevoEstado: EstadoAsistencia) {
   if (!item.asistenciaId) return
   corrigiendoId.value = item.asistenciaId
   try {
     await asistenciaApi.actualizar(item.asistenciaId, nuevoEstado)
     estadoLocal.value[item.inscripcionId] = nuevoEstado
-    const idx = respuesta.value.lista.findIndex((i: any) => i.inscripcionId === item.inscripcionId)
-    if (idx !== -1) respuesta.value.lista[idx].estado = nuevoEstado
+    if (respuesta.value) {
+      const idx = respuesta.value.lista.findIndex(i => i.inscripcionId === item.inscripcionId)
+      if (idx !== -1) respuesta.value.lista[idx].estado = nuevoEstado
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al corregir'
   } finally {
@@ -109,10 +130,28 @@ async function corregir(item: any, nuevoEstado: EstadoAsistencia) {
   }
 }
 
+// ✅ faltaba RETRASO — v6 tiene 4 estados, no 3
+const ESTADOS: EstadoAsistencia[] = ['PRESENTE', 'RETRASO', 'AUSENTE', 'JUSTIFICADO']
+
 const badgeClase: Record<EstadoAsistencia, string> = {
   PRESENTE:    'badge-success',
+  RETRASO:     'badge-info',
   AUSENTE:     'badge-error',
   JUSTIFICADO: 'badge-warning',
+}
+
+const btnClase: Record<EstadoAsistencia, string> = {
+  PRESENTE:    'btn-success',
+  RETRASO:     'btn-info',
+  AUSENTE:     'btn-error',
+  JUSTIFICADO: 'btn-warning',
+}
+
+const radioClase: Record<EstadoAsistencia, string> = {
+  PRESENTE:    'radio-success',
+  RETRASO:     'radio-info',
+  AUSENTE:     'radio-error',
+  JUSTIFICADO: 'radio-warning',
 }
 
 const stats = computed(() => {
@@ -120,6 +159,7 @@ const stats = computed(() => {
   if (!vals.length) return null
   return {
     presente:    vals.filter(e => e === 'PRESENTE').length,
+    retraso:     vals.filter(e => e === 'RETRASO').length,
     ausente:     vals.filter(e => e === 'AUSENTE').length,
     justificado: vals.filter(e => e === 'JUSTIFICADO').length,
   }
@@ -156,7 +196,7 @@ const stats = computed(() => {
                 ? 'btn-primary' : 'btn-ghost'"
               @click="cambiarAsignacion(asig)"
             >
-              {{ asig.materia.nombre }} — {{ asig.curso.nombre }}
+              {{ asig.materia.nombre }} — {{ nombreCursoCorto(asig.curso) }}
             </button>
           </div>
         </div>
@@ -166,7 +206,7 @@ const stats = computed(() => {
       <div v-if="asignacion" class="card bg-base-100 shadow">
         <div class="card-body py-3 flex flex-wrap gap-4 items-center">
           <div><p class="text-xs text-base-content/50">Materia</p><p class="font-semibold">{{ asignacion.materia.nombre }}</p></div>
-          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ asignacion.curso.nombre }}</p></div>
+          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ nombreCursoCorto(asignacion.curso) }}</p></div>
           <div><p class="text-xs text-base-content/50">Estudiantes</p><p class="font-semibold">{{ asignacion.totalEstudiantes }}</p></div>
           <!-- Selector de fecha -->
           <div class="ml-auto flex items-center gap-2">
@@ -198,9 +238,7 @@ const stats = computed(() => {
               <tr>
                 <th>#</th>
                 <th>Estudiante</th>
-                <th class="text-center">P</th>
-                <th class="text-center">A</th>
-                <th class="text-center">J</th>
+                <th class="text-center" colspan="4">Marcar</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -211,16 +249,13 @@ const stats = computed(() => {
 
                 <!-- Ya registrado → botones de corrección -->
                 <template v-if="respuesta.yaRegistrado">
-                  <td colspan="3" class="text-center">
+                  <td colspan="4" class="text-center">
                     <div class="join">
                       <button
-                        v-for="estado in (['PRESENTE','AUSENTE','JUSTIFICADO'] as EstadoAsistencia[])"
+                        v-for="estado in ESTADOS"
                         :key="estado"
                         class="join-item btn btn-xs"
-                        :class="estadoLocal[item.inscripcionId] === estado
-                          ? estado === 'PRESENTE' ? 'btn-success'
-                          : estado === 'AUSENTE' ? 'btn-error' : 'btn-warning'
-                          : 'btn-ghost'"
+                        :class="estadoLocal[item.inscripcionId] === estado ? btnClase[estado] : 'btn-ghost'"
                         :disabled="corrigiendoId === item.asistenciaId"
                         @click="corregir(item, estado)"
                       >
@@ -232,23 +267,11 @@ const stats = computed(() => {
 
                 <!-- Primer registro → radios -->
                 <template v-else>
-                  <td class="text-center">
-                    <input type="radio" class="radio radio-success radio-sm"
+                  <td v-for="estado in ESTADOS" :key="estado" class="text-center">
+                    <input type="radio" class="radio radio-sm" :class="radioClase[estado]"
                       :name="`e-${item.inscripcionId}`"
-                      :checked="estadoLocal[item.inscripcionId] === 'PRESENTE'"
-                      @change="estadoLocal[item.inscripcionId] = 'PRESENTE'" />
-                  </td>
-                  <td class="text-center">
-                    <input type="radio" class="radio radio-error radio-sm"
-                      :name="`e-${item.inscripcionId}`"
-                      :checked="estadoLocal[item.inscripcionId] === 'AUSENTE'"
-                      @change="estadoLocal[item.inscripcionId] = 'AUSENTE'" />
-                  </td>
-                  <td class="text-center">
-                    <input type="radio" class="radio radio-warning radio-sm"
-                      :name="`e-${item.inscripcionId}`"
-                      :checked="estadoLocal[item.inscripcionId] === 'JUSTIFICADO'"
-                      @change="estadoLocal[item.inscripcionId] = 'JUSTIFICADO'" />
+                      :checked="estadoLocal[item.inscripcionId] === estado"
+                      @change="estadoLocal[item.inscripcionId] = estado" />
                   </td>
                 </template>
 
@@ -266,6 +289,7 @@ const stats = computed(() => {
         <div class="flex flex-wrap items-center gap-3">
           <template v-if="stats">
             <span class="badge badge-success badge-outline">Presentes: {{ stats.presente }}</span>
+            <span class="badge badge-info badge-outline">Retrasos: {{ stats.retraso }}</span>
             <span class="badge badge-error badge-outline">Ausentes: {{ stats.ausente }}</span>
             <span class="badge badge-warning badge-outline">Justificados: {{ stats.justificado }}</span>
           </template>

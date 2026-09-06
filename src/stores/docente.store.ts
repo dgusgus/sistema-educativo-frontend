@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/api/axios'
+import type { Horario, Nivel } from '@/types'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 // Reflejan EXACTAMENTE lo que devuelve GET /docentes/mis-cursos
@@ -14,52 +15,49 @@ export interface EstudianteAsignado {
   ci:            string
 }
 
+// ✅ el curso acá viene SIN "nombre" calculado (el controller arma el
+// objeto a mano: { id, nivel, grado, paralelo } — sin turno ni conNombre()).
+export interface CursoAsignacion {
+  id:       number
+  nivel:    Nivel
+  grado:    number
+  paralelo: string
+}
+
 export interface Asignacion {
   docenteMateriaCursoId: number
   materia:  { id: number; nombre: string }
-  curso:    { id: number; nombre: string }
+  curso:    CursoAsignacion
   gestion:  { id: number; anio: number }
-  // ¿Por qué horarios es array? Un docente puede tener múltiples
-  // horarios para la misma materia/curso (lunes y miércoles, por ej.)
-  horarios: Array<{
-    id:        number
-    diaSemana: string
-    horaInicio: string
-    horaFin:   string
-    aula:      string | null
-  }>
+  horarios: Horario[]
   totalEstudiantes: number
   estudiantes: EstudianteAsignado[]
-  // ✅ _stats eliminado — el backend NO lo devuelve
 }
 
 export interface MisCursosResponse {
+  // ⚠️ el backend NO devuelve "especialidad" acá (el select de Persona
+  // solo trae nombre/apellido) — si la necesitas, usa authStore.usuario
+  // o un GET /docentes/:id aparte.
   docente: {
-    id:           number
-    nombre:       string
-    apellido:     string
-    especialidad: string | null
+    id:       number
+    nombre:   string
+    apellido: string
   }
   totalAsignaciones: number
   asignaciones: Asignacion[]
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
-//
-// ¿Por qué un store separado para el docente?
-// Las vistas AsistenciaView y CalificacionesView necesitan las mismas
-// asignaciones. Sin el store, cada vista haría su propio GET /docentes/mis-cursos
-// al montar — dos llamadas idénticas al backend por cada cambio de pestaña.
-// El store las centraliza: se carga una vez y queda disponible para ambas vistas.
+// Centraliza "mis cursos" para que AsistenciaView y CalificacionesView no
+// dupliquen la misma llamada al backend.
 
 export const useDocenteStore = defineStore('docente', () => {
   const datos    = ref<MisCursosResponse | null>(null)
   const cargando = ref(false)
   const error    = ref<string | null>(null)
 
-  // Asignación seleccionada actualmente (compartida entre Asistencia y Calificaciones)
-  // ¿Por qué la guardamos en el store? Para que si el docente cambia de materia
-  // en AsistenciaView y luego va a CalificacionesView, ya esté pre-seleccionada.
+  // Compartida entre Asistencia y Calificaciones — si el docente ya eligió
+  // materia en una vista, la otra la encuentra pre-seleccionada.
   const asignacionActiva = ref<Asignacion | null>(null)
 
   const asignaciones      = computed(() => datos.value?.asignaciones ?? [])
@@ -67,14 +65,12 @@ export const useDocenteStore = defineStore('docente', () => {
   const tieneAsignaciones = computed(() => asignaciones.value.length > 0)
 
   async function cargar() {
-    if (datos.value) return   // ya cargado — evitar llamadas duplicadas
+    if (datos.value) return   // ya cargado — evita llamadas duplicadas
     cargando.value = true
     error.value = null
     try {
       const { data } = await api.get<MisCursosResponse>('/docentes/mis-cursos')
       datos.value = data
-      // Si solo tiene una asignación, seleccionarla automáticamente
-      // para que no tenga que elegirla manualmente cada vez que entra
       if (data.asignaciones.length === 1) {
         asignacionActiva.value = data.asignaciones[0]
       }
@@ -89,7 +85,7 @@ export const useDocenteStore = defineStore('docente', () => {
     asignacionActiva.value = asig
   }
 
-  // limpiar() se llama al hacer logout para no dejar datos del docente anterior
+  // Se llama al hacer logout para no dejar datos del docente anterior
   function limpiar() {
     datos.value = null
     asignacionActiva.value = null

@@ -1,19 +1,27 @@
 import api from '@/api/axios'
+import type { Nivel, Turno } from '@/types'
 
-// ¿Por qué una interface separada para GestionActiva?
-// Porque GET /gestiones/activa devuelve MÁS datos que GET /gestiones/:id —
-// incluye director, cursos y trimestres embebidos para que el frontend
-// no tenga que hacer 3 llamadas extra al cargar el dashboard.
-// Tiparlo exactamente evita que el frontend asuma campos que no existen.
+// ⚠️ OJO: a diferencia de GET /cursos (que sí pasa por conNombre()), los
+// cursos embebidos dentro de Gestion NO traen "nombre" calculado — el
+// controller los incluye crudos. Si necesitas mostrar el nombre acá,
+// usa el helper nombreCurso() de estructura.api.ts.
+export interface CursoEmbebido {
+  id:        number
+  nivel:     Nivel
+  grado:     number
+  paralelo:  string
+  turno:     Turno
+  activo:    boolean
+  gestionId: number
+}
+
 export interface GestionActiva {
-  id:          number
-  anio:        number
-  activa:      boolean
-  descripcion: string | null
-  directorId:  number | null
-  // ¿Para qué director embebido?
-  // El DashboardLayout y el DashboardView muestran el nombre del director
-  // en el encabezado. Sin esto habría que hacer un GET /directores/activo aparte.
+  id:                    number
+  anio:                  number
+  activa:                boolean
+  descripcion:           string | null
+  directorId:            number | null
+  notaMinimaAprobacion:  number
   director: {
     id:       number
     nombre:   string
@@ -21,17 +29,14 @@ export interface GestionActiva {
     telefono: string | null
     email:    string | null
   } | null
-  cursos: Array<{
-    id:       number
-    nombre:   string
-    nivel:    string
-    paralelo: string
-  }>
+  cursos:      CursoEmbebido[]
   trimestres: Array<{
-    id:      number
-    numero:  number
-    nombre:  string
-    cerrado: boolean
+    id:          number
+    numero:      number
+    nombre:      string
+    cerrado:     boolean
+    fechaInicio: string | null
+    fechaFin:    string | null
   }>
   _count: { inscripciones: number }
 }
@@ -41,46 +46,62 @@ export interface GestionResumen {
   anio:        number
   activa:      boolean
   descripcion: string | null
-  director: { id: number; nombre: string; apellido: string } | null
-  _count: { cursos: number; inscripciones: number; trimestres: number }
+  director:    { id: number; nombre: string; apellido: string } | null
+  _count:      { cursos: number; inscripciones: number; trimestres: number }
+}
+
+export interface GestionPayload {
+  anio:                   number
+  descripcion?:           string
+  fechaInicio?:           string
+  fechaFin?:              string
+  directorId?:            number
+  notaMinimaAprobacion?:  number
 }
 
 export const gestionApi = {
-  // GET /gestiones/activa — cargado UNA vez al login y compartido vía gestion.store
+  // Cargado una vez al login y compartido vía gestion.store
   getActiva: () =>
     api.get<GestionActiva>('/gestiones/activa').then(r => r.data),
 
-  // GET /gestiones — solo el Director necesita la lista histórica
   getAll: () =>
     api.get<GestionResumen[]>('/gestiones').then(r => r.data),
 
-  // GET /gestiones/:id — detalle completo con trimestres, conceptos de pago, etc.
+  // Detalle completo — incluye conceptosPago (no viene en getActiva)
   getById: (id: number) =>
-    api.get<GestionActiva>(`/gestiones/${id}`).then(r => r.data),
+    api.get<GestionActiva & { conceptosPago: unknown[] }>(`/gestiones/${id}`).then(r => r.data),
 
-  create: (data: { anio: number; descripcion?: string; fechaInicio?: string; fechaFin?: string }) =>
+  create: (data: GestionPayload) =>
     api.post<GestionResumen>('/gestiones', data).then(r => r.data),
 
-  update: (id: number, data: { descripcion?: string; fechaInicio?: string; fechaFin?: string }) =>
+  update: (id: number, data: Omit<GestionPayload, 'anio' | 'directorId'>) =>
     api.put<GestionResumen>(`/gestiones/${id}`, data).then(r => r.data),
 
-  // ¿Por qué endpoint separado para asignar director?
-  // Porque es una acción institucional importante — asignar o cambiar
-  // quién dirige el año académico merece su propio endpoint con su propia
-  // validación (que el director esté activo, que no haya otro, etc.)
   asignarDirector: (id: number, directorId: number) =>
     api.put(`/gestiones/${id}/director`, { directorId }).then(r => r.data),
 
   activar: (id: number) =>
     api.put(`/gestiones/${id}/activar`).then(r => r.data),
 
+  // Requiere todos los trimestres cerrados y todos los estudiantes con
+  // resultado registrado — el backend devuelve el detalle si falla algo.
   cerrar: (id: number) =>
     api.post(`/gestiones/${id}/cerrar`).then(r => r.data),
 
-  // ¿Para qué propuestaInscripciones?
-  // Al cerrar el año, la secretaria necesita saber a qué curso
-  // inscribir a cada estudiante el año siguiente (promovidos suben,
-  // reprobados repiten). El backend calcula la sugerencia automáticamente.
+  // Sugerencia de promoción/repitencia para la siguiente gestión
   getPropuestaInscripciones: (id: number) =>
-    api.get(`/gestiones/${id}/propuesta-inscripciones`).then(r => r.data),
+    api.get<{
+      gestion:  { id: number; anio: number }
+      resumen:  { promover: number; repetir: number; egresados: number; noContinua: number; revisarManualmente: number }
+      propuesta: Array<{
+        estudianteId: number
+        estudiante:   string
+        ci:           string | null
+        cursoActual:  string
+        estado:       string
+        resultado:    string
+        accion:       string
+        cursoSugerido: string | null
+      }>
+    }>(`/gestiones/${id}/propuesta-inscripciones`).then(r => r.data),
 }

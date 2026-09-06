@@ -1,14 +1,12 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/api/axios'
-import type { UsuarioAuth, Rol } from '@/types/index.ts'
+import type { UsuarioAuth, Rol } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   // ── Estado ──────────────────────────────────────────────────────────────────
-  // ¿Por qué inicializar desde localStorage?
-  // Sin esto, cada recarga de página cerraría la sesión automáticamente
-  // porque ref() empieza en null. Al leer de localStorage, el usuario
-  // sigue "logueado" aunque haya recargado el navegador.
+  // Inicializar desde localStorage — sin esto, cada recarga cerraría la
+  // sesión porque ref() empieza en null.
   const token = ref<string | null>(localStorage.getItem('token'))
 
   const usuario = ref<UsuarioAuth | null>(
@@ -18,7 +16,6 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         return JSON.parse(guardado) as UsuarioAuth
       } catch {
-        // JSON corrupto (ej: localStorage editado manualmente) → empezamos limpio
         return null
       }
     })()
@@ -26,20 +23,22 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   const estaAutenticado = computed(() => !!token.value && !!usuario.value)
-  const rol             = computed(() => usuario.value?.rol ?? null)
 
-  // ¿Por qué helpers individuales (esDirector, esDocente, etc.) además de tieneRol()?
-  // En el template de DashboardLayout se usan en v-if directamente:
-  // v-if="auth.esDirector" es más legible que v-if="auth.tieneRol(['DIRECTOR'])".
-  // tieneRol() sirve para guards del router donde necesitamos comparar un array.
-  const esDirector   = computed(() => rol.value === 'DIRECTOR')
-  const esSecretaria = computed(() => rol.value === 'SECRETARIA')
-  const esDocente    = computed(() => rol.value === 'DOCENTE')
-  const esEstudiante = computed(() => rol.value === 'ESTUDIANTE')
-  const esTutor      = computed(() => rol.value === 'TUTOR')
+  // ✅ v6: un usuario puede tener VARIOS roles a la vez (ej. Director que
+  // también es Docente). Ya no existe un "rol" singular — todo lo que antes
+  // comparaba contra un solo valor ahora es un arreglo.
+  const roles = computed<Rol[]>(() => usuario.value?.roles ?? [])
 
-  function tieneRol(roles: Rol[]): boolean {
-    return rol.value !== null && roles.includes(rol.value)
+  const esDirector   = computed(() => roles.value.includes('DIRECTOR'))
+  const esSecretaria = computed(() => roles.value.includes('SECRETARIA'))
+  const esDocente    = computed(() => roles.value.includes('DOCENTE'))
+  const esEstudiante = computed(() => roles.value.includes('ESTUDIANTE'))
+  const esTutor      = computed(() => roles.value.includes('TUTOR'))
+
+  // true si tiene AL MENOS UNO de los roles pedidos (mismo criterio que
+  // requireRol() en el backend — ver rbac.middleware.ts)
+  function tieneRol(rolesPermitidos: Rol[]): boolean {
+    return roles.value.some(r => rolesPermitidos.includes(r))
   }
 
   // ── Acciones ─────────────────────────────────────────────────────────────────
@@ -51,11 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
     token.value   = data.token
     usuario.value = data.usuario
 
-    // ¿Por qué guardar en localStorage además del ref?
-    // El ref vive en memoria — se pierde al recargar la página.
-    // El localStorage persiste entre recargas pero no es reactivo.
-    // Necesitamos ambos: el ref para que Vue reaccione a los cambios,
-    // y el localStorage para sobrevivir recargas.
     localStorage.setItem('token', data.token)
     localStorage.setItem('usuario', JSON.stringify(data.usuario))
   }
@@ -66,29 +60,23 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('token')
     localStorage.removeItem('usuario')
 
-    // ¿Por qué window.location.href en lugar de router.push('/login')?
-    // Si importáramos el router acá crearíamos una dependencia circular:
-    // router importa auth.store → auth.store importa router → loop infinito.
-    // window.location.href lo evita completamente y además limpia el estado
-    // reactivo de Vue al hacer una recarga completa de la página.
+    // window.location.href evita el ciclo router → store → api → router
     window.location.href = '/login'
   }
 
-  // ¿Para qué refreshMe?
-  // Si el Director cambia sus propios datos de perfil (nombre, etc.),
-  // el JWT sigue teniendo el nombre viejo hasta que expire.
-  // refreshMe actualiza el usuario en memoria y localStorage sin
-  // necesitar hacer logout/login.
+  // Si el usuario cambia sus propios datos, el JWT sigue con el nombre
+  // viejo hasta que expire — refreshMe() actualiza sin logout/login.
   async function refreshMe(): Promise<void> {
     if (!token.value) return
-    const { data } = await api.get<UsuarioAuth>('/auth/me')
-    usuario.value = data
-    localStorage.setItem('usuario', JSON.stringify(data))
+    const { data } = await api.get<{ id: number; username: string; roles: Rol[]; perfil: { nombre: string; apellido: string } | null }>('/auth/me')
+    const nombre = data.perfil ? `${data.perfil.nombre} ${data.perfil.apellido}` : data.username
+    usuario.value = { id: data.id, username: data.username, roles: data.roles, nombre }
+    localStorage.setItem('usuario', JSON.stringify(usuario.value))
   }
 
   return {
     token, usuario,
-    estaAutenticado, rol,
+    estaAutenticado, roles,
     esDirector, esSecretaria, esDocente, esEstudiante, esTutor,
     tieneRol, login, logout, refreshMe,
   }

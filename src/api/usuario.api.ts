@@ -1,93 +1,101 @@
 import api from '@/api/axios'
-import type { Rol } from '@/types'
+import type { Rol, PersonaFlat, PerfilesUsuario } from '@/types'
 
+// Refleja GET /usuarios y GET /usuarios/:id (usuario.controller.ts)
 export interface Usuario {
-  id:       number
-  username: string
-  rol:      Rol
-  activo:   boolean
-  creadoEn: string
-  // ¿Por qué perfil nullable?
-  // Un usuario puede existir sin perfil vinculado (caso raro pero posible
-  // si se crea manualmente). El frontend debe manejar perfil === null.
-  perfil: { id: number; nombre: string; apellido: string; ci: string } | null
+  id:            number
+  username:      string
+  roles:         Rol[]              // ✅ antes "rol" (uno solo)
+  activo:        boolean
+  creadoEn:      string
+  actualizadoEn: string
+  perfil:        PersonaFlat | null   // el primero que exista, por compat
+  perfiles:      PerfilesUsuario      // todos los que tenga vinculados
 }
 
+// POST /usuarios — crea SOLO la cuenta, sin Persona (para vincular después)
 export interface UsuarioPayload {
   username: string
   password: string
-  rol:      Rol
+  roles:    Rol[]
 }
 
-// ¿Por qué ConPerfilPayload separado?
-// POST /usuarios/con-perfil crea usuario + perfil en una sola transacción.
-// El campo "perfil" varía según el rol: un Director puede incluir gestionId,
-// un Docente puede incluir especialidad, un Estudiante incluye fechaNacimiento.
-// Tiparlo con un objeto genérico permite enviar lo que corresponda sin forzar
-// todos los campos opcionales en un único type rígido.
-export interface ConPerfilPayload {
-  rol:      Rol
-  username: string
-  password: string
-  perfil: {
-    ci:              string
-    nombre:          string
-    apellido:        string
-    telefono?:       string
-    email?:          string
-    // Solo DOCENTE
-    especialidad?:   string
-    // Solo DIRECTOR
-    gestionId?:      number
-    // Solo ESTUDIANTE
-    fechaNacimiento?: string
-    direccion?:       string
-    // Solo TUTOR
-    parentesco?:      string
+export interface PersonaInput {
+  ci:               string
+  nombre:           string
+  apellido:         string
+  sexo?:            'MASCULINO' | 'FEMENINO'
+  fechaNacimiento?: string
+  direccion?:       string
+  telefono?:        string
+  email?:           string
+  nacionalidad?:    string
+  fotoUrl?:         string
+}
+
+// Datos específicos por rol al crear perfiles (persona.helper.ts → DatosPorRol)
+export interface DatosPorRol {
+  DIRECTOR?:   { gestionId?: number }
+  DOCENTE?:    { especialidad?: string }
+  ESTUDIANTE?: {
+    rude?:             string
+    lugarNacimiento?:  string
+    idiomaMaterno?:    string
+    idiomaHablado?:    string
+    discapacidad?:     boolean
+    tipoDiscapacidad?: string
   }
+  TUTOR?: { ocupacion?: string; gradoInstruccion?: string }
+}
+
+// POST /usuarios/con-perfil — crea cuenta + Persona + un perfil por cada rol,
+// todos apuntando a la MISMA persona (ej. Director que también es Docente)
+export interface ConPerfilPayload {
+  roles:       Rol[]
+  username:    string
+  password:    string
+  persona:     PersonaInput
+  datosPorRol?: DatosPorRol
 }
 
 export const usuarioApi = {
   // GET /usuarios — solo Director
-  getAll: (params?: { rol?: Rol; activo?: boolean }) =>
+  getAll: (params?: { rol?: Rol; activo?: boolean; search?: string }) =>
     api.get<Usuario[]>('/usuarios', { params }).then(r => r.data),
 
   getById: (id: number) =>
     api.get<Usuario>(`/usuarios/${id}`).then(r => r.data),
 
-  // POST /usuarios — crea solo la cuenta sin perfil
+  // Director → cualquier combinación de roles
+  // Secretaria → solo ESTUDIANTE y/o TUTOR (validado en el backend)
   create: (payload: UsuarioPayload) =>
     api.post<Usuario>('/usuarios', payload).then(r => r.data),
 
-  // POST /usuarios/con-perfil — crea cuenta + perfil en una transacción
-  // ¿Por qué preferir este sobre POST /usuarios?
-  // Porque el flujo normal del Director es crear a alguien con todo listo:
-  // cuenta de acceso + datos personales al mismo tiempo. Usar dos endpoints
-  // separados obligaría a manejar el rollback manual si el segundo falla.
   createConPerfil: (payload: ConPerfilPayload) =>
-    api.post<{ usuario: Usuario; credenciales: { username: string; password: string } }>(
-      '/usuarios/con-perfil', payload
-    ).then(r => r.data),
+    api.post<{
+      usuario: { id: number; username: string; roles: Rol[] }
+      persona: PersonaFlat
+      perfiles: Record<string, unknown>
+      credenciales: { username: string; password: string; nota: string }
+    }>('/usuarios/con-perfil', payload).then(r => r.data),
 
-  update: (id: number, data: { rol?: Rol; activo?: boolean }) =>
+  // Editar SOLO roles/activo de la cuenta — no toca el perfil (Persona)
+  update: (id: number, data: { roles?: Rol[]; activo?: boolean }) =>
     api.put<Usuario>(`/usuarios/${id}`, data).then(r => r.data),
 
   delete: (id: number) =>
     api.delete(`/usuarios/${id}`).then(r => r.data),
 
-  // ¿Por qué resetearPassword en lugar de PUT /auth/password?
-  // PUT /auth/password requiere que el usuario sepa su contraseña actual —
-  // es para cuando el propio usuario quiere cambiarla.
-  // PUT /usuarios/:id/resetear es para cuando el Director/Secretaria
-  // necesita darle acceso a alguien que olvidó su contraseña, sin conocerla.
+  // Resetear sin conocer la contraseña actual (Director/Secretaria)
   resetearPassword: (id: number, nuevaPassword: string) =>
     api.put(`/usuarios/${id}/resetear`, { nuevaPassword }).then(r => r.data),
 
+  // Vincula una cuenta existente a un perfil (Docente/Estudiante/Tutor)
+  // que ya existe sin cuenta. ⚠️ NO acepta directorId/secretariaId — esos
+  // dos roles siempre nacen ya vinculados (ver director/secretaria.controller).
   vincularPerfil: (id: number, data: {
     docenteId?:    number
     estudianteId?: number
     tutorId?:      number
-    directorId?:   number
-    secretariaId?: number
   }) => api.put(`/usuarios/${id}/vincular`, data).then(r => r.data),
 }
