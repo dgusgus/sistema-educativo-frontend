@@ -37,6 +37,13 @@ export const evaluacionApi = {
   createDimension: (data: DimensionPayload) =>
     api.post<DimensionEvaluacion>('/dimensiones', data).then(r => r.data),
 
+  updateDimension: (id: number, data: Partial<Omit<DimensionPayload, 'gestionId'>>) =>
+    api.put<DimensionEvaluacion>(`/dimensiones/${id}`, data).then(r => r.data),
+
+  // Rechaza (400) si la dimensión ya tiene actividades evaluativas registradas
+  deleteDimension: (id: number) =>
+    api.delete(`/dimensiones/${id}`).then(r => r.data),
+
   // Actividades evaluativas (lo que el docente califica dentro de una dimensión)
   getActividadesEvaluativas: (docenteMateriaCursoId: number, trimestreId: number) =>
     api.get<ActividadEvaluativa[]>('/actividades-evaluativas', {

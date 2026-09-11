@@ -50,29 +50,32 @@ const router = createRouter({
       component: () => import('@/layouts/DashboardLayout.vue'),
       meta: { requiresAuth: true, roles: ['DIRECTOR'] },
       children: [
-        { path: 'dashboard',  name: 'director-dashboard',  component: () => import('@/views/director/DashboardView.vue') },
-        { path: 'docentes',   name: 'director-docentes',   component: () => import('@/views/director/DocentesView.vue') },
-        { path: 'reportes',   name: 'director-reportes',   component: () => import('@/views/director/ReportesView.vue') },
-        { path: 'usuarios',   name: 'director-usuarios',   component: () => import('@/views/director/UsuariosView.vue') },
-        { path: 'estructura', name: 'director-estructura', component: () => import('@/views/director/EstructuraView.vue') },
-        { path: 'gestiones',  name: 'director-gestiones',  component: () => import('@/views/director/GestionesView.vue') },
-        { path: 'institucion', name: 'director-institucion', component: () => import('@/views/director/InstitucionView.vue') },
+        { path: 'dashboard',    name: 'director-dashboard',    component: () => import('@/views/director/DashboardView.vue') },
+        { path: 'docentes',     name: 'director-docentes',     component: () => import('@/views/director/DocentesView.vue') },
+        { path: 'directores',   name: 'director-directores',   component: () => import('@/views/director/Directoresview.vue') },
+        { path: 'secretarias',  name: 'director-secretarias',  component: () => import('@/views/director/Secretariasview.vue') },
+        { path: 'reportes',     name: 'director-reportes',     component: () => import('@/views/director/ReportesView.vue') },
+        { path: 'estructura',   name: 'director-estructura',   component: () => import('@/views/director/EstructuraView.vue') },
+        { path: 'dimensiones',  name: 'director-dimensiones',  component: () => import('@/views/director/Dimensionesview.vue') },
+        { path: 'gestiones',    name: 'director-gestiones',    component: () => import('@/views/director/GestionesView.vue') },
+        { path: 'institucion',  name: 'director-institucion',  component: () => import('@/views/director/InstitucionView.vue') },
       ],
     },
 
     // ── SECRETARIA (también accesible para DIRECTOR — backend ya lo permite
-    // en estudiante/inscripcion/pago/boletin.routes.ts) ──────────────────────
+    // en estudiante/inscripcion/pago/boletin/tutor.routes.ts) ────────────────
     {
       path: '/secretaria',
       component: () => import('@/layouts/DashboardLayout.vue'),
       meta: { requiresAuth: true, roles: ['SECRETARIA', 'DIRECTOR'] },
       children: [
-        { path: 'estudiantes',    name: 'secretaria-estudiantes',    component: () => import('@/views/secretaria/EstudiantesView.vue') },
-        { path: 'inscripciones',  name: 'secretaria-inscripciones',  component: () => import('@/views/secretaria/InscripcionesView.vue') },
-        { path: 'pagos',          name: 'secretaria-pagos',          component: () => import('@/views/secretaria/PagosView.vue') },
-        { path: 'boletines',      name: 'secretaria-boletines',      component: () => import('@/views/secretaria/BoletinesView.vue') },
-        // Igual que arriba: DIRECTOR y SECRETARIA (calificacion.routes.ts)
-        { path: 'correccion-notas', name: 'correccion-notas', component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
+        // Estudiantes + Inscripciones fusionadas — ver comentario al
+        // principio de EstudiantesView.vue
+        { path: 'estudiantes',      name: 'secretaria-estudiantes',   component: () => import('@/views/secretaria/EstudiantesView.vue') },
+        { path: 'tutores',          name: 'secretaria-tutores',       component: () => import('@/views/secretaria/Tutoresview.vue') },
+        { path: 'pagos',            name: 'secretaria-pagos',         component: () => import('@/views/secretaria/PagosView.vue') },
+        { path: 'boletines',        name: 'secretaria-boletines',     component: () => import('@/views/secretaria/BoletinesView.vue') },
+        { path: 'correccion-notas', name: 'correccion-notas',         component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
       ],
     },
 
