@@ -16,8 +16,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { estudianteApi, type CambiarEstadoPayload } from '@/api/estudiante.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import type { Inscripcion, EstadoInscripcion, ResultadoFinal } from '@/types'
-import api from '@/api/axios'
+import type { Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
 
 const gestion = useGestionStore()
 
@@ -237,6 +236,16 @@ const badgeResultado: Record<ResultadoFinal, string> = {
   PROMOVIDO:  'badge-success',
   REPROBADO:  'badge-error',
 }
+
+// ⚠️ el curso embebido acá viene de estudianteApi.getAll() — no trae
+// "nombre" calculado, solo nivel/grado/paralelo (mismo caso que en
+// EstudiantesView.vue y ReportesView.vue).
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function nombreCursoDeInscripcion(insc: Inscripcion | null): string {
+  const c = insc?.curso
+  if (!c) return '—'
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
+}
 </script>
 
 <template>
@@ -312,7 +321,7 @@ const badgeResultado: Record<ResultadoFinal, string> = {
               {{ insc.estudiante?.apellido }}, {{ insc.estudiante?.nombre }}
             </td>
             <td class="font-mono text-sm">{{ insc.estudiante?.ci }}</td>
-            <td class="text-sm">{{ insc.curso?.nombre ?? '—' }}</td>
+            <td class="text-sm">{{ nombreCursoDeInscripcion(insc) }}</td>
             <td>
               <span class="badge badge-sm" :class="badgeEstado[insc.estadoInscripcion]">
                 {{ insc.estadoInscripcion }}
@@ -441,7 +450,7 @@ const badgeResultado: Record<ResultadoFinal, string> = {
       <h3 class="font-bold text-lg mb-1">Cambiar estado de inscripción</h3>
       <p class="text-sm text-base-content/60 mb-4">
         {{ inscripcionActiva?.estudiante?.nombre }} {{ inscripcionActiva?.estudiante?.apellido }}
-        · {{ inscripcionActiva?.curso?.nombre }}
+        · {{ nombreCursoDeInscripcion(inscripcionActiva) }}
       </p>
 
       <div v-if="errorEstado" role="alert" class="alert alert-error mb-4 py-2 text-sm">
@@ -493,7 +502,7 @@ const badgeResultado: Record<ResultadoFinal, string> = {
       <h3 class="font-bold text-lg mb-1">Registrar resultado final</h3>
       <p class="text-sm text-base-content/60 mb-4">
         {{ inscripcionActiva?.estudiante?.nombre }} {{ inscripcionActiva?.estudiante?.apellido }}
-        · {{ inscripcionActiva?.curso?.nombre }}
+        · {{ nombreCursoDeInscripcion(inscripcionActiva) }}
       </p>
 
       <div role="alert" class="alert alert-warning py-2 text-sm mb-4">

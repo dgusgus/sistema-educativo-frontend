@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { estudianteApi, type EstudiantePayload, type CambiarEstadoPayload } from '@/api/estudiante.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import type { Estudiante, Inscripcion, EstadoInscripcion } from '@/types'
+import type { Estudiante, Inscripcion, EstadoInscripcion, Nivel } from '@/types'
 
 const gestion = useGestionStore()
 
@@ -93,6 +93,16 @@ function badgeEstado(estado: EstadoInscripcion): string {
     CONCLUIDA:   'badge-ghost',
   }
   return clases[estado] ?? 'badge-neutral'
+}
+
+// ⚠️ el curso embebido en Estudiante.inscripciones (GET /estudiantes) no
+// trae "nombre" calculado — solo nivel/grado/paralelo (sin turno). Se
+// arma acá igual que en las demás vistas.
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function nombreCursoDeInscripcion(insc: Inscripcion | null): string {
+  const c = insc?.curso
+  if (!c) return '—'
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
 }
 
 // ─── Crear / Editar estudiante ────────────────────────────────────────────────
@@ -267,7 +277,7 @@ const requiereFecha = computed(() =>
                    La secretaria necesita saber de un vistazo en qué curso
                    está cada estudiante sin tener que abrir el detalle. -->
               <span v-if="ultimaInscripcion(e)">
-                {{ ultimaInscripcion(e)?.curso?.nombre ?? '—' }}
+                {{ nombreCursoDeInscripcion(ultimaInscripcion(e)) }}
               </span>
               <span v-else class="text-base-content/30">Sin inscripción</span>
             </td>

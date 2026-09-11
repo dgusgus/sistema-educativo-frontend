@@ -58,6 +58,22 @@ export interface ConPerfilPayload {
   datosPorRol?: DatosPorRol
 }
 
+// Shape real de cada perfil creado (persona.helper.ts → crearPerfilesParaRoles).
+// Son las filas crudas de cada tabla de rol — sin persona ni usuario anidados.
+interface PerfilCreadoBase {
+  id:         number
+  personaId:  number
+  usuarioId:  number
+  activo?:    boolean
+}
+export interface PerfilesCreados {
+  DIRECTOR?:   PerfilCreadoBase
+  SECRETARIA?: PerfilCreadoBase
+  DOCENTE?:    PerfilCreadoBase & { especialidad?: string | null }
+  ESTUDIANTE?: PerfilCreadoBase & { rude?: string | null }
+  TUTOR?:      PerfilCreadoBase & { ocupacion?: string | null; gradoInstruccion?: string | null }
+}
+
 export const usuarioApi = {
   // GET /usuarios — solo Director
   getAll: (params?: { rol?: Rol; activo?: boolean; search?: string }) =>
@@ -71,11 +87,16 @@ export const usuarioApi = {
   create: (payload: UsuarioPayload) =>
     api.post<Usuario>('/usuarios', payload).then(r => r.data),
 
+  // ✅ Es una transacción atómica en el backend (usuario + persona + N
+  // perfiles, todo o nada) — el resultado que devuelve YA es la fuente
+  // de verdad. No hace falta un GET extra después para confiar en él;
+  // recargar la lista completa aquí es lo que causaba la condición de
+  // carrera (una recarga vieja en curso pisando esta con datos stale).
   createConPerfil: (payload: ConPerfilPayload) =>
     api.post<{
-      usuario: { id: number; username: string; roles: Rol[] }
-      persona: PersonaFlat
-      perfiles: Record<string, unknown>
+      usuario:  { id: number; username: string; roles: Rol[] }
+      persona:  PersonaFlat
+      perfiles: PerfilesCreados
       credenciales: { username: string; password: string; nota: string }
     }>('/usuarios/con-perfil', payload).then(r => r.data),
 

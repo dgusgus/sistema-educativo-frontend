@@ -1,5 +1,5 @@
 import api from '@/api/axios'
-import type { Docente } from '@/types'
+import type { Docente, DocenteMateriaCurso } from '@/types'
 
 export interface DocentePayload {
   ci:            string
@@ -37,7 +37,9 @@ export const docenteApi = {
   // aparte y no parte de create(). El backend valida que el curso
   // pertenezca a la gestión enviada.
   asignar: (docenteId: number, payload: AsignacionPayload) =>
-    api.post(`/docentes/${docenteId}/asignacion`, payload).then(r => r.data),
+    api.post<DocenteMateriaCurso & { advertencia?: string }>(
+      `/docentes/${docenteId}/asignacion`, payload
+    ).then(r => r.data),
 
   removeAsignacion: (docenteId: number, asignacionId: number) =>
     api.delete(`/docentes/${docenteId}/asignacion/${asignacionId}`).then(r => r.data),

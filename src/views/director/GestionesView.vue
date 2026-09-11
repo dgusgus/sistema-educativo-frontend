@@ -20,6 +20,11 @@ import { ref, computed, onMounted } from 'vue'
 import { gestionApi, type GestionResumen } from '@/api/gestion.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import api from '@/api/axios'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToastStore } from '@/stores/toast.store'
+
+const { confirmar } = useConfirm()
+const toast = useToastStore()
 
 const gestionStore = useGestionStore()
 
@@ -122,6 +127,7 @@ async function crearGestion() {
     })
     gestiones.value.unshift(nueva)
     modalCrear.value = false
+    toast.success(`Gestión ${nueva.anio} creada`)
   } catch (e) {
     errorModal.value = e instanceof Error ? e.message : 'Error al crear gestión'
   } finally {
@@ -138,7 +144,11 @@ const activando = ref<number | null>(null)
 
 async function activar(g: GestionResumen) {
   if (g.activa) return
-  if (!confirm(`¿Activar la gestión ${g.anio}? Esto desactivará la gestión actual y todos los módulos usarán los datos de ${g.anio}.`)) return
+  const ok = await confirmar({
+    mensaje: `¿Activar la gestión ${g.anio}? Esto desactivará la gestión actual y todos los módulos usarán los datos de ${g.anio}.`,
+    peligroso: true,
+  })
+  if (!ok) return
 
   activando.value = g.id
   error.value     = null
@@ -153,6 +163,7 @@ async function activar(g: GestionResumen) {
     // (AsistenciaView, CalificacionesView, EstudiantesView, etc.).
     // Si no lo recargamos, esos módulos seguirían viendo la gestión anterior.
     await gestionStore.recargar()
+    toast.success(`Gestión ${g.anio} activada`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al activar gestión'
   } finally {
@@ -199,6 +210,7 @@ async function asignarDirector() {
       }
     }
     modalDirector.value = false
+    toast.success('Director asignado')
     // Si la gestión afectada es la activa, recargar el store
     // para que el nombre del director se actualice en el sidebar/dashboard
     if (gestionSeleccionada.value.activa) {

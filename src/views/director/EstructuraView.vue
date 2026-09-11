@@ -8,6 +8,11 @@ import { ref, onMounted } from 'vue'
 import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
 import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
 import { useGestionStore } from '@/stores/gestion.store'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToastStore } from '@/stores/toast.store'
+
+const { confirmar } = useConfirm()
+const toast = useToastStore()
 
 const gestion = useGestionStore()
 
@@ -121,6 +126,8 @@ async function guardar() {
       await guardarTrimestre()
     }
     modalAbierto.value = false
+    const entidad = tab.value === 'cursos' ? 'Curso' : tab.value === 'materias' ? 'Materia' : 'Trimestre'
+    toast.success(`${entidad} ${modoEdicion.value ? 'actualizado' : 'creado'}`)
   } catch (e) {
     errorModal.value = e instanceof Error ? e.message : 'Error al guardar'
   } finally {
@@ -203,13 +210,18 @@ async function guardarTrimestre() {
 const cerrando = ref<number | null>(null)
 
 async function cerrarTrimestre(t: Trimestre) {
-  if (!confirm(`¿Cerrar "${t.nombre}"? Esta acción no se puede deshacer — las notas quedarán bloqueadas.`)) return
+  const ok = await confirmar({
+    mensaje: `¿Cerrar "${t.nombre}"? Esta acción no se puede deshacer — las notas quedarán bloqueadas.`,
+    peligroso: true,
+  })
+  if (!ok) return
   cerrando.value = t.id
   try {
     await trimestreApi.cerrar(t.id)
     const idx = trimestres.value.findIndex(x => x.id === t.id)
     if (idx !== -1) trimestres.value[idx].cerrado = true
     await gestion.recargar()
+    toast.success(`Trimestre "${t.nombre}" cerrado`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cerrar trimestre'
   } finally {
@@ -220,12 +232,14 @@ async function cerrarTrimestre(t: Trimestre) {
 const eliminando = ref<number | null>(null)
 
 async function eliminarCurso(c: Curso) {
-  if (!confirm(`¿Eliminar el curso "${c.nombre}"?`)) return
+  const ok = await confirmar({ mensaje: `¿Eliminar el curso "${c.nombre}"?`, peligroso: true })
+  if (!ok) return
   eliminando.value = c.id
   try {
     await cursoApi.delete(c.id)
     cursos.value = cursos.value.filter(x => x.id !== c.id)
     await gestion.recargar()
+    toast.success('Curso eliminado')
   } catch (e) {
     // El backend devuelve "No se puede eliminar — el curso tiene N
     // estudiantes inscritos" — más útil que un mensaje genérico

@@ -1,36 +1,66 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth.store'
 import { useGestionStore } from '@/stores/gestion.store'
+import { calificacionApi } from '@/api/calificacion.api'
 import api from '@/api/axios'
+import type { Nivel, ResultadoFinal } from '@/types'
 
-const auth    = useAuthStore()
 const gestion = useGestionStore()
 
-// El tutor puede tener múltiples hijos vinculados
-// GET /auth/me devuelve el perfil con los estudiantes vinculados
-const estudiantes   = ref<any[]>([])
-const seleccionado  = ref<number | null>(null)
-const datosEstudiante = ref<any | null>(null)
-const cargando      = ref(true)
-const cargandoDatos = ref(false)
-const error         = ref<string | null>(null)
+// ─── Tipos locales ────────────────────────────────────────────────────────────
+// No existe un tutor.api.ts dedicado todavía — se consulta directo con
+// tipos locales en vez de "any" para no perder seguridad de tipos.
+interface EstudianteVinculado {
+  id: number
+  nombre: string
+  apellido: string
+  ci: string
+}
+
+// Refleja GET /calificaciones/estudiante (mismo shape que MiPerfilView.vue)
+interface CalificacionItem {
+  id: number
+  promedioTrimestral: number | null   // ✅ antes "nota" — ya no existe
+  docenteMateriaCursoId: number
+  docenteMateriaCurso: { materia: { nombre: string } }
+  trimestre: { numero: number; nombre: string }
+}
+interface PromedioFinalItem {
+  docenteMateriaCursoId: number
+  promedioFinal: number
+  resultado: ResultadoFinal   // ✅ antes "aprobado" (boolean) — ya no existe
+  docenteMateriaCurso: { materia: { nombre: string } }
+}
+interface InscripcionConNotas {
+  id: number
+  resultado: ResultadoFinal
+  // ⚠️ el curso acá no trae "nombre" calculado — solo nivel/grado/paralelo
+  curso:  { nivel: Nivel; grado: number; paralelo: string }
+  gestion: { anio: number }
+  calificaciones:   CalificacionItem[]
+  promediosFinales: PromedioFinalItem[]
+}
+
+const estudiantes     = ref<EstudianteVinculado[]>([])
+const seleccionado    = ref<number | null>(null)
+const datosEstudiante = ref<InscripcionConNotas[] | null>(null)
+const cargando        = ref(true)
+const cargandoDatos   = ref(false)
+const error           = ref<string | null>(null)
 
 onMounted(async () => {
   try {
     await gestion.cargar()
-    // Obtener el perfil del tutor con sus estudiantes vinculados
-    const { data } = await api.get('/auth/me')
-    // El perfil del tutor viene en data.perfil, sus estudiantes en data.perfil.estudiantes
-    // Pero el controller de tutor devuelve los vínculos desde TutorEstudiante
-    // Usamos GET /tutores/:id para obtener los estudiantes vinculados
+    // GET /auth/me trae el perfil del tutor (id) — de ahí sacamos sus
+    // estudiantes vinculados con GET /tutores/:id
+    const { data } = await api.get<{ perfil: { id: number } | null }>('/auth/me')
     const tutorId = data.perfil?.id
     if (tutorId) {
-      const { data: tutor } = await api.get(`/tutores/${tutorId}`)
-      estudiantes.value = tutor.estudiantes?.map((te: any) => te.estudiante) ?? []
-      // Auto-seleccionar si hay solo uno
+      const { data: tutor } = await api.get<{
+        estudiantes: Array<{ estudiante: EstudianteVinculado }>
+      }>(`/tutores/${tutorId}`)
+      estudiantes.value = tutor.estudiantes?.map(te => te.estudiante) ?? []
       if (estudiantes.value.length === 1) {
-        seleccionado.value = estudiantes.value[0].id
         await cargarDatos(estudiantes.value[0].id)
       }
     }
@@ -47,10 +77,9 @@ async function cargarDatos(estudianteId: number) {
   error.value = null
   datosEstudiante.value = null
   try {
-    const { data } = await api.get('/calificaciones/estudiante', {
-      params: { estudianteId, gestionId: gestion.gestionId },
-    })
-    datosEstudiante.value = Array.isArray(data) ? data : []
+    if (!gestion.gestionId) throw new Error('No hay gestión activa')
+    const data = await calificacionApi.getDeEstudiante({ estudianteId, gestionId: gestion.gestionId })
+    datosEstudiante.value = Array.isArray(data) ? data as InscripcionConNotas[] : []
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar datos del estudiante'
   } finally {
@@ -65,10 +94,14 @@ function claseNota(nota: number | null): string {
   return 'text-error font-bold'
 }
 
-const estudianteActual = ref<any>(null)
-function seleccionarEstudiante(est: any) {
-  estudianteActual.value = est
-  cargarDatos(est.id)
+function notaDelTrimestre(insc: InscripcionConNotas, dmcId: number, numero: number): number | null {
+  return insc.calificaciones.find(c => c.docenteMateriaCursoId === dmcId && c.trimestre?.numero === numero)
+    ?.promedioTrimestral ?? null
+}
+
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }): string {
+  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
 }
 </script>
 
@@ -78,7 +111,6 @@ function seleccionarEstudiante(est: any) {
 
     <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
 
-    <!-- Skeleton inicial -->
     <div v-if="cargando" class="skeleton h-20 rounded-xl"></div>
 
     <template v-else>
@@ -92,7 +124,7 @@ function seleccionarEstudiante(est: any) {
               :key="est.id"
               class="btn btn-sm"
               :class="seleccionado === est.id ? 'btn-primary' : 'btn-ghost'"
-              @click="seleccionarEstudiante(est)"
+              @click="cargarDatos(est.id)"
             >
               {{ est.nombre }} {{ est.apellido }}
             </button>
@@ -100,12 +132,10 @@ function seleccionarEstudiante(est: any) {
         </div>
       </div>
 
-      <!-- Sin hijos vinculados -->
       <div v-if="estudiantes.length === 0" class="text-center text-base-content/40 py-12">
         No hay estudiantes vinculados a tu cuenta. Contactá a la secretaría.
       </div>
 
-      <!-- Datos del estudiante seleccionado -->
       <template v-if="seleccionado">
         <div v-if="cargandoDatos" class="space-y-3">
           <div class="skeleton h-40 rounded-xl"></div>
@@ -115,10 +145,10 @@ function seleccionarEstudiante(est: any) {
           <div v-for="insc in datosEstudiante" :key="insc.id" class="card bg-base-100 shadow">
             <div class="card-body">
               <div class="flex items-center justify-between mb-3">
-                <h3 class="font-semibold">{{ insc.curso?.nombre }} — {{ insc.gestion?.anio }}</h3>
+                <h3 class="font-semibold">{{ nombreCursoCorto(insc.curso) }} — {{ insc.gestion?.anio }}</h3>
                 <span class="badge" :class="insc.resultado === 'PROMOVIDO' ? 'badge-success' :
                   insc.resultado === 'REPROBADO' ? 'badge-error' : 'badge-ghost'">
-                  {{ insc.resultado ?? 'EN CURSO' }}
+                  {{ insc.resultado === 'PENDIENTE' ? 'EN CURSO' : insc.resultado }}
                 </span>
               </div>
 
@@ -134,24 +164,19 @@ function seleccionarEstudiante(est: any) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="pf in insc.promediosFinales" :key="pf.id" class="hover">
-                      <td class="font-medium">{{ pf.docenteMateriaCurso?.materia?.nombre }}</td>
+                    <tr v-for="pf in insc.promediosFinales" :key="pf.docenteMateriaCursoId" class="hover">
+                      <td class="font-medium">{{ pf.docenteMateriaCurso.materia.nombre }}</td>
                       <td class="text-center" v-for="num in [1,2,3]" :key="num">
-                        <span :class="claseNota(insc.calificaciones.find(
-                          (c: any) => c.docenteMateriaCursoId === pf.docenteMateriaCursoId
-                            && c.trimestre?.numero === num)?.nota ?? null)">
-                          {{ insc.calificaciones.find(
-                            (c: any) => c.docenteMateriaCursoId === pf.docenteMateriaCursoId
-                              && c.trimestre?.numero === num)?.nota ?? '—' }}
+                        <span :class="claseNota(notaDelTrimestre(insc, pf.docenteMateriaCursoId, num))">
+                          {{ notaDelTrimestre(insc, pf.docenteMateriaCursoId, num) ?? '—' }}
                         </span>
                       </td>
                       <td class="text-center">
                         <span :class="claseNota(pf.promedioFinal)">
                           {{ pf.promedioFinal?.toFixed(1) ?? '—' }}
                         </span>
-                        <span v-if="pf.promedioFinal !== null" class="ml-1 text-xs"
-                          :class="pf.aprobado ? 'text-success' : 'text-error'">
-                          {{ pf.aprobado ? '✓' : '✗' }}
+                        <span class="ml-1 text-xs" :class="pf.resultado === 'PROMOVIDO' ? 'text-success' : 'text-error'">
+                          {{ pf.resultado === 'PROMOVIDO' ? '✓' : '✗' }}
                         </span>
                       </td>
                     </tr>

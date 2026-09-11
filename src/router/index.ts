@@ -56,19 +56,23 @@ const router = createRouter({
         { path: 'usuarios',   name: 'director-usuarios',   component: () => import('@/views/director/UsuariosView.vue') },
         { path: 'estructura', name: 'director-estructura', component: () => import('@/views/director/EstructuraView.vue') },
         { path: 'gestiones',  name: 'director-gestiones',  component: () => import('@/views/director/GestionesView.vue') },
+        { path: 'institucion', name: 'director-institucion', component: () => import('@/views/director/InstitucionView.vue') },
       ],
     },
 
-    // ── SECRETARIA ────────────────────────────────────────────────────────────
+    // ── SECRETARIA (también accesible para DIRECTOR — backend ya lo permite
+    // en estudiante/inscripcion/pago/boletin.routes.ts) ──────────────────────
     {
       path: '/secretaria',
       component: () => import('@/layouts/DashboardLayout.vue'),
-      meta: { requiresAuth: true, roles: ['SECRETARIA'] },
+      meta: { requiresAuth: true, roles: ['SECRETARIA', 'DIRECTOR'] },
       children: [
         { path: 'estudiantes',    name: 'secretaria-estudiantes',    component: () => import('@/views/secretaria/EstudiantesView.vue') },
         { path: 'inscripciones',  name: 'secretaria-inscripciones',  component: () => import('@/views/secretaria/InscripcionesView.vue') },
         { path: 'pagos',          name: 'secretaria-pagos',          component: () => import('@/views/secretaria/PagosView.vue') },
         { path: 'boletines',      name: 'secretaria-boletines',      component: () => import('@/views/secretaria/BoletinesView.vue') },
+        // Igual que arriba: DIRECTOR y SECRETARIA (calificacion.routes.ts)
+        { path: 'correccion-notas', name: 'correccion-notas', component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
       ],
     },
 
@@ -80,6 +84,7 @@ const router = createRouter({
       children: [
         { path: 'asistencia',     name: 'docente-asistencia',     component: () => import('@/views/docente/AsistenciaView.vue') },
         { path: 'calificaciones', name: 'docente-calificaciones', component: () => import('@/views/docente/CalificacionesView.vue') },
+        { path: 'bitacora',       name: 'docente-bitacora',       component: () => import('@/views/docente/BitacoraView.vue') },
       ],
     },
 

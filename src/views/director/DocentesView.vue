@@ -3,11 +3,12 @@ import { ref, computed, onMounted } from 'vue'
 import { docenteApi, type DocentePayload } from '@/api/docente.api'
 import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import { materiaApi, type Materia } from '@/api/estructura.api'
-import type { Docente } from '@/types'
+import { materiaApi } from '@/api/estructura.api'
+import { useToastStore } from '@/stores/toast.store'
+import type { Docente, Nivel, Materia } from '@/types'
 
-// El gestionStore ya tiene cargados gestionId y los cursos de la gestión
-// activa — evita un GET extra solo para el modal de asignación.
+const toast = useToastStore()
+
 const gestion = useGestionStore()
 
 // ─── Estado principal ─────────────────────────────────────────────────────────
@@ -17,69 +18,32 @@ const cargando  = ref(true)
 const error     = ref<string | null>(null)
 const busqueda  = ref('')
 
-// ─── Modal crear/editar perfil ────────────────────────────────────────────────
-const modalPerfil  = ref(false)
-const guardando    = ref(false)
-const errorModal   = ref<string | null>(null)
-const modoEdicion  = ref(false)
-const idEditando   = ref<number | null>(null)
+// ✅ Guard anti-race: cada llamada a cargar() se numera; si una respuesta
+// vieja llega DESPUÉS de una más nueva, se descarta. Sin esto, una
+// recarga lenta (ej. la del onMounted) puede resolver tarde y pisar
+// datos frescos con una foto vieja de la lista — eso era la causa real
+// de los "docente no encontrado" y "se ven datos de otro docente":
+// el id que quedaba en pantalla venía de una lista ya obsoleta.
+let cargaSeq = 0
 
-const formVacio = (): DocentePayload => ({
-  nombre: '', apellido: '', ci: '', email: '', telefono: '', especialidad: '',
-})
-const form = ref<DocentePayload>(formVacio())
-
-// ─── Modal crear cuenta (con-perfil) ─────────────────────────────────────────
-// 1. "Crear perfil" → solo datos personales, sin acceso al sistema.
-// 2. "Crear con cuenta" → perfil + usuario en una transacción (flujo normal).
-const modalConCuenta  = ref(false)
-const creandoCuenta   = ref(false)
-const errorCuenta     = ref<string | null>(null)
-const credenciales    = ref<{ username: string; password: string } | null>(null)
-
-const formCuenta = ref({
-  ci: '', nombre: '', apellido: '', especialidad: '',
-  email: '', telefono: '',
-  username: '', password: '',
-})
-
-// ─── Modal vincular cuenta existente a un perfil ya registrado ───────────────
-// Escenario: el Director creó el perfil del docente (solo datos personales)
-// y ahora hay que darle acceso, SIN duplicar su Persona. El flujo real es:
-//   1. POST /usuarios — crea la cuenta sola (username+password, roles)
-//   2. PUT /usuarios/:id/vincular — la liga al docenteId ya existente
-// (createConPerfil NO sirve acá — crearía una Persona nueva.)
-const modalVincular      = ref(false)
-const vinculando         = ref(false)
-const errorVincular      = ref<string | null>(null)
-const docenteAVincular   = ref<Docente | null>(null)
-const usernameVincular   = ref('')
-const passwordVincular   = ref('')
-
-// ─── Modal asignar materia+curso ──────────────────────────────────────────────
-const modalAsignacion   = ref(false)
-const asignando         = ref(false)
-const errorAsignacion   = ref<string | null>(null)
-const docenteAsignar    = ref<Docente | null>(null)
-const formAsignacion    = ref<{ materiaId: number | ''; cursoId: number | '' }>({
-  materiaId: '', cursoId: '',
-})
-
-// ─── Carga inicial ────────────────────────────────────────────────────────────
 onMounted(async () => {
   await gestion.cargar()
   await Promise.all([cargar(), cargarMaterias()])
 })
 
 async function cargar() {
+  const miTurno = ++cargaSeq
   cargando.value = true
   error.value = null
   try {
-    docentes.value = await docenteApi.getAll()
+    const lista = await docenteApi.getAll()
+    if (miTurno !== cargaSeq) return   // llegó una respuesta más nueva antes — descartar esta
+    docentes.value = lista
   } catch (e) {
+    if (miTurno !== cargaSeq) return
     error.value = e instanceof Error ? e.message : 'Error al cargar docentes'
   } finally {
-    cargando.value = false
+    if (miTurno === cargaSeq) cargando.value = false
   }
 }
 
@@ -101,7 +65,31 @@ const docentesFiltrados = computed(() => {
   )
 })
 
+// ─── Cursos asignados (para la columna nueva) ────────────────────────────────
+// docenteApi.getAll() ya incluye asignaciones de la gestión activa — no
+// hace falta un fetch extra. El curso acá no trae "nombre" calculado
+// (solo nivel/grado/paralelo), se arma igual que en el resto del frontend.
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+function cursosDe(d: Docente): string[] {
+  return (d.asignaciones ?? []).map(a => {
+    const c = a.curso
+    const nombreCurso = c ? `${c.grado}° ${NIVEL_TEXTO[c.nivel]}"${c.paralelo}"` : '?'
+    return `${a.materia?.nombre ?? '?'} · ${nombreCurso}`
+  })
+}
+
 // ─── Crear/editar perfil ──────────────────────────────────────────────────────
+const modalPerfil  = ref(false)
+const guardando    = ref(false)
+const errorModal   = ref<string | null>(null)
+const modoEdicion  = ref(false)
+const idEditando   = ref<number | null>(null)
+
+const formVacio = (): DocentePayload => ({
+  nombre: '', apellido: '', ci: '', email: '', telefono: '', especialidad: '',
+})
+const form = ref<DocentePayload>(formVacio())
+
 function abrirCrear() {
   modoEdicion.value  = false
   idEditando.value   = null
@@ -136,10 +124,12 @@ async function guardar() {
     if (modoEdicion.value && idEditando.value) {
       const actualizado = await docenteApi.update(idEditando.value, form.value)
       const idx = docentes.value.findIndex(d => d.id === idEditando.value)
-      if (idx !== -1) docentes.value[idx] = actualizado
+      if (idx !== -1) docentes.value[idx] = { ...docentes.value[idx], ...actualizado }
+      toast.success('Docente actualizado')
     } else {
       const nuevo = await docenteApi.create(form.value)
       docentes.value.unshift(nuevo)
+      toast.success('Docente creado')
     }
     modalPerfil.value = false
   } catch (e) {
@@ -150,6 +140,17 @@ async function guardar() {
 }
 
 // ─── Crear docente con cuenta en una sola operación ──────────────────────────
+const modalConCuenta  = ref(false)
+const creandoCuenta   = ref(false)
+const errorCuenta     = ref<string | null>(null)
+const credenciales    = ref<{ username: string; password: string } | null>(null)
+
+const formCuenta = ref({
+  ci: '', nombre: '', apellido: '', especialidad: '',
+  email: '', telefono: '',
+  username: '', password: '',
+})
+
 function abrirConCuenta() {
   formCuenta.value  = { ci: '', nombre: '', apellido: '', especialidad: '', email: '', telefono: '', username: '', password: '' }
   errorCuenta.value = null
@@ -170,8 +171,6 @@ async function crearConCuenta() {
   creandoCuenta.value = true
   errorCuenta.value   = null
   try {
-    // ✅ v6: roles[] + persona (no "perfil") + datosPorRol para lo
-    // específico de cada rol (especialidad va ahí, no dentro de persona)
     const payload: ConPerfilPayload = {
       roles:    ['DOCENTE'],
       username: formCuenta.value.username,
@@ -189,7 +188,26 @@ async function crearConCuenta() {
     }
     const resultado = await usuarioApi.createConPerfil(payload)
     credenciales.value = resultado.credenciales
-    await cargar()
+
+    // ✅ En vez de volver a pedir GET /docentes (eso era la fuente de la
+    // condición de carrera — ver comentario junto a cargaSeq), armamos el
+    // docente directo con lo que el backend YA confirmó que existe. La
+    // creación es transaccional: si llegamos acá, es 100% real.
+    const perfilDocente = resultado.perfiles.DOCENTE
+    if (perfilDocente) {
+      docentes.value.unshift({
+        id:            perfilDocente.id,
+        ci:            resultado.persona.ci,
+        nombre:        resultado.persona.nombre,
+        apellido:      resultado.persona.apellido,
+        telefono:      resultado.persona.telefono ?? null,
+        email:         resultado.persona.email ?? null,
+        especialidad:  perfilDocente.especialidad ?? null,
+        activo:        true,
+        usuario:       { id: resultado.usuario.id, username: resultado.usuario.username, activo: true },
+        asignaciones:  [],
+      })
+    }
   } catch (e) {
     errorCuenta.value = e instanceof Error ? e.message : 'Error al crear docente'
   } finally {
@@ -198,6 +216,16 @@ async function crearConCuenta() {
 }
 
 // ─── Vincular cuenta existente a docente sin cuenta ──────────────────────────
+// Flujo real: 1) crear la cuenta sola, 2) PUT /usuarios/:id/vincular la
+// liga al docenteId ya existente (createConPerfil NO sirve acá — crearía
+// una Persona duplicada).
+const modalVincular      = ref(false)
+const vinculando         = ref(false)
+const errorVincular      = ref<string | null>(null)
+const docenteAVincular   = ref<Docente | null>(null)
+const usernameVincular   = ref('')
+const passwordVincular   = ref('')
+
 function abrirVincular(d: Docente) {
   docenteAVincular.value = d
   usernameVincular.value = ''
@@ -216,16 +244,27 @@ async function vincular() {
   vinculando.value    = true
   errorVincular.value = null
   try {
-    // Paso 1: crear la cuenta SOLA (sin persona/perfil — el docente ya existe)
     const usuario = await usuarioApi.create({
       username: usernameVincular.value,
       password: passwordVincular.value,
       roles:    ['DOCENTE'],
     })
-    // Paso 2: vincularla al perfil de Docente que ya está registrado
     await usuarioApi.vincularPerfil(usuario.id, { docenteId: docenteAVincular.value.id })
+
+    // ✅ Igual que en crearConCuenta: parchamos el registro en memoria
+    // directamente en vez de recargar toda la lista. Esto también hace
+    // que el botón "Vincular cuenta" desaparezca al instante (tieneCuenta
+    // pasa a true), evitando que alguien lo apriete de nuevo y genere
+    // una cuenta huérfana más si algo tarda en reflejarse.
+    const idx = docentes.value.findIndex(d => d.id === docenteAVincular.value!.id)
+    if (idx !== -1) {
+      docentes.value[idx] = {
+        ...docentes.value[idx],
+        usuario: { id: usuario.id, username: usuario.username, activo: true },
+      }
+    }
     modalVincular.value = false
-    await cargar()
+    toast.success('Cuenta vinculada correctamente')
   } catch (e) {
     errorVincular.value = e instanceof Error ? e.message : 'Error al vincular cuenta'
   } finally {
@@ -234,6 +273,14 @@ async function vincular() {
 }
 
 // ─── Asignar materia + curso al docente ───────────────────────────────────────
+const modalAsignacion   = ref(false)
+const asignando         = ref(false)
+const errorAsignacion   = ref<string | null>(null)
+const docenteAsignar    = ref<Docente | null>(null)
+const formAsignacion    = ref<{ materiaId: number | ''; cursoId: number | '' }>({
+  materiaId: '', cursoId: '',
+})
+
 function abrirAsignacion(d: Docente) {
   docenteAsignar.value   = d
   formAsignacion.value   = { materiaId: '', cursoId: '' }
@@ -253,13 +300,19 @@ async function asignar() {
   asignando.value       = true
   errorAsignacion.value = null
   try {
-    await docenteApi.asignar(docenteAsignar.value.id, {
+    const nuevaAsig = await docenteApi.asignar(docenteAsignar.value.id, {
       materiaId: Number(formAsignacion.value.materiaId),
       cursoId:   Number(formAsignacion.value.cursoId),
       gestionId: gestion.gestionId,
     })
+    // ✅ parche en memoria en vez de recargar — misma razón que arriba
+    const idx = docentes.value.findIndex(d => d.id === docenteAsignar.value!.id)
+    if (idx !== -1) {
+      const asignaciones = docentes.value[idx].asignaciones ?? []
+      docentes.value[idx] = { ...docentes.value[idx], asignaciones: [...asignaciones, nuevaAsig] }
+    }
     modalAsignacion.value = false
-    await cargar()
+    toast.success('Materia asignada')
   } catch (e) {
     errorAsignacion.value = e instanceof Error ? e.message : 'Error al asignar'
   } finally {
@@ -311,6 +364,7 @@ function tieneCuenta(d: Docente): boolean {
             <th>Nombre</th>
             <th>CI</th>
             <th>Especialidad</th>
+            <th>Cursos asignados</th>
             <th>Cuenta</th>
             <th>Estado</th>
             <th>Acciones</th>
@@ -318,10 +372,10 @@ function tieneCuenta(d: Docente): boolean {
         </thead>
         <tbody>
           <tr v-if="cargando" v-for="i in 5" :key="i">
-            <td colspan="6"><div class="skeleton h-4 w-full"></div></td>
+            <td colspan="7"><div class="skeleton h-4 w-full"></div></td>
           </tr>
           <tr v-else-if="docentesFiltrados.length === 0">
-            <td colspan="6" class="text-center text-base-content/40 py-8">
+            <td colspan="7" class="text-center text-base-content/40 py-8">
               No se encontraron docentes
             </td>
           </tr>
@@ -329,6 +383,12 @@ function tieneCuenta(d: Docente): boolean {
             <td class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
+            <td>
+              <div class="flex flex-wrap gap-1 max-w-xs">
+                <span v-for="(c, i) in cursosDe(d)" :key="i" class="badge badge-sm badge-outline">{{ c }}</span>
+                <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
+              </div>
+            </td>
             <td>
               <span v-if="tieneCuenta(d)" class="badge badge-sm badge-success">
                 {{ d.usuario?.username }}
@@ -473,6 +533,16 @@ function tieneCuenta(d: Docente): boolean {
           <legend class="fieldset-legend text-xs">Especialidad</legend>
           <input v-model="formCuenta.especialidad" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
         </fieldset>
+        <div class="grid grid-cols-2 gap-3">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Email</legend>
+            <input v-model="formCuenta.email" type="email" class="input input-bordered w-full" :disabled="creandoCuenta" />
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Teléfono</legend>
+            <input v-model="formCuenta.telefono" type="tel" class="input input-bordered w-full" :disabled="creandoCuenta" />
+          </fieldset>
+        </div>
 
         <div class="divider text-xs">Cuenta de acceso</div>
         <fieldset class="fieldset">

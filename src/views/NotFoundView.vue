@@ -7,8 +7,8 @@ const router = useRouter()
 const auth = useAuthStore()
 
 function volver() {
-  if (auth.estaAutenticado && auth.rol) {
-    router.push(homeSegunRol(auth.rol))
+  if (auth.estaAutenticado && auth.roles.length > 0) {
+    router.push(homeSegunRol(auth.roles))
   } else {
     router.push('/login')
   }

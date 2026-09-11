@@ -4,7 +4,12 @@ import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores
 import { useGestionStore } from '@/stores/gestion.store'
 import { calificacionApi, type PlanillaResponse } from '@/api/calificacion.api'
 import { evaluacionApi } from '@/api/evaluacion.api'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToastStore } from '@/stores/toast.store'
 import type { DimensionEvaluacion, ActividadEvaluativa, Nivel } from '@/types'
+
+const { confirmar } = useConfirm()
+const toast = useToastStore()
 
 const docenteStore = useDocenteStore()
 const gestion      = useGestionStore()
@@ -26,7 +31,6 @@ const trimestreId = ref<number | ''>('')
 
 const cargando  = ref(false)
 const error     = ref<string | null>(null)
-const exito     = ref<string | null>(null)
 
 // ── Planilla final (solo lectura — el backend calcula el promedio) ──────────
 const planilla    = ref<PlanillaResponse | null>(null)
@@ -60,7 +64,6 @@ async function cargarTodo() {
   if (!asignacion.value || !trimestreId.value || !gestion.gestionId) return
   cargando.value = true
   error.value = null
-  exito.value = null
   actividadFormAbierto.value = false
   actividadParaNotas.value = null
 
@@ -107,6 +110,7 @@ async function crearActividad() {
     actividades.value.push(creada)
     actividadFormAbierto.value = false
     nuevaActividad.value = { nombre: '', fecha: new Date().toISOString().split('T')[0], puntajeMaximo: 100, peso: 1, esRecuperatorio: false }
+    toast.success('Actividad creada')
     abrirNotas(creada)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al crear la actividad'
@@ -158,10 +162,9 @@ async function guardarNotas() {
 
   guardandoNotas.value = true
   error.value = null
-  exito.value = null
   try {
     await evaluacionApi.registrarNotas(actividadParaNotas.value.id, notas)
-    exito.value = 'Notas guardadas — promedio recalculado'
+    toast.success('Notas guardadas — promedio recalculado')
     actividadParaNotas.value = null
     await cargarTodo()
   } catch (e) {
@@ -172,11 +175,16 @@ async function guardarNotas() {
 }
 
 async function desactivarActividad(act: ActividadEvaluativa) {
-  if (!confirm(`¿Desactivar "${act.nombre}"? Las notas ya registradas se conservan mas no se sumará en nuevos cálculos.`)) return
+  const ok = await confirmar({
+    mensaje: `¿Desactivar "${act.nombre}"? Las notas ya registradas se conservan mas no se sumará en nuevos cálculos.`,
+    peligroso: true,
+  })
+  if (!ok) return
   try {
     await evaluacionApi.desactivarActividadEvaluativa(act.id)
     actividades.value = actividades.value.filter(a => a.id !== act.id)
     if (actividadParaNotas.value?.id === act.id) actividadParaNotas.value = null
+    toast.success('Actividad desactivada')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al desactivar la actividad'
   }
@@ -247,7 +255,6 @@ const statsFinales = computed(() => {
       </div>
 
       <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
-      <div v-if="exito" role="alert" class="alert alert-success"><span>{{ exito }}</span></div>
 
       <template v-if="planilla">
         <div v-if="trimCerrado" role="alert" class="alert alert-warning text-sm">

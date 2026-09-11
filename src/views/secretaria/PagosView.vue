@@ -1,21 +1,57 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { pagoApi, type PagosInscripcionResponse, type PagoPayload } from '@/api/pago.api'
+import { ref, computed, onMounted, watch } from 'vue'
+import { pagoApi, type PagosInscripcionResponse, type PagoPayload, type ConceptoPago } from '@/api/pago.api'
+import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante'
+import { useGestionStore } from '@/stores/gestion.store'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToastStore } from '@/stores/toast.store'
+import type { Nivel } from '@/types'
 
-const inscripcionId = ref<number | ''>('')
+const { confirmar } = useConfirm()
+const toast = useToastStore()
+
+const gestion = useGestionStore()
+const buscador = useBuscadorEstudiante()
+
+onMounted(() => gestion.cargar())
+
+// La inscripción activa es la más reciente del estudiante elegido — el
+// buscador ya trae take:1 ordenado por gestión desc, así que alcanza con
+// el primero. Si el estudiante no tiene inscripción, no hay nada que cobrar.
+const inscripcionId = computed(() => buscador.seleccionado.value?.inscripciones?.[0]?.id ?? null)
+
+const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
+const cursoDelSeleccionado = computed(() => {
+  const c = buscador.seleccionado.value?.inscripciones?.[0]?.curso
+  return c ? `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"` : null
+})
+
 const datos     = ref<PagosInscripcionResponse | null>(null)
 const cargando  = ref(false)
 const error     = ref<string | null>(null)
 
-async function buscar() {
-  if (!inscripcionId.value) { error.value = 'Ingresá el ID de inscripción'; return }
-  cargando.value = true
-  error.value = null
+// Al elegir un estudiante con inscripción, se carga solo — sin botón extra
+watch(inscripcionId, async (id) => {
   datos.value = null
+  error.value = null
+  if (!id) return
+  cargando.value = true
   try {
-    datos.value = await pagoApi.getDeInscripcion(Number(inscripcionId.value))
+    datos.value = await pagoApi.getDeInscripcion(id)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al buscar'
+    error.value = e instanceof Error ? e.message : 'Error al cargar pagos'
+  } finally {
+    cargando.value = false
+  }
+})
+
+async function recargar() {
+  if (!inscripcionId.value) return
+  cargando.value = true
+  try {
+    datos.value = await pagoApi.getDeInscripcion(inscripcionId.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al cargar pagos'
   } finally {
     cargando.value = false
   }
@@ -27,7 +63,7 @@ const guardando    = ref(false)
 const errorModal   = ref<string | null>(null)
 
 const formVacio = (): PagoPayload => ({
-  inscripcionId:  Number(inscripcionId.value) || 0,
+  inscripcionId:  0,
   conceptoPagoId: 0,
   montoPagado:    0,
   metodoPago:     'EFECTIVO',
@@ -36,7 +72,8 @@ const formVacio = (): PagoPayload => ({
 const form = ref<PagoPayload>(formVacio())
 
 function abrirModal(conceptoPagoId = 0, monto = 0) {
-  form.value = { ...formVacio(), conceptoPagoId, montoPagado: monto }
+  if (!inscripcionId.value) return
+  form.value = { ...formVacio(), inscripcionId: inscripcionId.value, conceptoPagoId, montoPagado: monto }
   errorModal.value = null
   modalAbierto.value = true
 }
@@ -49,7 +86,8 @@ async function registrar() {
   try {
     await pagoApi.registrar(form.value)
     modalAbierto.value = false
-    await buscar() // recargar para mostrar el nuevo pago
+    toast.success('Pago registrado')
+    await recargar()
   } catch (e) {
     errorModal.value = e instanceof Error ? e.message : 'Error al registrar'
   } finally {
@@ -61,11 +99,13 @@ async function registrar() {
 const anulando = ref<number | null>(null)
 
 async function anular(id: number) {
-  if (!confirm('¿Anular este pago? Quedará en el historial como ANULADO.')) return
+  const ok = await confirmar({ mensaje: '¿Anular este pago? Quedará en el historial como ANULADO.', peligroso: true })
+  if (!ok) return
   anulando.value = id
   try {
     await pagoApi.anular(id)
-    await buscar()
+    await recargar()
+    toast.success('Pago anulado')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al anular'
   } finally {
@@ -78,46 +118,129 @@ const badgeEstado: Record<string, string> = {
   PENDIENTE:'badge-warning',
   ANULADO:  'badge-ghost',
 }
+
+// ── Conceptos de pago (gestión aparte — usaba una API que no se llamaba
+// desde ningún lado) ──────────────────────────────────────────────────────
+const modalConceptos    = ref(false)
+const conceptos         = ref<ConceptoPago[]>([])
+const cargandoConceptos = ref(false)
+const guardandoConcepto = ref(false)
+const errorConcepto     = ref<string | null>(null)
+
+const formConcepto = ref({ nombre: '', descripcion: '', monto: 0, obligatorio: true, fechaVencimiento: '' })
+
+async function abrirConceptos() {
+  modalConceptos.value = true
+  errorConcepto.value  = null
+  if (!gestion.gestionId) return
+  cargandoConceptos.value = true
+  try {
+    conceptos.value = await pagoApi.getConceptos(gestion.gestionId)
+  } catch (e) {
+    errorConcepto.value = e instanceof Error ? e.message : 'Error al cargar conceptos'
+  } finally {
+    cargandoConceptos.value = false
+  }
+}
+
+async function crearConcepto() {
+  if (!formConcepto.value.nombre || formConcepto.value.monto <= 0) {
+    errorConcepto.value = 'Nombre y monto (mayor a 0) son obligatorios'
+    return
+  }
+  if (!gestion.gestionId) return
+  guardandoConcepto.value = true
+  errorConcepto.value     = null
+  try {
+    const nuevo = await pagoApi.crearConcepto({
+      nombre:            formConcepto.value.nombre,
+      descripcion:       formConcepto.value.descripcion || undefined,
+      monto:             formConcepto.value.monto,
+      obligatorio:       formConcepto.value.obligatorio,
+      gestionId:         gestion.gestionId,
+      fechaVencimiento:  formConcepto.value.fechaVencimiento || undefined,
+    })
+    conceptos.value.push(nuevo)
+    formConcepto.value = { nombre: '', descripcion: '', monto: 0, obligatorio: true, fechaVencimiento: '' }
+    toast.success('Concepto de pago creado')
+  } catch (e) {
+    errorConcepto.value = e instanceof Error ? e.message : 'Error al crear concepto'
+  } finally {
+    guardandoConcepto.value = false
+  }
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <h2 class="text-2xl font-bold">Pagos</h2>
+    <div class="flex items-center justify-between">
+      <h2 class="text-2xl font-bold">Pagos</h2>
+      <button class="btn btn-outline btn-sm" @click="abrirConceptos">
+        Conceptos de pago
+      </button>
+    </div>
 
-    <!-- Buscador -->
+    <!-- Buscador de estudiante -->
     <div class="card bg-base-100 shadow">
-      <div class="card-body flex flex-col sm:flex-row gap-3 items-end">
-        <fieldset class="fieldset flex-1">
-          <legend class="fieldset-legend text-xs">ID de Inscripción</legend>
-          <input v-model="inscripcionId" type="number" min="1" placeholder="Ej: 1"
-            class="input input-bordered w-full" @keyup.enter="buscar" />
-        </fieldset>
-        <button class="btn btn-primary" :disabled="cargando" @click="buscar">
-          <span v-if="cargando" class="loading loading-spinner loading-sm"></span>
-          Buscar
-        </button>
+      <div class="card-body py-3">
+        <div class="relative max-w-md">
+          <label class="input input-bordered flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+            </svg>
+            <input
+              v-model="buscador.query.value"
+              type="search"
+              placeholder="Buscar estudiante por nombre o CI..."
+              class="grow"
+              @input="buscador.onInput"
+            />
+            <span v-if="buscador.buscando.value" class="loading loading-spinner loading-xs"></span>
+          </label>
+
+          <!-- Dropdown de resultados -->
+          <ul v-if="buscador.resultados.value.length"
+            class="absolute z-10 mt-1 w-full bg-base-100 rounded-box shadow-lg border border-base-300 max-h-64 overflow-y-auto">
+            <li v-for="e in buscador.resultados.value" :key="e.id">
+              <button
+                class="w-full text-left px-4 py-2 hover:bg-base-200 flex justify-between items-center"
+                @click="buscador.seleccionar(e)"
+              >
+                <span>{{ e.apellido }}, {{ e.nombre }}</span>
+                <span class="font-mono text-xs text-base-content/50">{{ e.ci }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Info del seleccionado -->
+        <div v-if="buscador.seleccionado.value" class="flex flex-wrap gap-6 items-center mt-3 pt-3 border-t border-base-300">
+          <div>
+            <p class="text-xs text-base-content/50">Estudiante</p>
+            <p class="font-semibold">{{ buscador.seleccionado.value.nombre }} {{ buscador.seleccionado.value.apellido }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/50">Curso</p>
+            <p class="font-semibold">{{ cursoDelSeleccionado ?? 'Sin inscripción activa' }}</p>
+          </div>
+          <button class="btn btn-ghost btn-xs ml-auto" @click="buscador.limpiar">Cambiar estudiante</button>
+        </div>
       </div>
     </div>
 
     <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
 
+    <div v-if="buscador.seleccionado.value && !inscripcionId" role="alert" class="alert alert-warning text-sm">
+      <span>Este estudiante no tiene una inscripción activa en la gestión actual — no se pueden registrar pagos.</span>
+    </div>
+
+    <div v-if="cargando" class="skeleton h-32 rounded-xl"></div>
+
     <template v-if="datos">
 
-      <!-- Resumen del estudiante -->
+      <!-- Resumen -->
       <div class="card bg-base-100 shadow">
         <div class="card-body py-3 flex flex-wrap gap-6 items-center">
-          <div>
-            <p class="text-xs text-base-content/50">Estudiante</p>
-            <p class="font-semibold">{{ datos.inscripcion.estudiante.nombre }} {{ datos.inscripcion.estudiante.apellido }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-base-content/50">CI</p>
-            <p class="font-mono">{{ datos.inscripcion.estudiante.ci }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-base-content/50">Curso</p>
-            <p class="font-semibold">{{ datos.inscripcion.curso.nombre }}</p>
-          </div>
           <div>
             <p class="text-xs text-base-content/50">Gestión</p>
             <p class="font-semibold">{{ datos.inscripcion.gestion.anio }}</p>
@@ -137,10 +260,7 @@ const badgeEstado: Record<string, string> = {
       <!-- Estado por concepto -->
       <div class="card bg-base-100 shadow">
         <div class="card-body">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="font-semibold">Estado por concepto</h3>
-            <button class="btn btn-primary btn-sm" @click="abrirModal()">+ Registrar pago</button>
-          </div>
+          <h3 class="font-semibold mb-3">Estado por concepto</h3>
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>
@@ -165,13 +285,19 @@ const badgeEstado: Record<string, string> = {
                     </button>
                   </td>
                 </tr>
+                <tr v-if="!datos.estadoPorConcepto.length">
+                  <td colspan="5" class="text-center text-base-content/40 py-4">
+                    No hay conceptos de pago definidos para esta gestión —
+                    <button class="link link-primary" @click="abrirConceptos">creá uno</button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- Historial completo -->
+      <!-- Historial -->
       <div class="card bg-base-100 shadow overflow-x-auto">
         <div class="card-body">
           <h3 class="font-semibold mb-3">Historial de pagos</h3>
@@ -208,8 +334,8 @@ const badgeEstado: Record<string, string> = {
 
     </template>
 
-    <div v-else-if="!cargando && !error" class="text-center text-base-content/40 py-12">
-      Ingresá el ID de inscripción para ver el estado de pagos
+    <div v-else-if="!cargando && !buscador.seleccionado.value" class="text-center text-base-content/40 py-12">
+      Buscá un estudiante para ver su estado de pagos
     </div>
   </div>
 
@@ -258,5 +384,59 @@ const badgeEstado: Record<string, string> = {
       </form>
     </div>
     <form method="dialog" class="modal-backdrop" @click="modalAbierto = false"><button>cerrar</button></form>
+  </dialog>
+
+  <!-- Modal conceptos de pago -->
+  <dialog :open="modalConceptos" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-2xl">
+      <h3 class="font-bold text-lg mb-1">Conceptos de pago</h3>
+      <p class="text-sm text-base-content/60 mb-4">Gestión {{ gestion.anio }}</p>
+
+      <div v-if="errorConcepto" role="alert" class="alert alert-error mb-4 py-2 text-sm">
+        <span>{{ errorConcepto }}</span>
+      </div>
+
+      <div v-if="cargandoConceptos" class="skeleton h-20 rounded-lg mb-4"></div>
+      <table v-else class="table table-sm mb-4">
+        <thead><tr><th>Nombre</th><th>Monto</th><th>Tipo</th></tr></thead>
+        <tbody>
+          <tr v-for="c in conceptos" :key="c.id">
+            <td>{{ c.nombre }}</td>
+            <td>Bs. {{ c.monto }}</td>
+            <td><span class="badge badge-xs" :class="c.obligatorio ? 'badge-primary' : 'badge-ghost'">{{ c.obligatorio ? 'Obligatorio' : 'Opcional' }}</span></td>
+          </tr>
+          <tr v-if="!conceptos.length"><td colspan="3" class="text-center text-base-content/40 py-4">Sin conceptos aún</td></tr>
+        </tbody>
+      </table>
+
+      <div class="divider text-xs">Nuevo concepto</div>
+      <form class="grid grid-cols-2 gap-3 items-end" @submit.prevent="crearConcepto">
+        <fieldset class="fieldset col-span-2">
+          <legend class="fieldset-legend text-xs">Nombre *</legend>
+          <input v-model="formConcepto.nombre" type="text" placeholder="Ej: Matrícula" class="input input-bordered w-full" :disabled="guardandoConcepto" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Monto (Bs.) *</legend>
+          <input v-model.number="formConcepto.monto" type="number" min="1" class="input input-bordered w-full" :disabled="guardandoConcepto" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Vencimiento</legend>
+          <input v-model="formConcepto.fechaVencimiento" type="date" class="input input-bordered w-full" :disabled="guardandoConcepto" />
+        </fieldset>
+        <label class="label cursor-pointer justify-start gap-2 col-span-2">
+          <input v-model="formConcepto.obligatorio" type="checkbox" class="checkbox checkbox-sm" />
+          <span class="text-xs">Obligatorio</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm col-span-2" :disabled="guardandoConcepto">
+          <span v-if="guardandoConcepto" class="loading loading-spinner loading-xs"></span>
+          Crear concepto
+        </button>
+      </form>
+
+      <div class="modal-action mt-4">
+        <button class="btn btn-ghost" @click="modalConceptos = false">Cerrar</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="modalConceptos = false"><button>cerrar</button></form>
   </dialog>
 </template>

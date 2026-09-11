@@ -3,7 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores/docente.store'
 import { useGestionStore } from '@/stores/gestion.store'
 import { asistenciaApi, type AsistenciaDiaResponse, type ListaItem } from '@/api/asistencia.api'
+import { useToastStore } from '@/stores/toast.store'
 import type { EstadoAsistencia, Nivel } from '@/types'
+
+const toast = useToastStore()
 
 const docenteStore = useDocenteStore()
 const gestionStore = useGestionStore()
@@ -31,7 +34,6 @@ const respuesta   = ref<AsistenciaDiaResponse | null>(null)
 const cargando    = ref(false)
 const guardando   = ref(false)
 const error       = ref<string | null>(null)
-const exito       = ref(false)
 const estadoLocal = ref<Record<number, EstadoAsistencia>>({})
 
 onMounted(async () => {
@@ -45,7 +47,6 @@ async function cargar() {
   if (!asignacion.value) return
   cargando.value = true
   error.value = null
-  exito.value = false
   respuesta.value = null
 
   try {
@@ -89,7 +90,6 @@ async function guardar() {
 
   guardando.value = true
   error.value = null
-  exito.value = false
   try {
     const resultado = await asistenciaApi.registrar({
       docenteMateriaCursoId: asignacion.value.docenteMateriaCursoId,
@@ -100,9 +100,9 @@ async function guardar() {
         estado: estadoLocal.value[item.inscripcionId] ?? 'PRESENTE',
       })),
     })
-    exito.value = true
+    toast.success('Asistencia guardada correctamente')
     if (resultado.alertas.length > 0) {
-      error.value = `Atención: ${resultado.alertas.length} estudiante(s) por debajo del 80% de asistencia`
+      toast.warning(`Atención: ${resultado.alertas.length} estudiante(s) por debajo del 80% de asistencia`)
     }
     await cargar()
   } catch (e) {
@@ -224,7 +224,6 @@ const stats = computed(() => {
 
       <!-- Feedback -->
       <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
-      <div v-if="exito" role="alert" class="alert alert-success"><span>Asistencia guardada correctamente</span></div>
 
       <!-- Lista de estudiantes -->
       <template v-if="respuesta">

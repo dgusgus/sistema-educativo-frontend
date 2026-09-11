@@ -41,6 +41,27 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.value.some(r => rolesPermitidos.includes(r))
   }
 
+  // ── Vista activa (para el selector del sidebar) ────────────────────────────
+  // Un usuario puede tener varios roles (ej. Director + Docente). En vez de
+  // fusionar los menús de todos en uno solo, el sidebar muestra el menú de
+  // UN rol a la vez — "vista activa" es cuál. Se persiste en localStorage
+  // para que sobreviva recargas, igual que el token/usuario.
+  const PRIORIDAD_VISTA: Rol[] = ['DIRECTOR', 'SECRETARIA', 'DOCENTE', 'ESTUDIANTE', 'TUTOR']
+  const vistaActiva = ref<Rol | null>(localStorage.getItem('vistaActiva') as Rol | null)
+
+  // Si la vista guardada ya no es válida (el usuario perdió ese rol, o
+  // nunca se eligió una), cae al primer rol disponible por prioridad.
+  const vistaEfectiva = computed<Rol | null>(() => {
+    if (vistaActiva.value && roles.value.includes(vistaActiva.value)) return vistaActiva.value
+    return PRIORIDAD_VISTA.find(r => roles.value.includes(r)) ?? roles.value[0] ?? null
+  })
+
+  function setVista(rol: Rol) {
+    if (!roles.value.includes(rol)) return
+    vistaActiva.value = rol
+    localStorage.setItem('vistaActiva', rol)
+  }
+
   // ── Acciones ─────────────────────────────────────────────────────────────────
   async function login(username: string, password: string): Promise<void> {
     const { data } = await api.post<{ token: string; usuario: UsuarioAuth }>(
@@ -57,8 +78,10 @@ export const useAuthStore = defineStore('auth', () => {
   function logout(): void {
     token.value   = null
     usuario.value = null
+    vistaActiva.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('usuario')
+    localStorage.removeItem('vistaActiva')
 
     // window.location.href evita el ciclo router → store → api → router
     window.location.href = '/login'
@@ -74,10 +97,17 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('usuario', JSON.stringify(usuario.value))
   }
 
+  // Cambio de contraseña por el propio usuario (requiere saber la actual —
+  // distinto de resetearPassword, que usa Director/Secretaria sin conocerla)
+  async function cambiarPassword(passwordActual: string, passwordNueva: string): Promise<void> {
+    await api.put('/auth/password', { passwordActual, passwordNueva })
+  }
+
   return {
     token, usuario,
     estaAutenticado, roles,
     esDirector, esSecretaria, esDocente, esEstudiante, esTutor,
-    tieneRol, login, logout, refreshMe,
+    vistaEfectiva, setVista,
+    tieneRol, login, logout, refreshMe, cambiarPassword,
   }
 })

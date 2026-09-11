@@ -4,7 +4,10 @@ import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { docenteApi } from '@/api/docente.api'
 import { estudianteApi } from '@/api/estudiante.api'
 import { useGestionStore } from '@/stores/gestion.store'
+import { useToastStore } from '@/stores/toast.store'
 import type { Rol, Nivel } from '@/types'
+
+const toast = useToastStore()
 
 const gestion = useGestionStore()
 
@@ -201,6 +204,7 @@ async function resetear() {
   try {
     await usuarioApi.resetearPassword(usuarioAResetear.value.usuario.id, nuevaPassword.value)
     modalReset.value = false
+    toast.success('Contraseña reseteada correctamente')
   } catch (e) {
     errorReset.value = e instanceof Error ? e.message : 'Error al resetear'
   } finally {
