@@ -324,6 +324,57 @@ async function asignar() {
 function tieneCuenta(d: Docente): boolean {
   return !!d.usuario
 }
+
+// ─── Activar / desactivar cuenta ──────────────────────────────────────────────
+const toggeandoActivo = ref<number | null>(null)
+
+async function toggleActivoCuenta(d: Docente) {
+  if (!d.usuario) return
+  toggeandoActivo.value = d.usuario.id
+  try {
+    const estadoActual = d.usuario.activo ?? true
+    await usuarioApi.update(d.usuario.id, { activo: !estadoActual })
+    d.usuario.activo = !estadoActual
+    toast.success(estadoActual ? 'Cuenta desactivada' : 'Cuenta activada')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al cambiar estado de la cuenta'
+  } finally {
+    toggeandoActivo.value = null
+  }
+}
+
+// ─── Resetear contraseña ──────────────────────────────────────────────────────
+const modalReset    = ref(false)
+const reseteando    = ref(false)
+const errorReset    = ref<string | null>(null)
+const nuevaPassword = ref('')
+const docenteAResetear = ref<Docente | null>(null)
+
+function abrirReset(d: Docente) {
+  docenteAResetear.value = d
+  nuevaPassword.value = ''
+  errorReset.value = null
+  modalReset.value = true
+}
+
+async function resetearPassword() {
+  if (nuevaPassword.value.length < 6) {
+    errorReset.value = 'La contraseña debe tener al menos 6 caracteres'
+    return
+  }
+  if (!docenteAResetear.value?.usuario?.id) return
+  reseteando.value = true
+  errorReset.value = null
+  try {
+    await usuarioApi.resetearPassword(docenteAResetear.value.usuario.id, nuevaPassword.value)
+    modalReset.value = false
+    toast.success('Contraseña reseteada correctamente')
+  } catch (e) {
+    errorReset.value = e instanceof Error ? e.message : 'Error al resetear'
+  } finally {
+    reseteando.value = false
+  }
+}
 </script>
 
 <template>
@@ -390,9 +441,17 @@ function tieneCuenta(d: Docente): boolean {
               </div>
             </td>
             <td>
-              <span v-if="tieneCuenta(d)" class="badge badge-sm badge-success">
-                {{ d.usuario?.username }}
-              </span>
+              <div v-if="tieneCuenta(d)" class="flex items-center gap-2">
+                <span class="badge badge-sm badge-success font-mono">{{ d.usuario?.username }}</span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-success"
+                  :checked="d.usuario?.activo ?? true"
+                  :disabled="toggeandoActivo === d.usuario?.id"
+                  @change="toggleActivoCuenta(d)"
+                  :title="(d.usuario?.activo ?? true) ? 'Desactivar cuenta' : 'Activar cuenta'"
+                />
+              </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
             <td>
@@ -414,6 +473,13 @@ function tieneCuenta(d: Docente): boolean {
                   @click="abrirVincular(d)"
                 >
                   Vincular cuenta
+                </button>
+                <button
+                  v-if="tieneCuenta(d)"
+                  class="btn btn-ghost btn-xs"
+                  @click="abrirReset(d)"
+                >
+                  Reset pass
                 </button>
               </div>
             </td>
@@ -650,5 +716,31 @@ function tieneCuenta(d: Docente): boolean {
       </form>
     </div>
     <form method="dialog" class="modal-backdrop" @click="modalAsignacion = false"><button>cerrar</button></form>
+  </dialog>
+
+  <!-- ── Modal resetear contraseña ────────────────────────────────────────── -->
+  <dialog :open="modalReset" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-1">Resetear contraseña</h3>
+      <p class="text-sm text-base-content/60 mb-4">
+        {{ docenteAResetear?.nombre }} {{ docenteAResetear?.apellido }}
+        · <span class="font-mono">{{ docenteAResetear?.usuario?.username }}</span>
+      </p>
+      <div v-if="errorReset" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorReset }}</span></div>
+      <form class="space-y-3" @submit.prevent="resetearPassword">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Nueva contraseña * (mín. 6 caracteres)</legend>
+          <input v-model="nuevaPassword" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="reseteando" />
+        </fieldset>
+        <div class="modal-action mt-6">
+          <button type="button" class="btn btn-ghost" :disabled="reseteando" @click="modalReset = false">Cancelar</button>
+          <button type="submit" class="btn btn-warning" :disabled="reseteando">
+            <span v-if="reseteando" class="loading loading-spinner loading-sm"></span>
+            Resetear
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
 </template>

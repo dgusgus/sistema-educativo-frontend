@@ -26,6 +26,14 @@ const error       = ref<string | null>(null)
 const busqueda    = ref('')
 const filtroCurso  = ref<number | ''>('')
 const filtroEstado = ref<EstadoInscripcion | ''>('')
+// ⚠️ Antes se mandaba gestionId SIEMPRE — eso hacía que, al activar una
+// gestión nueva (sin inscripciones todavía), la lista completa de
+// estudiantes desapareciera. El Estudiante es un registro PERMANENTE,
+// separado de la Inscripcion (que sí es por gestión) — por defecto se
+// muestran TODOS los estudiantes existan o no inscripciones este año.
+// Este checkbox es opcional, para cuando sí querés acotar a "quién está
+// inscrito este año en particular".
+const soloGestionActiva = ref(false)
 
 let cargaSeq = 0   // guard anti-carrera, mismo patrón que DocentesView
 
@@ -40,7 +48,7 @@ async function cargar() {
   error.value = null
   try {
     const lista = await estudianteApi.getAll({
-      gestionId: gestion.gestionId ?? undefined,
+      ...(soloGestionActiva.value && { gestionId: gestion.gestionId ?? undefined }),
       ...(filtroEstado.value && { estadoInscripcion: filtroEstado.value }),
       ...(filtroCurso.value  && { cursoId: Number(filtroCurso.value) }),
     })
@@ -313,6 +321,80 @@ async function cambiarEstado() {
 
 const requiereFecha = computed(() => ['RETIRADA', 'TRANSFERIDA'].includes(formEstado.value.estadoInscripcion))
 
+// ─── Desinscribir (borrar la inscripción — deshacer un error) ───────────────
+const desinscribiendo = ref<number | null>(null)
+
+async function desinscribir(insc: Inscripcion) {
+  const ok = await confirmar({
+    mensaje: `¿Desinscribir de ${nombreCursoDeInscripcion(insc)}? Esto borra la inscripción — si ya tiene notas, asistencia o pagos cargados, el sistema lo va a rechazar y ahí corresponde usar "Estado" en su lugar.`,
+    peligroso: true,
+    textoConfirmar: 'Desinscribir',
+  })
+  if (!ok) return
+  desinscribiendo.value = insc.id
+  error.value = null
+  try {
+    await estudianteApi.eliminarInscripcion(insc.id)
+    toast.success('Inscripción eliminada')
+    await cargar()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al desinscribir'
+  } finally {
+    desinscribiendo.value = null
+  }
+}
+
+// ─── Activar / desactivar cuenta ──────────────────────────────────────────────
+const toggeandoActivo = ref<number | null>(null)
+
+async function toggleActivo(e: Estudiante) {
+  if (!e.usuario) return
+  toggeandoActivo.value = e.usuario.id
+  try {
+    const estadoActual = e.usuario.activo ?? true
+    await usuarioApi.update(e.usuario.id, { activo: !estadoActual })
+    e.usuario.activo = !estadoActual
+    toast.success(estadoActual ? 'Cuenta desactivada' : 'Cuenta activada')
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Error al cambiar estado de la cuenta'
+  } finally {
+    toggeandoActivo.value = null
+  }
+}
+
+// ─── Resetear contraseña ──────────────────────────────────────────────────────
+const modalReset    = ref(false)
+const reseteando    = ref(false)
+const errorReset    = ref<string | null>(null)
+const nuevaPassword = ref('')
+const estudianteAResetear = ref<Estudiante | null>(null)
+
+function abrirReset(e: Estudiante) {
+  estudianteAResetear.value = e
+  nuevaPassword.value = ''
+  errorReset.value = null
+  modalReset.value = true
+}
+
+async function resetearPassword() {
+  if (nuevaPassword.value.length < 6) {
+    errorReset.value = 'La contraseña debe tener al menos 6 caracteres'
+    return
+  }
+  if (!estudianteAResetear.value?.usuario?.id) return
+  reseteando.value = true
+  errorReset.value = null
+  try {
+    await usuarioApi.resetearPassword(estudianteAResetear.value.usuario.id, nuevaPassword.value)
+    modalReset.value = false
+    toast.success('Contraseña reseteada correctamente')
+  } catch (e) {
+    errorReset.value = e instanceof Error ? e.message : 'Error al resetear'
+  } finally {
+    reseteando.value = false
+  }
+}
+
 // ─── Registrar resultado final ────────────────────────────────────────────────
 const modalResultado = ref(false)
 const registrandoRes = ref(false)
@@ -383,6 +465,10 @@ async function registrarResultado() {
         <option value="TRANSFERIDA">Transferidas</option>
         <option value="CONCLUIDA">Concluidas</option>
       </select>
+      <label class="label cursor-pointer gap-2">
+        <input v-model="soloGestionActiva" type="checkbox" class="checkbox checkbox-sm" @change="cargar" />
+        <span class="text-sm">Solo inscritos en {{ gestion.anio }}</span>
+      </label>
     </div>
 
     <div v-if="error" role="alert" class="alert alert-error">
@@ -424,7 +510,17 @@ async function registrarResultado() {
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
             <td>
-              <span v-if="e.usuario" class="badge badge-sm badge-success font-mono">{{ e.usuario.username }}</span>
+              <div v-if="e.usuario" class="flex items-center gap-2">
+                <span class="badge badge-sm badge-success font-mono">{{ e.usuario.username }}</span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-success"
+                  :checked="e.usuario.activo ?? true"
+                  :disabled="toggeandoActivo === e.usuario.id"
+                  @change="toggleActivo(e)"
+                  :title="e.usuario.activo ?? true ? 'Desactivar cuenta' : 'Activar cuenta'"
+                />
+              </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
             <td>
@@ -445,6 +541,15 @@ async function registrarResultado() {
                   Estado
                 </button>
                 <button
+                  v-if="inscritoEnGestionActiva(e)"
+                  class="btn btn-ghost btn-xs text-error"
+                  :disabled="desinscribiendo === ultimaInscripcion(e)!.id"
+                  @click="desinscribir(ultimaInscripcion(e)!)"
+                >
+                  <span v-if="desinscribiendo === ultimaInscripcion(e)!.id" class="loading loading-xs loading-spinner"></span>
+                  <span v-else>Desinscribir</span>
+                </button>
+                <button
                   v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA' && ultimaInscripcion(e)?.resultado === 'PENDIENTE'"
                   class="btn btn-outline btn-xs btn-info"
                   @click="abrirResultado(ultimaInscripcion(e)!)"
@@ -457,6 +562,13 @@ async function registrarResultado() {
                   @click="abrirVincular(e)"
                 >
                   Vincular cuenta
+                </button>
+                <button
+                  v-if="e.usuario"
+                  class="btn btn-ghost btn-xs"
+                  @click="abrirReset(e)"
+                >
+                  Reset pass
                 </button>
               </div>
             </td>
@@ -714,5 +826,31 @@ async function registrarResultado() {
       </form>
     </div>
     <form method="dialog" class="modal-backdrop" @click="modalResultado = false"><button>cerrar</button></form>
+  </dialog>
+
+  <!-- ── Modal resetear contraseña ────────────────────────────────────────── -->
+  <dialog :open="modalReset" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-1">Resetear contraseña</h3>
+      <p class="text-sm text-base-content/60 mb-4">
+        {{ estudianteAResetear?.nombre }} {{ estudianteAResetear?.apellido }}
+        · <span class="font-mono">{{ estudianteAResetear?.usuario?.username }}</span>
+      </p>
+      <div v-if="errorReset" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorReset }}</span></div>
+      <form class="space-y-3" @submit.prevent="resetearPassword">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Nueva contraseña * (mín. 6 caracteres)</legend>
+          <input v-model="nuevaPassword" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="reseteando" />
+        </fieldset>
+        <div class="modal-action mt-6">
+          <button type="button" class="btn btn-ghost" :disabled="reseteando" @click="modalReset = false">Cancelar</button>
+          <button type="submit" class="btn btn-warning" :disabled="reseteando">
+            <span v-if="reseteando" class="loading loading-spinner loading-sm"></span>
+            Resetear
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
 </template>

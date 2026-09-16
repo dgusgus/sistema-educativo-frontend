@@ -62,4 +62,10 @@ export const estudianteApi = {
   // trimestres de la gestión ya cerrados.
   registrarResultado: (id: number, resultado: ResultadoFinal, observaciones?: string) =>
     api.post<Inscripcion>(`/inscripciones/${id}/resultado`, { resultado, observaciones }).then(r => r.data),
+
+  // "Desinscribir" — borra la inscripción de verdad (deshacer un error).
+  // El backend rechaza (400) si ya tiene notas/asistencia/pagos cargados;
+  // en ese caso corresponde usar cambiarEstado(RETIRADA) en su lugar.
+  eliminarInscripcion: (id: number) =>
+    api.delete(`/inscripciones/${id}`).then(r => r.data),
 }
