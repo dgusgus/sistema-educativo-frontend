@@ -59,6 +59,7 @@ const router = createRouter({
         { path: 'dimensiones',  name: 'director-dimensiones',  component: () => import('@/views/director/Dimensionesview.vue') },
         { path: 'gestiones',    name: 'director-gestiones',    component: () => import('@/views/director/GestionesView.vue') },
         { path: 'institucion',  name: 'director-institucion',  component: () => import('@/views/director/InstitucionView.vue') },
+        { path: 'horarios',     name: 'director-horarios',     component: () => import('@/views/director/HorariosView.vue') },
       ],
     },
 
