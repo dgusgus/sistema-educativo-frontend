@@ -6,12 +6,19 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { useDocenteStore } from '@/stores/docente.store'
 import { reporteApi } from '@/api/reporte.api'
 import type { Rol } from '@/types'
+import { useTheme } from '@/composables/useTheme'
+import AppIcon from '@/components/AppIcon.vue'
+import type { NombreIcono } from '@/lib/icons'
 
-const auth    = useAuthStore()
-const route   = useRoute()
-const router  = useRouter()
+
+const auth = useAuthStore()
+const { tema, alternar } = useTheme()
+const route = useRoute()
+const router = useRouter()
 const gestion = useGestionStore()
 const docenteStore = useDocenteStore()
+const itemsPrincipales = computed(() => menuItems.value.slice(0, 4))
+const hayMasItems = computed(() => menuItems.value.length > 4)
 
 // Badge de "Pagos pendientes" en el sidebar — GET /dashboard es Director-only,
 // así que solo se pide (y se muestra) cuando la vista activa es Director.
@@ -38,50 +45,50 @@ onMounted(() => {
 interface MenuItem {
   label: string
   to: string
-  icon: string
+  icon: NombreIcono   // antes: string (el path del svg)
   grupo?: string
 }
 
 const menusPorRol: Record<Rol, MenuItem[]> = {
   DIRECTOR: [
-    { label: 'Dashboard', to: '/director/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+    { label: 'Dashboard', to: '/director/dashboard', icon: 'dashboard' },
 
-    { label: 'Estructura',    to: '/director/estructura',         grupo: 'Académico', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-    { label: 'Dimensiones',   to: '/director/dimensiones',        grupo: 'Académico', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14' },
-    { label: 'Docentes',      to: '/director/docentes',           grupo: 'Académico', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-    { label: 'Estudiantes',   to: '/secretaria/estudiantes',      grupo: 'Académico', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { label: 'Tutores',       to: '/secretaria/tutores',          grupo: 'Académico', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-    { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', grupo: 'Académico', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
-    { label: 'Promoción de Gestión', to: '/secretaria/promocion', grupo: 'Académico', icon: 'M13 7l5 5m0 0l-5 5m5-5H6' },
+    { label: 'Estructura', to: '/director/estructura', grupo: 'Académico', icon: 'estructura' },
+    { label: 'Dimensiones', to: '/director/dimensiones', grupo: 'Académico', icon: 'dimensiones' },
+    { label: 'Docentes', to: '/director/docentes', grupo: 'Académico', icon: 'personas' },
+    { label: 'Estudiantes', to: '/secretaria/estudiantes', grupo: 'Académico', icon: 'estudiantes' },
+    { label: 'Tutores', to: '/secretaria/tutores', grupo: 'Académico', icon: 'personas' },
+    { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', grupo: 'Académico', icon: 'correccion' },
+    { label: 'Promoción de Gestión', to: '/secretaria/promocion', grupo: 'Académico', icon: 'promocion' },
 
-    { label: 'Directores',   to: '/director/directores',    grupo: 'Administración', icon: 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z' },
-    { label: 'Secretarias',  to: '/director/secretarias',   grupo: 'Administración', icon: 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z' },
-    { label: 'Pagos',        to: '/secretaria/pagos',       grupo: 'Administración', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z' },
-    { label: 'Boletines',    to: '/secretaria/boletines',   grupo: 'Administración', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { label: 'Institución',  to: '/director/institucion',   grupo: 'Administración', icon: 'M3 21h18M5 21V7l8-4v18M19 21V10l-6-3m-4 6h.01M9 16h.01M13 12h.01M13 16h.01' },
+    { label: 'Directores', to: '/director/directores', grupo: 'Administración', icon: 'personas' },
+    { label: 'Secretarias', to: '/director/secretarias', grupo: 'Administración', icon: 'personas' },
+    { label: 'Pagos', to: '/secretaria/pagos', grupo: 'Administración', icon: 'pagos' },
+    { label: 'Boletines', to: '/secretaria/boletines', grupo: 'Administración', icon: 'documento' },
+    { label: 'Institución', to: '/director/institucion', grupo: 'Administración', icon: 'institucion' },
 
-    { label: 'Reportes',  to: '/director/reportes',  icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { label: 'Gestiones', to: '/director/gestiones', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-    { label: 'Horarios', to: '/director/horarios', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+    { label: 'Reportes', to: '/director/reportes', icon: 'reportes' },
+    { label: 'Gestiones', to: '/director/gestiones', icon: 'gestiones' },
   ],
   SECRETARIA: [
-    { label: 'Estudiantes', to: '/secretaria/estudiantes', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { label: 'Tutores',     to: '/secretaria/tutores',     icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-    { label: 'Pagos',       to: '/secretaria/pagos',       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z' },
-    { label: 'Boletines',   to: '/secretaria/boletines',   icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
-    { label: 'Promoción de Gestión', to: '/secretaria/promocion', icon: 'M13 7l5 5m0 0l-5 5m5-5H6' },
+    { label: 'Estudiantes', to: '/secretaria/estudiantes', icon: 'estudiantes' },
+    { label: 'Tutores', to: '/secretaria/tutores', icon: 'personas' },
+    { label: 'Pagos', to: '/secretaria/pagos', icon: 'pagos' },
+    { label: 'Boletines', to: '/secretaria/boletines', icon: 'documento' },
+    { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', icon: 'correccion' },
+    { label: 'Promoción de Gestión', to: '/secretaria/promocion', icon: 'promocion' },
   ],
   DOCENTE: [
-    { label: 'Asistencia',     to: '/docente/asistencia',     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-    { label: 'Calificaciones', to: '/docente/calificaciones', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
-    { label: 'Bitácora',       to: '/docente/bitacora',       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { label: 'Asistencia', to: '/docente/asistencia', icon: 'asistencia' },
+    { label: 'Calificaciones', to: '/docente/calificaciones', icon: 'correccion' },
+    { label: 'Bitácora', to: '/docente/bitacora', icon: 'documento' },
+    { label: 'Mi Horario', to: '/docente/horario', icon: 'horario' },
   ],
   ESTUDIANTE: [
-    { label: 'Mi Perfil', to: '/estudiante/perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+    { label: 'Mi Perfil', to: '/estudiante/perfil', icon: 'perfil' },
   ],
   TUTOR: [
-    { label: 'Seguimiento', to: '/tutor/seguimiento', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
+    { label: 'Seguimiento', to: '/tutor/seguimiento', icon: 'seguimiento' },
   ],
 }
 
@@ -138,13 +145,13 @@ const rolesTexto = computed(() => auth.roles.map(r => NOMBRE_ROL[r] ?? r).join('
 // PUT /auth/password existía en el backend sin ningún consumidor en el
 // frontend — cualquier rol puede cambiarla acá, sin depender de que
 // Director/Secretaria se la resetee.
-const modalPassword    = ref(false)
-const passwordActual   = ref('')
-const passwordNueva    = ref('')
+const modalPassword = ref(false)
+const passwordActual = ref('')
+const passwordNueva = ref('')
 const passwordConfirma = ref('')
 const cambiandoPassword = ref(false)
-const errorPassword    = ref<string | null>(null)
-const exitoPassword     = ref(false)
+const errorPassword = ref<string | null>(null)
+const exitoPassword = ref(false)
 
 function abrirModalPassword() {
   passwordActual.value = ''
@@ -195,19 +202,31 @@ async function guardarPassword() {
       <nav class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-10">
         <div class="flex-none lg:hidden">
           <label for="drawer-toggle" class="btn btn-square btn-ghost">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <AppIcon nombre="menu" class="h-5 w-5" />
           </label>
         </div>
 
         <div class="flex-1 px-2">
           <span class="text-lg font-semibold text-base-content">
-            {{ menuItems.find(i => esActivo(i.to))?.label ?? 'Sistema Educativo' }}
+            {{menuItems.find(i => esActivo(i.to))?.label ?? 'Sistema Educativo'}}
           </span>
         </div>
 
         <div class="flex-none gap-2">
+          <!-- ── agregar dentro de <div class="flex-none gap-2">, ANTES del dropdown de usuario ── -->
+          <button type="button" class="btn btn-ghost btn-circle"
+            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" @click="alternar">
+            <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </button>
           <div class="dropdown dropdown-end">
             <div tabindex="0" role="button" class="btn btn-ghost gap-2">
               <div class="avatar placeholder">
@@ -217,21 +236,18 @@ async function guardarPassword() {
               </div>
               <span class="hidden sm:inline text-sm">{{ auth.usuario?.nombre }}</span>
             </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-300">
+            <ul tabindex="0"
+              class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-300">
               <li class="menu-title text-xs opacity-60">{{ rolesTexto }}</li>
               <li>
                 <button @click="abrirModalPassword">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
+                  <AppIcon nombre="candado" class="h-4 w-4" />
                   Cambiar contraseña
                 </button>
               </li>
               <li>
                 <button class="text-error" @click="auth.logout()">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
+                  <AppIcon nombre="salir" class="h-4 w-4" />
                   Cerrar sesión
                 </button>
               </li>
@@ -240,9 +256,23 @@ async function guardarPassword() {
         </div>
       </nav>
 
-      <main class="flex-1 p-4 bg-base-200">
+      <main class="flex-1 p-4 pb-20 lg:pb-4 bg-base-200">
         <RouterView />
       </main>
+
+      <!-- ── Bottom navigation — solo mobile, el sidebar de siempre sigue en desktop ── -->
+      <div class="dock lg:hidden">
+        <RouterLink v-for="item in itemsPrincipales" :key="item.to" :to="item.to"
+          :class="esActivo(item.to) ? 'dock-active' : ''">
+          <AppIcon :nombre="item.icon" class="h-5 w-5" />
+          <span class="dock-label">{{ item.label }}</span>
+        </RouterLink>
+
+        <label v-if="hayMasItems" for="drawer-toggle">
+          <AppIcon nombre="mas" class="h-5 w-5" />
+          <span class="dock-label">Más</span>
+        </label>
+      </div>
     </div>
 
     <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
@@ -259,11 +289,8 @@ async function guardarPassword() {
         <!-- Selector de vista — solo aparece si el usuario tiene más de un rol -->
         <div v-if="auth.roles.length > 1" class="px-3 pt-3">
           <label class="text-[10px] uppercase tracking-wide text-base-content/40 px-1">Viendo como</label>
-          <select
-            class="select select-bordered select-sm w-full mt-1"
-            :value="auth.vistaEfectiva ?? ''"
-            @change="cambiarVista(($event.target as HTMLSelectElement).value)"
-          >
+          <select class="select select-bordered select-sm w-full mt-1" :value="auth.vistaEfectiva ?? ''"
+            @change="cambiarVista(($event.target as HTMLSelectElement).value)">
             <option v-for="r in auth.roles" :key="r" :value="r">{{ NOMBRE_ROL[r] }}</option>
           </select>
         </div>
@@ -271,14 +298,13 @@ async function guardarPassword() {
         <!-- Ítems del menú, agrupados -->
         <ul class="menu menu-sm p-3 flex-1 gap-1 overflow-y-auto">
           <template v-for="grupo in grupos" :key="grupo ?? '_sin_grupo'">
-            <li v-if="grupo" class="menu-title text-[10px] uppercase tracking-wide text-base-content/40 mt-2 first:mt-0">
+            <li v-if="grupo"
+              class="menu-title text-[10px] uppercase tracking-wide text-base-content/40 mt-2 first:mt-0">
               <span>{{ grupo }}</span>
             </li>
             <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
               <RouterLink :to="item.to" :class="esActivo(item.to) ? 'active' : ''">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="item.icon" />
-                </svg>
+                <AppIcon :nombre="item.icon" class="h-4 w-4" />
                 <span class="flex-1">{{ item.label }}</span>
                 <span v-if="badgeDe(item)" class="badge badge-error badge-sm">{{ badgeDe(item) }}</span>
               </RouterLink>
@@ -286,8 +312,21 @@ async function guardarPassword() {
           </template>
         </ul>
 
-        <div class="p-4 border-t border-base-300 text-xs text-base-content/40">
-          Sistema Educativo v1.0
+        <div class="p-4 border-t border-base-300 flex items-center justify-between">
+          <span class="text-xs text-base-content/40">Sistema Educativo v1.0</span>
+          <button type="button" class="btn btn-ghost btn-sm btn-circle"
+            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" @click="alternar">
+            <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </button>
         </div>
       </aside>
     </div>
@@ -318,8 +357,8 @@ async function guardarPassword() {
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Contraseña nueva (mín. 8 caracteres)</legend>
-          <input v-model="passwordNueva" type="password" autocomplete="new-password"
-            class="input input-bordered w-full" :disabled="cambiandoPassword" />
+          <input v-model="passwordNueva" type="password" autocomplete="new-password" class="input input-bordered w-full"
+            :disabled="cambiandoPassword" />
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Confirmar contraseña nueva</legend>
@@ -327,7 +366,8 @@ async function guardarPassword() {
             class="input input-bordered w-full" :disabled="cambiandoPassword" />
         </fieldset>
         <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="cambiandoPassword" @click="modalPassword = false">Cancelar</button>
+          <button type="button" class="btn btn-ghost" :disabled="cambiandoPassword"
+            @click="modalPassword = false">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="cambiandoPassword">
             <span v-if="cambiandoPassword" class="loading loading-spinner loading-sm"></span>
             Guardar

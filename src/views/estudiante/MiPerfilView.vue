@@ -4,9 +4,14 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useGestionStore } from '@/stores/gestion.store'
 import { calificacionApi } from '@/api/calificacion.api'
 import type { Nivel, ResultadoFinal } from '@/types'
+import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
+import HorarioSemanal from '@/components/HorarioSemanal.vue'
 
 const auth    = useAuthStore()
 const gestion = useGestionStore()
+
+const horarios        = ref<HorarioDetalle[]>([])
+const cargandoHorario = ref(true)
 
 // Refleja GET /calificaciones/estudiante (calificacion.controller.ts)
 interface CalificacionItem {
@@ -41,12 +46,14 @@ onMounted(async () => {
     await gestion.cargar()
     if (!gestion.gestionId) throw new Error('No hay gestión activa')
 
-    // El backend resuelve el estudianteId desde el token cuando el rol
-    // es ESTUDIANTE — no hace falta pasarlo.
-    const data = await calificacionApi.getDeEstudiante({ gestionId: gestion.gestionId })
+    const [data] = await Promise.all([
+      calificacionApi.getDeEstudiante({ gestionId: gestion.gestionId }),
+      horarioApi.getPropio().then(h => { horarios.value = h }).finally(() => { cargandoHorario.value = false }),
+    ])
     inscripciones.value = Array.isArray(data) ? data as InscripcionConNotas[] : []
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar datos'
+    cargandoHorario.value = false
   } finally {
     cargando.value = false
   }
@@ -88,6 +95,13 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
         </div>
       </div>
     </div>
+    <!-- agregar en el template, después del <div class="card ..."> del encabezado (línea 90 del archivo original) y antes de "Notas por inscripción" -->
+<div class="card bg-base-100 shadow">
+  <div class="card-body">
+    <h3 class="font-semibold mb-2">Mi horario</h3>
+    <HorarioSemanal :horarios="horarios" :cargando="cargandoHorario" columna-extra="docente" />
+  </div>
+</div>
 
     <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
 

@@ -1,5 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
 @import "tailwindcss";
 @plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "colegio";
+  default: true;
+  color-scheme: light;
+  --color-primary: #1A3C5E;
+  --color-primary-content: #FFFFFF;
+  --color-secondary: #2E6DA4;
+  --color-secondary-content: #FFFFFF;
+  --color-accent: #2E6DA4;
+  --color-accent-content: #FFFFFF;
+  --color-neutral: #333333;
+  --color-neutral-content: #FFFFFF;
+  --color-base-100: #FFFFFF;
+  --color-base-200: #EBF2FA;
+  --color-base-300: #DCE7F2;
+  --color-base-content: #333333;
+  --color-info: #2E6DA4;
+  --color-info-content: #FFFFFF;
+  --color-success: #2E7D32;
+  --color-success-content: #FFFFFF;
+  --color-warning: #C77700;
+  --color-warning-content: #FFFFFF;
+  --color-error: #C0392B;
+  --color-error-content: #FFFFFF;
+  --radius-box: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+:root {
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
 
 /* Reset mínimo — Tailwind ya maneja la mayoría */
 *, *::before, *::after {
@@ -9,7 +48,11 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
 }
 
 /* Transiciones suaves para cambios de ruta */
@@ -20,4 +63,37 @@ body {
 .page-enter-from,
 .page-leave-to {
   opacity: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "colegio-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+  --color-primary: #3b82f6;
+  --color-primary-content: #ffffff;
+  --color-secondary: #60a5fa;
+  --color-secondary-content: #001d36;
+  --color-accent: #4edea3;
+  --color-accent-content: #002b1a;
+  --color-neutral: #1e314f;
+  --color-neutral-content: #dbe2f5;
+  --color-base-100: #101c2e;
+  --color-base-200: #0c1421;
+  --color-base-300: #16243b;
+  --color-base-content: #dbe2f5;
+  --color-info: #60a5fa;
+  --color-info-content: #001d36;
+  --color-success: #10b981;
+  --color-success-content: #00210f;
+  --color-warning: #f59e0b;
+  --color-warning-content: #2a1700;
+  --color-error: #f43f5e;
+  --color-error-content: #2a000a;
+  --radius-box: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }

@@ -4,9 +4,11 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { calificacionApi } from '@/api/calificacion.api'
 import api from '@/api/axios'
 import type { Nivel, ResultadoFinal } from '@/types'
+import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
+import HorarioSemanal from '@/components/HorarioSemanal.vue'
 
 const gestion = useGestionStore()
-
+const horarioEstudiante = ref<HorarioDetalle[]>([])
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 // No existe un tutor.api.ts dedicado todavía — se consulta directo con
 // tipos locales en vez de "any" para no perder seguridad de tipos.
@@ -76,10 +78,15 @@ async function cargarDatos(estudianteId: number) {
   cargandoDatos.value = true
   error.value = null
   datosEstudiante.value = null
+  horarioEstudiante.value = []
   try {
     if (!gestion.gestionId) throw new Error('No hay gestión activa')
-    const data = await calificacionApi.getDeEstudiante({ estudianteId, gestionId: gestion.gestionId })
+    const [data, horario] = await Promise.all([
+      calificacionApi.getDeEstudiante({ estudianteId, gestionId: gestion.gestionId }),
+      horarioApi.getPropio(estudianteId),
+    ])
     datosEstudiante.value = Array.isArray(data) ? data as InscripcionConNotas[] : []
+    horarioEstudiante.value = horario
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar datos del estudiante'
   } finally {
@@ -140,7 +147,13 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
         <div v-if="cargandoDatos" class="space-y-3">
           <div class="skeleton h-40 rounded-xl"></div>
         </div>
-
+<!-- agregar dentro de <template v-if="seleccionado"> ..., antes de v-else-if="datosEstudiante" o después de cerrar ese bloque, al mismo nivel -->
+<div v-if="!cargandoDatos" class="card bg-base-100 shadow">
+  <div class="card-body">
+    <h3 class="font-semibold mb-2">Horario</h3>
+    <HorarioSemanal :horarios="horarioEstudiante" :cargando="cargandoDatos" columna-extra="docente" />
+  </div>
+</div>
         <template v-else-if="datosEstudiante">
           <div v-for="insc in datosEstudiante" :key="insc.id" class="card bg-base-100 shadow">
             <div class="card-body">

@@ -90,6 +90,7 @@ const router = createRouter({
         { path: 'asistencia',     name: 'docente-asistencia',     component: () => import('@/views/docente/AsistenciaView.vue') },
         { path: 'calificaciones', name: 'docente-calificaciones', component: () => import('@/views/docente/CalificacionesView.vue') },
         { path: 'bitacora',       name: 'docente-bitacora',       component: () => import('@/views/docente/BitacoraView.vue') },
+        { path: 'horario',        name: 'docente-horario',        component: () => import('@/views/docente/HorarioView.vue') },
       ],
     },
 
