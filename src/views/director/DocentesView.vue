@@ -8,6 +8,7 @@ import { useToastStore } from '@/stores/toast.store'
 import type { Docente, Nivel, Materia } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import { codigoCurso } from '@/lib/abreviar'
 
 const toast = useToastStore()
 
@@ -71,12 +72,18 @@ const docentesFiltrados = computed(() => {
 // docenteApi.getAll() ya incluye asignaciones de la gestión activa — no
 // hace falta un fetch extra. El curso acá no trae "nombre" calculado
 // (solo nivel/grado/paralelo), se arma igual que en el resto del frontend.
+// ✅ reemplazar por esto
 const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
-function cursosDe(d: Docente): string[] {
+function cursosDe(d: Docente): Array<{ corto: string; completo: string }> {
   return (d.asignaciones ?? []).map(a => {
     const c = a.curso
-    const nombreCurso = c ? `${c.grado}° ${NIVEL_TEXTO[c.nivel]}"${c.paralelo}"` : '?'
-    return `${a.materia?.nombre ?? '?'} · ${nombreCurso}`
+    const completo = c
+      ? `${a.materia?.nombre ?? '?'} — ${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
+      : a.materia?.nombre ?? '?'
+    const corto = c
+      ? `${a.materia?.codigo ?? a.materia?.nombre?.slice(0, 3).toUpperCase() ?? '?'} · ${codigoCurso(c)}`
+      : a.materia?.nombre ?? '?'
+    return { corto, completo }
   })
 }
 
@@ -421,9 +428,11 @@ async function resetearPassword() {
             <th>Acciones</th>
           </tr>
         </thead>
-        <tbody>
+       <tbody>
           <tr v-if="cargando" v-for="i in 5" :key="i">
-            <td colspan="7"><div class="skeleton h-4 w-full"></div></td>
+            <td colspan="7">
+              <div class="skeleton h-4 w-full"></div>
+            </td>
           </tr>
           <tr v-else-if="docentesFiltrados.length === 0">
             <td colspan="7" class="text-center text-base-content/40 py-8">
@@ -434,28 +443,30 @@ async function resetearPassword() {
             <td class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
-            <td>
-              <div class="flex flex-wrap gap-1 max-w-xs">
-                <span v-for="(c, i) in cursosDe(d)" :key="i" class="badge badge-sm badge-outline">{{ c }}</span>
-                <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
-              </div>
-            </td>
+<td>
+  <div class="flex flex-wrap gap-1 max-w-xs">
+    <span
+      v-for="(c, i) in cursosDe(d)"
+      :key="i"
+      class="badge badge-sm badge-outline"
+      :title="c.completo"
+    >
+      {{ c.corto }}
+    </span>
+    <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
+  </div>
+</td>
             <td>
               <div v-if="tieneCuenta(d)" class="flex items-center gap-2">
                 <span class="badge badge-sm badge-success font-mono">{{ d.usuario?.username }}</span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-xs toggle-success"
-                  :checked="d.usuario?.activo ?? true"
-                  :disabled="toggeandoActivo === d.usuario?.id"
-                  @change="toggleActivoCuenta(d)"
-                  :title="(d.usuario?.activo ?? true) ? 'Desactivar cuenta' : 'Activar cuenta'"
-                />
+                <input type="checkbox" class="toggle toggle-xs toggle-success" :checked="d.usuario?.activo ?? true"
+                  :disabled="toggeandoActivo === d.usuario?.id" @change="toggleActivoCuenta(d)"
+                  :title="(d.usuario?.activo ?? true) ? 'Desactivar cuenta' : 'Activar cuenta'" />
               </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
             <td>
-<StatusBadge :estado="d.activo ? 'ACTIVO' : 'INACTIVO'" :texto="d.activo ? 'Activo' : 'Inactivo'" />
+              <StatusBadge :estado="d.activo ? 'ACTIVO' : 'INACTIVO'" :texto="d.activo ? 'Activo' : 'Inactivo'" />
             </td>
             <td>
               <div class="flex gap-1 flex-wrap">
@@ -465,18 +476,10 @@ async function resetearPassword() {
                 <button class="btn btn-outline btn-xs btn-info" @click="abrirAsignacion(d)">
                   Asignar
                 </button>
-                <button
-                  v-if="!tieneCuenta(d)"
-                  class="btn btn-outline btn-xs btn-warning"
-                  @click="abrirVincular(d)"
-                >
+                <button v-if="!tieneCuenta(d)" class="btn btn-outline btn-xs btn-warning" @click="abrirVincular(d)">
                   Vincular cuenta
                 </button>
-                <button
-                  v-if="tieneCuenta(d)"
-                  class="btn btn-ghost btn-xs"
-                  @click="abrirReset(d)"
-                >
+                <button v-if="tieneCuenta(d)" class="btn btn-ghost btn-xs" @click="abrirReset(d)">
                   Reset pass
                 </button>
               </div>

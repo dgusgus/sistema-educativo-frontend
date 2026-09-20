@@ -319,17 +319,22 @@ async function resetearPassword() {
             <td class="font-medium">{{ t.apellido }}, {{ t.nombre }}</td>
             <td class="font-mono text-sm">{{ t.ci }}</td>
             <td class="text-sm">{{ t.ocupacion ?? '—' }}</td>
-            <td>
-              <div class="flex flex-wrap gap-1">
-                <span v-for="v in t.estudiantes" :key="v.estudiante?.id" class="badge badge-sm badge-outline gap-1">
-                  {{ v.estudiante?.nombre }} {{ v.estudiante?.apellido }} ({{ v.parentesco }})
-                  <button class="text-error inline-flex" @click="desvincular(t, v.estudiante!.id)">
-  <AppIcon nombre="cerrar" class="h-3 w-3" />
-</button>
-                </span>
-                <span v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</span>
-              </div>
-            </td>
+<td>
+  <div class="flex flex-col gap-1 max-w-xs">
+    <div
+      v-for="v in t.estudiantes"
+      :key="v.estudiante?.id"
+      class="flex items-center gap-2 bg-base-200 rounded-field px-2 py-1 text-xs"
+    >
+      <span class="flex-1">{{ v.estudiante?.nombre }} {{ v.estudiante?.apellido }}</span>
+      <span class="badge badge-xs badge-ghost shrink-0">{{ v.parentesco }}</span>
+      <button class="text-error shrink-0" @click="desvincular(t, v.estudiante!.id)">
+        <AppIcon nombre="cerrar" class="h-3 w-3" />
+      </button>
+    </div>
+    <span v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</span>
+  </div>
+</td>
             <td>
               <div v-if="t.usuario" class="flex items-center gap-2">
                 <span class="badge badge-sm badge-success font-mono">{{ t.usuario.username }}</span>
