@@ -65,4 +65,10 @@ export const evaluacionApi = {
     api.post<{ registradas: number; resultados: Array<{ inscripcionId: number; promedioTrimestral: number | null }> }>(
       `/actividades-evaluativas/${actividadEvaluativaId}/notas`, { notas }
     ).then(r => r.data),
+  
+  // Notas ya registradas de una actividad — para precargar el formulario
+  getNotasActividad: (actividadEvaluativaId: number) =>
+    api.get<Array<{ inscripcionId: number; nota: number; observacion: string | null }>>(
+      `/actividades-evaluativas/${actividadEvaluativaId}/notas`
+    ).then(r => r.data),
 }

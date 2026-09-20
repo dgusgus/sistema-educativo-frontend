@@ -124,14 +124,22 @@ const actividadParaNotas = ref<ActividadEvaluativa | null>(null)
 const notasLocales = ref<Record<number, string>>({})
 const guardandoNotas = ref(false)
 
-// ⚠️ Limitación real del backend: no existe un GET que devuelva las notas
-// ya cargadas de una actividad puntual (solo _count.notas en la lista).
-// Por eso el formulario arranca en blanco aunque la actividad ya tenga
-// notas registradas — solo se sabe CUÁNTAS tiene, no CUÁLES. Si se agrega
-// ese endpoint más adelante, precargar notasLocales acá.
-function abrirNotas(act: ActividadEvaluativa) {
+// ── reemplazar el comentario + función abrirNotas por esto ──
+const cargandoNotasActuales = ref(false)
+
+async function abrirNotas(act: ActividadEvaluativa) {
   actividadParaNotas.value = act
   notasLocales.value = {}
+  cargandoNotasActuales.value = true
+  try {
+    const notas = await evaluacionApi.getNotasActividad(act.id)
+    notasLocales.value = Object.fromEntries(notas.map(n => [n.inscripcionId, String(n.nota)]))
+  } catch {
+    // Si falla la carga, el formulario queda en blanco — el docente
+    // puede seguir registrando notas nuevas sin bloquearse por esto.
+  } finally {
+    cargandoNotasActuales.value = false
+  }
 }
 
 function notaValida(v: string, max: number): boolean {
@@ -331,9 +339,10 @@ const statsFinales = computed(() => {
 
         <!-- Registrar notas de la actividad seleccionada -->
         <div v-if="actividadParaNotas" class="card bg-base-100 shadow">
-          <div class="card-body py-3">
+         <div class="card-body py-3">
             <p class="text-sm font-semibold mb-2">
               Notas — {{ actividadParaNotas.nombre }} (máx. {{ actividadParaNotas.puntajeMaximo }})
+              <span v-if="cargandoNotasActuales" class="loading loading-spinner loading-xs ml-2"></span>
             </p>
             <div class="overflow-x-auto">
               <table class="table table-sm">
@@ -385,9 +394,8 @@ const statsFinales = computed(() => {
                   </td>
                   <td class="font-semibold">{{ item.promedio !== null ? item.promedio.toFixed(1) : '—' }}</td>
                   <td>
-                    <span v-if="item.promedio !== null" class="badge badge-sm" :class="item.promedio >= 51 ? 'badge-success' : 'badge-error'">
-                      {{ item.promedio >= 51 ? 'Aprobado' : 'Reprobado' }}
-                    </span>
+                    <StatusBadge v-if="item.promedio !== null"
+                      :estado="item.promedio >= 51 ? 'APROBADO' : 'REPROBADO'" />
                     <span v-else class="text-base-content/30 text-sm">Sin nota</span>
                   </td>
                 </tr>
