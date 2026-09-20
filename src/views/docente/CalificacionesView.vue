@@ -203,7 +203,7 @@ const statsFinales = computed(() => {
   const promedios = planilla.value.planilla.map(p => p.promedio).filter((n): n is number => n !== null)
   if (!promedios.length) return null
   const promedio  = promedios.reduce((a, b) => a + b, 0) / promedios.length
-  const aprobados = promedios.filter(n => n >= 51).length
+  const aprobados = promedios.filter(n => n >= gestion.notaMinima).length
   return { promedio: promedio.toFixed(1), aprobados, reprobados: promedios.length - aprobados }
 })
 </script>
@@ -393,9 +393,9 @@ const statsFinales = computed(() => {
                     {{ item.dimensiones.find(x => x.nombre === d.nombre)?.promedio?.toFixed(1) ?? '—' }}
                   </td>
                   <td class="font-semibold">{{ item.promedio !== null ? item.promedio.toFixed(1) : '—' }}</td>
-                  <td>
+                 <td>
                     <StatusBadge v-if="item.promedio !== null"
-                      :estado="item.promedio >= 51 ? 'APROBADO' : 'REPROBADO'" />
+                      :estado="item.promedio >= gestion.notaMinima ? 'APROBADO' : 'REPROBADO'" />
                     <span v-else class="text-base-content/30 text-sm">Sin nota</span>
                   </td>
                 </tr>

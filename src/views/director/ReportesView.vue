@@ -6,6 +6,9 @@ import { nombreCurso } from '@/api/estructura.api'
 import { descargarBlob } from '@/api/boletin.api'
 import type { Nivel, Turno } from '@/types'
 
+import AppIcon from '@/components/AppIcon.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+
 const gestion    = useGestionStore()
 const cursoId    = ref<number | ''>('')
 const reporte    = ref<ReporteAcademicoResponse | null>(null)
@@ -89,9 +92,7 @@ function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>
         </button>
         <button class="btn btn-outline" :disabled="descargando" @click="descargarPdf">
           <span v-if="descargando" class="loading loading-spinner loading-sm"></span>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
+          <AppIcon v-else nombre="descargar" class="h-4 w-4" />
           PDF
         </button>
       </div>
@@ -144,12 +145,10 @@ function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>
               <td class="font-medium">{{ insc.estudiante.apellido }}, {{ insc.estudiante.nombre }}</td>
               <td class="text-sm text-base-content/60">{{ nombreCursoCorto(insc.curso) }}</td>
               <td>
-                <div class="flex flex-wrap gap-1">
-                  <span v-for="(pf, idx) in insc.promediosFinales" :key="idx"
-                    class="badge badge-xs" :class="pf.resultado === 'PROMOVIDO' ? 'badge-success' : 'badge-error'"
-                    :title="pf.docenteMateriaCurso.materia.nombre">
-                    {{ pf.docenteMateriaCurso.materia.nombre.substring(0,3) }}:{{ pf.promedioFinal.toFixed(0) }}
-                  </span>
+               <div class="flex flex-wrap gap-1">
+                  <StatusBadge v-for="(pf, idx) in insc.promediosFinales" :key="idx" :estado="pf.resultado" tamano="xs"
+                    :texto="`${pf.docenteMateriaCurso.materia.nombre.substring(0, 3)}:${pf.promedioFinal.toFixed(0)}`"
+                    :title="pf.docenteMateriaCurso.materia.nombre" />
                   <span v-if="!insc.promediosFinales.length" class="text-xs text-base-content/40">Sin datos</span>
                 </div>
               </td>
@@ -160,10 +159,7 @@ function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>
                 <span v-else class="text-base-content/40">—</span>
               </td>
               <td>
-                <span class="badge badge-sm"
-                  :class="insc.resultado === 'PROMOVIDO' ? 'badge-success' : insc.resultado === 'REPROBADO' ? 'badge-error' : 'badge-ghost'">
-                  {{ insc.resultado }}
-                </span>
+                <StatusBadge :estado="insc.resultado" />
               </td>
             </tr>
           </tbody>

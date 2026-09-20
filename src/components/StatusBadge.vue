@@ -2,18 +2,26 @@
 type Estado = 'APROBADO' | 'PROMOVIDO' | 'AL_DIA' | 'PAGADO'
             | 'REPROBADO' | 'MOROSO'
             | 'PENDIENTE' | 'RETRASO' | 'JUSTIFICADO'
+            | 'ANULADO'
 
-const props = defineProps<{ estado: Estado | string; texto?: string }>()
+const props = withDefaults(defineProps<{
+  estado: Estado | string
+  texto?: string
+  tamano?: 'xs' | 'sm' | 'md'
+}>(), {
+  tamano: 'sm',
+})
 
 const ESTILO: Record<string, string> = {
   APROBADO: 'badge-success', PROMOVIDO: 'badge-success', AL_DIA: 'badge-success', PAGADO: 'badge-success',
   REPROBADO: 'badge-error',  MOROSO: 'badge-error',
   PENDIENTE: 'badge-warning', RETRASO: 'badge-warning', JUSTIFICADO: 'badge-warning',
+  ANULADO: 'badge-ghost',
 }
 
-const claseClase = ESTILO[props.estado] ?? 'badge-neutral'
+const claseEstado = ESTILO[props.estado] ?? 'badge-neutral'
 </script>
 
 <template>
-  <span class="badge badge-sm" :class="claseClase">{{ texto ?? estado }}</span>
+  <span class="badge" :class="[claseEstado, `badge-${tamano}`]">{{ texto ?? estado }}</span>
 </template>

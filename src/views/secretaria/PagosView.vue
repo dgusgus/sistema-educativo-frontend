@@ -184,10 +184,8 @@ async function crearConcepto() {
     <div class="card bg-base-100 shadow">
       <div class="card-body py-3">
         <div class="relative max-w-md">
-          <label class="input input-bordered flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-            </svg>
+         <label class="input input-bordered flex items-center gap-2">
+            <AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
             <input
               v-model="buscador.query.value"
               type="search"
@@ -250,9 +248,7 @@ async function crearConcepto() {
             <p class="text-2xl font-bold" :class="datos.resumen.alDia ? 'text-success' : 'text-error'">
               Bs. {{ datos.resumen.saldo.toLocaleString('es-BO') }}
             </p>
-            <span class="badge badge-sm" :class="datos.resumen.alDia ? 'badge-success' : 'badge-error'">
-              {{ datos.resumen.alDia ? 'Al día' : 'Con deuda' }}
-            </span>
+            <StatusBadge :estado="datos.resumen.alDia ? 'AL_DIA' : 'MOROSO'" :texto="datos.resumen.alDia ? 'Al día' : 'Con deuda'" />
           </div>
         </div>
       </div>
@@ -274,7 +270,7 @@ async function crearConcepto() {
                   </td>
                   <td>Bs. {{ c.concepto.monto }}</td>
                   <td>
-                    <span class="badge badge-sm" :class="badgeEstado[c.estado]">{{ c.estado }}</span>
+                    <StatusBadge :estado="c.estado" />
                   </td>
                   <td class="font-mono text-xs text-base-content/60">{{ c.numeroRecibo ?? '—' }}</td>
                   <td>
@@ -316,7 +312,7 @@ async function crearConcepto() {
                 <td class="font-semibold">Bs. {{ p.montoPagado.toLocaleString('es-BO') }}</td>
                 <td class="text-sm">{{ p.metodoPago }}</td>
                 <td class="text-sm text-base-content/60">{{ new Date(p.fechaPago).toLocaleDateString('es-BO') }}</td>
-                <td><span class="badge badge-sm" :class="badgeEstado[p.estado]">{{ p.estado }}</span></td>
+                <td><StatusBadge :estado="p.estado" /></td>
                 <td>
                   <button v-if="p.estado === 'PAGADO'"
                     class="btn btn-ghost btn-xs text-error"

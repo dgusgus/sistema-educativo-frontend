@@ -26,6 +26,7 @@ export const useGestionStore = defineStore('gestion', () => {
   const trimestreActivo = computed(() =>
     gestion.value?.trimestres.find(t => !t.cerrado) ?? null
   )
+  const notaMinima = computed(() => gestion.value?.notaMinimaAprobacion ?? 51)
 
   async function cargar() {
     // DashboardLayout llama a cargar() en cada montaje — este guard evita
@@ -57,6 +58,7 @@ export const useGestionStore = defineStore('gestion', () => {
   return {
     gestion, cargando, error,
     gestionId, anio, cursos, trimestres, director, trimestreActivo,
+    notaMinima,
     cargar, recargar, limpiar,
   }
 })
