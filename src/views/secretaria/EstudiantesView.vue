@@ -14,6 +14,7 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const gestion = useGestionStore()
 const { confirmar } = useConfirm()
@@ -82,12 +83,6 @@ function inscritoEnGestionActiva(e: Estudiante): boolean {
   return !!insc && insc.gestionId === gestion.gestionId
 }
 
-const badgeEstado: Record<EstadoInscripcion, string> = {
-  ACTIVA: 'badge-success', RETIRADA: 'badge-error', TRANSFERIDA: 'badge-warning', CONCLUIDA: 'badge-ghost',
-}
-const badgeResultado: Record<ResultadoFinal, string> = {
-  PENDIENTE: 'badge-ghost', PROMOVIDO: 'badge-success', REPROBADO: 'badge-error',
-}
 
 // ⚠️ el curso embebido en Estudiante.inscripciones no trae "nombre"
 // calculado — solo nivel/grado/paralelo (sin turno).
@@ -495,18 +490,14 @@ async function registrarResultado() {
             <td class="font-mono text-sm">{{ e.ci }}</td>
             <td class="text-sm">
               <span v-if="ultimaInscripcion(e)">{{ nombreCursoDeInscripcion(ultimaInscripcion(e)) }}</span>
-              <span v-else class="text-base-content/30">Sin inscripción</span>
+             <span v-else class="text-base-content/30">Sin inscripción</span>
             </td>
             <td>
-              <span v-if="ultimaInscripcion(e)" class="badge badge-sm" :class="badgeEstado[ultimaInscripcion(e)!.estadoInscripcion]">
-                {{ ultimaInscripcion(e)!.estadoInscripcion }}
-              </span>
+              <StatusBadge v-if="ultimaInscripcion(e)" :estado="ultimaInscripcion(e)!.estadoInscripcion" />
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
             <td>
-              <span v-if="ultimaInscripcion(e)" class="badge badge-sm" :class="badgeResultado[ultimaInscripcion(e)!.resultado]">
-                {{ ultimaInscripcion(e)!.resultado }}
-              </span>
+              <StatusBadge v-if="ultimaInscripcion(e)" :estado="ultimaInscripcion(e)!.resultado" />
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
             <td>

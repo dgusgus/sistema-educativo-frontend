@@ -4,6 +4,7 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { cursoApi } from '@/api/estructura.api'
 import { calificacionApi, type PlanillaResponse, type PlanillaItem, type HistorialItem } from '@/api/calificacion.api'
 import { useToastStore } from '@/stores/toast.store'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const toast = useToastStore()
 
@@ -189,9 +190,7 @@ async function guardarCorreccion() {
               <td class="font-medium">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
               <td class="font-semibold">{{ item.promedio !== null ? item.promedio.toFixed(1) : '—' }}</td>
               <td>
-                <span v-if="item.promedio !== null" class="badge badge-sm" :class="item.promedio >= 51 ? 'badge-success' : 'badge-error'">
-                  {{ item.promedio >= 51 ? 'Aprobado' : 'Reprobado' }}
-                </span>
+<StatusBadge v-if="item.promedio !== null" :estado="item.promedio >= gestion.notaMinima ? 'APROBADO' : 'REPROBADO'" />
               </td>
               <td>
                 <button class="btn btn-ghost btn-xs" :disabled="!item.calificacionId" @click="abrirCorreccion(item)">

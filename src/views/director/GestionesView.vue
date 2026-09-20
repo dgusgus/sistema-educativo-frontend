@@ -22,6 +22,8 @@ import { useGestionStore } from '@/stores/gestion.store'
 import api from '@/api/axios'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
+import AppIcon from '@/components/AppIcon.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -302,7 +304,7 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
               <span v-if="g.director" class="text-sm">
                 {{ g.director.nombre }} {{ g.director.apellido }}
               </span>
-              <span v-else class="badge badge-sm badge-warning">Sin asignar</span>
+              <StatusBadge v-else estado="PENDIENTE" texto="Sin asignar" />
             </td>
             <td class="text-center">
               <span class="badge badge-sm badge-ghost">{{ g._count.cursos }}</span>
@@ -311,9 +313,7 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
               <span class="badge badge-sm badge-ghost">{{ g._count.inscripciones }}</span>
             </td>
             <td>
-              <span class="badge badge-sm" :class="g.activa ? 'badge-success' : 'badge-ghost'">
-                {{ g.activa ? 'Activa' : 'Cerrada' }}
-              </span>
+              <StatusBadge :estado="g.activa ? 'ACTIVA' : 'CONCLUIDA'" :texto="g.activa ? 'Activa' : 'Cerrada'" />
             </td>
             <td>
               <div class="flex gap-1 flex-wrap">
@@ -390,9 +390,7 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
              quién va a dirigirla. Se puede asignar después con el botón
              "Asignar director" en la tabla. -->
         <div role="alert" class="alert py-2 text-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          <AppIcon nombre="alerta" class="h-4 w-4" />
           <span>
             El director se asigna por separado desde la tabla.
             Después de crear, recordá también crear los cursos y trimestres en <strong>Estructura</strong>.

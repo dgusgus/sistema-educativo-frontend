@@ -10,6 +10,7 @@ import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -397,9 +398,7 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
             <td class="text-sm">{{ t.fechaInicio ? new Date(t.fechaInicio).toLocaleDateString('es-BO') : '—' }}</td>
             <td class="text-sm">{{ t.fechaFin    ? new Date(t.fechaFin).toLocaleDateString('es-BO')    : '—' }}</td>
             <td>
-              <span class="badge badge-sm" :class="t.cerrado ? 'badge-error' : 'badge-success'">
-                {{ t.cerrado ? 'Cerrado' : 'Abierto' }}
-              </span>
+              <StatusBadge :estado="t.cerrado ? 'CERRADO' : 'ABIERTO'" :texto="t.cerrado ? 'Cerrado' : 'Abierto'" />
             </td>
             <td>
               <div class="flex gap-1">

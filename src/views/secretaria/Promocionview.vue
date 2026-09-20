@@ -15,6 +15,7 @@ import { cursoApi } from '@/api/estructura.api'
 import { estudianteApi } from '@/api/estudiante.api'
 import { useToastStore } from '@/stores/toast.store'
 import type { Curso } from '@/types'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const toast = useToastStore()
 
@@ -243,7 +244,7 @@ async function confirmarMatricula() {
                   <td>{{ p.estudiante }}</td>
                   <td class="font-mono text-xs text-base-content/50">{{ p.ci }}</td>
                   <td class="text-xs text-base-content/50">{{ p.cursoActual }}</td>
-                  <td><span class="badge badge-xs" :class="p.accion === 'PROMOVER' ? 'badge-success' : 'badge-warning'">{{ p.accion }}</span></td>
+                  <td><StatusBadge :estado="p.accion" tamano="xs" /></td>
                 </tr>
               </tbody>
             </table>

@@ -3,15 +3,16 @@ import { ref, onMounted } from 'vue'
 import { boletinApi, descargarBlob } from '@/api/boletin.api'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante.ts'
 import { useGestionStore } from '@/stores/gestion.store'
+import AppIcon from '@/components/AppIcon.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
 
 // ── Boletín individual ────────────────────────────────────────────────────────
-const buscadorInd    = useBuscadorEstudiante()
-const trimestreId    = ref<number | ''>('')
+const buscadorInd = useBuscadorEstudiante()
+const trimestreId = ref<number | ''>('')
 const descargandoInd = ref(false)
-const errorInd       = ref<string | null>(null)
+const errorInd = ref<string | null>(null)
 
 async function descargarIndividual() {
   const estudianteId = buscadorInd.seleccionado.value?.id
@@ -36,10 +37,10 @@ async function descargarIndividual() {
 }
 
 // ── Boletín masivo por curso ──────────────────────────────────────────────────
-const cursoId         = ref<number | ''>('')
-const trimestreIdMas  = ref<number | ''>('')
-const descargandoMas  = ref(false)
-const errorMas        = ref<string | null>(null)
+const cursoId = ref<number | ''>('')
+const trimestreIdMas = ref<number | ''>('')
+const descargandoMas = ref(false)
+const errorMas = ref<string | null>(null)
 
 async function descargarMasivo() {
   if (!cursoId.value || !trimestreIdMas.value) {
@@ -83,16 +84,9 @@ async function descargarMasivo() {
             <legend class="fieldset-legend text-xs">Estudiante</legend>
             <div class="relative">
               <label class="input input-bordered flex items-center gap-2 w-full">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-                </svg>
-                <input
-                  v-model="buscadorInd.query.value"
-                  type="search"
-                  placeholder="Nombre o CI..."
-                  class="grow"
-                  @input="buscadorInd.onInput"
-                />
+                <AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
+                <input v-model="buscadorInd.query.value" type="search" placeholder="Nombre o CI..." class="grow"
+                  @input="buscadorInd.onInput" />
                 <span v-if="buscadorInd.buscando.value" class="loading loading-spinner loading-xs"></span>
               </label>
               <ul v-if="buscadorInd.resultados.value.length"
@@ -126,15 +120,10 @@ async function descargarMasivo() {
             </p>
           </fieldset>
 
-          <button
-            class="btn btn-primary w-full"
-            :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId"
-            @click="descargarIndividual"
-          >
+          <button class="btn btn-primary w-full"
+            :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId" @click="descargarIndividual">
             <span v-if="descargandoInd" class="loading loading-spinner loading-sm"></span>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
+            <AppIcon v-else nombre="documento" class="h-4 w-4" />
             {{ descargandoInd ? 'Generando PDF...' : 'Descargar boletín' }}
           </button>
         </div>
@@ -170,15 +159,10 @@ async function descargarMasivo() {
             </select>
           </fieldset>
 
-          <button
-            class="btn btn-secondary w-full"
-            :disabled="descargandoMas || !cursoId || !trimestreIdMas"
-            @click="descargarMasivo"
-          >
+          <button class="btn btn-secondary w-full" :disabled="descargandoMas || !cursoId || !trimestreIdMas"
+            @click="descargarMasivo">
             <span v-if="descargandoMas" class="loading loading-spinner loading-sm"></span>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
+            <AppIcon v-else nombre="descargar" class="h-4 w-4" />
             {{ descargandoMas ? 'Generando PDFs...' : 'Descargar todos' }}
           </button>
         </div>

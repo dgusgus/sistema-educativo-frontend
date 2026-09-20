@@ -6,6 +6,7 @@ import { estudianteApi } from '@/api/estudiante.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useToastStore } from '@/stores/toast.store'
 import type { Rol, Nivel } from '@/types'
+import AppIcon from '@/components/AppIcon.vue'
 
 const toast = useToastStore()
 
@@ -297,9 +298,7 @@ function labelCampoExtra(): string {
 
     <!-- Buscador -->
     <label class="input input-bordered flex items-center gap-2 max-w-sm">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-      </svg>
+<AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
       <input v-model="busqueda" type="search" :placeholder="`Buscar en ${labelActivo}...`" class="grow" />
     </label>
 

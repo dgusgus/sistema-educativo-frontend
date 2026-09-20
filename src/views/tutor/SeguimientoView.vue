@@ -6,6 +6,7 @@ import api from '@/api/axios'
 import type { Nivel, ResultadoFinal } from '@/types'
 import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
 import HorarioSemanal from '@/components/HorarioSemanal.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const gestion = useGestionStore()
 const horarioEstudiante = ref<HorarioDetalle[]>([])
@@ -159,10 +160,7 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
             <div class="card-body">
               <div class="flex items-center justify-between mb-3">
                 <h3 class="font-semibold">{{ nombreCursoCorto(insc.curso) }} — {{ insc.gestion?.anio }}</h3>
-                <span class="badge" :class="insc.resultado === 'PROMOVIDO' ? 'badge-success' :
-                  insc.resultado === 'REPROBADO' ? 'badge-error' : 'badge-ghost'">
-                  {{ insc.resultado === 'PENDIENTE' ? 'EN CURSO' : insc.resultado }}
-                </span>
+                <StatusBadge :estado="insc.resultado" :texto="insc.resultado === 'PENDIENTE' ? 'EN CURSO' : insc.resultado" />
               </div>
 
               <div v-if="insc.promediosFinales?.length" class="overflow-x-auto">

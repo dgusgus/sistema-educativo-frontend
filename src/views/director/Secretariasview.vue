@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { secretariaApi, type SecretariaConCuentaPayload } from '@/api/secretaria.api'
 import { useToastStore } from '@/stores/toast.store'
 import type { Secretaria } from '@/types'
+import AppIcon from '@/components/AppIcon.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 
 const toast = useToastStore()
 
@@ -110,9 +112,7 @@ async function guardarEdicion() {
     </div>
 
     <label class="input input-bordered flex items-center gap-2 max-w-sm">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-      </svg>
+<AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
       <input v-model="busqueda" type="search" placeholder="Buscar por nombre o CI..." class="grow" />
     </label>
 
@@ -126,7 +126,7 @@ async function guardarEdicion() {
             <td class="font-medium">{{ s.apellido }}, {{ s.nombre }}</td>
             <td class="font-mono text-sm">{{ s.ci }}</td>
             <td><span class="badge badge-sm badge-success font-mono">{{ s.usuario?.username }}</span></td>
-            <td><span class="badge badge-sm" :class="s.activo ? 'badge-success' : 'badge-ghost'">{{ s.activo ? 'Activo' : 'Inactivo' }}</span></td>
+            <td><StatusBadge :estado="s.activo ? 'ACTIVO' : 'INACTIVO'" :texto="s.activo ? 'Activo' : 'Inactivo'" /></td>
             <td><button class="btn btn-ghost btn-xs" @click="abrirEditar(s)">Editar</button></td>
           </tr>
         </tbody>

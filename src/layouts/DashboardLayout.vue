@@ -69,6 +69,8 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
 
     { label: 'Reportes', to: '/director/reportes', icon: 'reportes' },
     { label: 'Gestiones', to: '/director/gestiones', icon: 'gestiones' },
+    { label: 'Horarios', to: '/director/horarios', icon: 'horario' },
+    
   ],
   SECRETARIA: [
     { label: 'Estudiantes', to: '/secretaria/estudiantes', icon: 'estudiantes' },
