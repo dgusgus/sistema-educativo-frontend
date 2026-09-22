@@ -15,6 +15,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
+import ImportarExcelModal, { type ResultadoImport } from '@/components/ImportarExcelModal.vue'
+import { descargarBlob } from '@/api/boletin.api'   // ya existe, reutilizado — es un helper genérico, no específico de boletines
 
 const gestion = useGestionStore()
 const { confirmar } = useConfirm()
@@ -424,6 +426,23 @@ async function registrarResultado() {
   } finally {
     registrandoRes.value = false
   }
+
+}
+const modalImportar = ref(false)
+
+async function onImportar(archivo: File): Promise<ResultadoImport> {
+  if (!gestion.gestionId) throw new Error('No hay gestión activa')
+  return estudianteApi.importar(archivo, gestion.gestionId)
+}
+
+function onImportacionCompletada() {
+  cargar()   // recarga la lista — igual que después de cualquier otra escritura
+}
+
+async function exportar() {
+  if (!gestion.gestionId) return
+  const blob = await estudianteApi.exportar(gestion.gestionId)
+  descargarBlob(blob, `estudiantes_gestion_${gestion.anio}.xlsx`)
 }
 </script>
 
@@ -438,6 +457,8 @@ async function registrarResultado() {
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" @click="abrirCrear">+ Solo perfil</button>
         <button class="btn btn-primary btn-sm" @click="abrirConCuenta">+ Con cuenta</button>
+        <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
+        <button class="btn btn-outline btn-sm" @click="modalImportar = true">Importar</button>
       </div>
     </div>
 
@@ -842,6 +863,9 @@ async function registrarResultado() {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
+   <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
+  <ImportarExcelModal v-model="modalImportar" titulo="Importar estudiantes"
+    :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']" :importar="onImportar"
+    @completado="onImportacionCompletada" />
 </template>

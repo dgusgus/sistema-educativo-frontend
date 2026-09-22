@@ -68,4 +68,16 @@ export const estudianteApi = {
   // en ese caso corresponde usar cambiarEstado(RETIRADA) en su lugar.
   eliminarInscripcion: (id: number) =>
     api.delete(`/inscripciones/${id}`).then(r => r.data),
+
+  importar: (archivo: File, gestionId: number) => {
+    const form = new FormData()
+    form.append('archivo', archivo)
+    form.append('gestionId', String(gestionId))
+    return api.post<{ totalFilas: number; exitosas: number; fallidas: number; errores: Array<{ fila: number; error: string }> }>(
+      '/estudiantes/import', form, { headers: { 'Content-Type': 'multipart/form-data' } }
+    ).then(r => r.data)
+  },
+
+  exportar: (gestionId: number) =>
+    api.get<Blob>('/estudiantes/export', { params: { gestionId }, responseType: 'blob' }).then(r => r.data),
 }
