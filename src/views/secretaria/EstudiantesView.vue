@@ -866,6 +866,7 @@ async function exportar() {
    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
   <ImportarExcelModal v-model="modalImportar" titulo="Importar estudiantes"
-    :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']" :importar="onImportar"
-    @completado="onImportacionCompletada" />
+    :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']"
+    :fila-ejemplo="['4567890', 'Sofía', 'Condori Mamani', '15/03/2010', 'Av. 6 de Agosto 123', '12345678', '1AS']"
+    :importar="onImportar" @completado="onImportacionCompletada" />
 </template>

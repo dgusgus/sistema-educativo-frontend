@@ -13,11 +13,8 @@ export interface ResultadoImport {
 const props = defineProps<{
   modelValue: boolean
   titulo: string
-  // Columnas esperadas, en el orden que van en el Excel — se usan tanto
-  // para mostrar la ayuda como para generar la plantilla descargable.
   columnas: string[]
-  // Cada vista pasa SU propia función de importación (estudianteApi.importar,
-  // docenteApi.importar, etc.) — el modal no sabe nada de endpoints.
+  filaEjemplo?: string[]   // ← nuevo, opcional — mismo orden que columnas
   importar: (archivo: File) => Promise<ResultadoImport>
 }>()
 
@@ -40,11 +37,11 @@ function onSeleccionarArchivo(e: Event) {
   resultado.value = null
 }
 
+// ImportarExcelModal.vue — reemplazar descargarPlantilla()
 function descargarPlantilla() {
-  // Plantilla simple en CSV — Excel la abre igual que un .xlsx, y así
-  // no hace falta sumar una librería nueva solo para generar el archivo
-  // de ejemplo del lado del navegador.
-  const contenido = props.columnas.join(',') + '\n'
+  const encabezado = props.columnas.join(',')
+  const ejemplo = props.filaEjemplo?.join(',') ?? ''
+  const contenido = ejemplo ? `${encabezado}\n${ejemplo}\n` : `${encabezado}\n`
   const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -86,6 +83,9 @@ function cerrar() {
       <div v-if="!resultado" class="space-y-4">
         <p class="text-sm text-base-content/60">
           Columnas esperadas (primera fila del archivo): <span class="font-mono">{{ columnas.join(', ') }}</span>
+        </p>
+        <p v-if="filaEjemplo" class="text-xs text-base-content/40">
+          Ejemplo: <span class="font-mono">{{ filaEjemplo.join(', ') }}</span>
         </p>
 
         <button type="button" class="btn btn-outline btn-sm" @click="descargarPlantilla">
