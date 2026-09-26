@@ -225,6 +225,71 @@ async function asignarDirector() {
   }
 }
 
+// ─── Modal editar gestión ─────────────────────────────────────────────────────
+// Solo descripcion y notaMinimaAprobacion (el año no se edita: es la
+// identidad de la gestión y rompería el historial si cambiara).
+const modalEditar   = ref(false)
+const editando      = ref(false)
+const errorEditar   = ref<string | null>(null)
+const gestionEditar = ref<GestionResumen | null>(null)
+const formEditar    = ref({ descripcion: '', notaMinimaAprobacion: 51 })
+
+function abrirEditar(g: GestionResumen) {
+  gestionEditar.value = g
+  formEditar.value    = { descripcion: g.descripcion ?? '', notaMinimaAprobacion: 51 }
+  errorEditar.value   = null
+  modalEditar.value   = true
+}
+
+async function guardarEdicion() {
+  if (!gestionEditar.value) return
+  editando.value    = true
+  errorEditar.value = null
+  try {
+    await gestionApi.update(gestionEditar.value.id, {
+      descripcion:          formEditar.value.descripcion || undefined,
+      notaMinimaAprobacion: Number(formEditar.value.notaMinimaAprobacion),
+    })
+    const idx = gestiones.value.findIndex(x => x.id === gestionEditar.value!.id)
+    if (idx !== -1) gestiones.value[idx].descripcion = formEditar.value.descripcion || null
+    if (gestionEditar.value.activa) await gestionStore.recargar()
+    modalEditar.value = false
+    toast.success(`Gestión ${gestionEditar.value.anio} actualizada`)
+  } catch (e) {
+    errorEditar.value = e instanceof Error ? e.message : 'Error al guardar cambios'
+  } finally {
+    editando.value = false
+  }
+}
+
+// ─── Cerrar gestión ───────────────────────────────────────────────────────────
+// Requiere trimestres cerrados y resultados registrados — el backend
+// devuelve el detalle si algo falta, se muestra tal cual.
+const cerrandoGestion = ref<number | null>(null)
+
+async function cerrarGestion(g: GestionResumen) {
+  if (!g.activa) return
+  const ok = await confirmar({
+    mensaje: `¿Cerrar la gestión ${g.anio}? Ya no será la activa y no se podrá registrar nada más en ella.`,
+    peligroso: true,
+    textoConfirmar: 'Cerrar gestión',
+  })
+  if (!ok) return
+  cerrandoGestion.value = g.id
+  error.value = null
+  try {
+    await gestionApi.cerrar(g.id)
+    const idx = gestiones.value.findIndex(x => x.id === g.id)
+    if (idx !== -1) gestiones.value[idx].activa = false
+    await gestionStore.recargar()
+    toast.success(`Gestión ${g.anio} cerrada`)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al cerrar gestión'
+  } finally {
+    cerrandoGestion.value = null
+  }
+}
+
 // ─── Helpers de display ───────────────────────────────────────────────────────
 // Directores activos para el selector — ¿por qué filtrar inactivos?
 // No tiene sentido asignar como director a alguien que ya no trabaja
@@ -317,6 +382,10 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
             </td>
             <td>
               <div class="flex gap-1 flex-wrap">
+                <!-- Editar datos (descripción, nota mínima) -->
+                <button class="btn btn-ghost btn-xs" @click="abrirEditar(g)">
+                  Editar
+                </button>
                 <!-- Asignar director: disponible para cualquier gestión -->
                 <button
                   class="btn btn-ghost btn-xs"
@@ -325,7 +394,18 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
                 >
                   {{ g.director ? 'Cambiar director' : 'Asignar director' }}
                 </button>
-                <!-- Activar: solo si no está ya activa -->
+                <!-- Cerrar: solo la activa. El backend rechaza si hay
+                     trimestres abiertos o resultados pendientes -->
+                <button
+                  v-if="g.activa"
+                  class="btn btn-outline btn-xs btn-warning"
+                  :disabled="cerrandoGestion === g.id"
+                  @click="cerrarGestion(g)"
+                >
+                  <span v-if="cerrandoGestion === g.id" class="loading loading-spinner loading-xs"></span>
+                  <span v-else>Cerrar</span>
+                </button>
+                <!-- Activar: solo si no está ya activa ni cerrada... solo no activa -->
                 <button
                   v-if="!g.activa"
                   class="btn btn-outline btn-xs btn-success"
@@ -335,7 +415,7 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
                   <span v-if="activando === g.id" class="loading loading-spinner loading-xs"></span>
                   <span v-else>Activar</span>
                 </button>
-                <span v-else class="text-xs text-success font-medium self-center">✓ Activa</span>
+                <span v-if="g.activa" class="text-xs text-success font-medium self-center">✓ Activa</span>
               </div>
             </td>
           </tr>
@@ -475,5 +555,37 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
     <form method="dialog" class="modal-backdrop" @click="modalDirector = false">
       <button>cerrar</button>
     </form>
+  </dialog>
+
+  <!-- ── Modal editar gestión ────────────────────────────────────────────────── -->
+  <dialog :open="modalEditar" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-1">Editar gestión {{ gestionEditar?.anio }}</h3>
+      <p class="text-sm text-base-content/60 mb-4">El año no se puede cambiar — es la identidad de la gestión.</p>
+
+      <div v-if="errorEditar" role="alert" class="alert alert-error mb-4 py-2 text-sm">
+        <span>{{ errorEditar }}</span>
+      </div>
+
+      <form class="space-y-3" @submit.prevent="guardarEdicion">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Descripción</legend>
+          <input v-model="formEditar.descripcion" type="text" class="input input-bordered w-full" :disabled="editando" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Nota mínima de aprobación</legend>
+          <input v-model.number="formEditar.notaMinimaAprobacion" type="number" min="1" max="100"
+            class="input input-bordered w-full" :disabled="editando" />
+        </fieldset>
+        <div class="modal-action mt-6">
+          <button type="button" class="btn btn-ghost" :disabled="editando" @click="modalEditar = false">Cancelar</button>
+          <button type="submit" class="btn btn-primary" :disabled="editando">
+            <span v-if="editando" class="loading loading-spinner loading-sm"></span>
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="modalEditar = false"><button>cerrar</button></form>
   </dialog>
 </template>
