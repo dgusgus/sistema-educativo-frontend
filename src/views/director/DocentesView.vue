@@ -5,6 +5,7 @@ import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { materiaApi } from '@/api/estructura.api'
 import { useToastStore } from '@/stores/toast.store'
+import { useConfirm } from '@/composables/useConfirm'
 import type { Docente, Nivel, Materia } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -12,6 +13,7 @@ import { codigoCurso } from '@/lib/abreviar'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
 import { descargarBlob } from '@/api/boletin.api.js'
 const toast = useToastStore()
+const { confirmar } = useConfirm()
 
 const gestion = useGestionStore()
 
@@ -75,7 +77,7 @@ const docentesFiltrados = computed(() => {
 // (solo nivel/grado/paralelo), se arma igual que en el resto del frontend.
 // ✅ reemplazar por esto
 const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
-function cursosDe(d: Docente): Array<{ corto: string; completo: string }> {
+function cursosDe(d: Docente): Array<{ id: number; corto: string; completo: string }> {
   return (d.asignaciones ?? []).map(a => {
     const c = a.curso
     const completo = c
@@ -84,8 +86,36 @@ function cursosDe(d: Docente): Array<{ corto: string; completo: string }> {
     const corto = c
       ? `${a.materia?.codigo ?? a.materia?.nombre?.slice(0, 3).toUpperCase() ?? '?'} · ${codigoCurso(c)}`
       : a.materia?.nombre ?? '?'
-    return { corto, completo }
+    return { id: a.id, corto, completo }
   })
+}
+
+// ─── Quitar asignación ────────────────────────────────────────────────────────
+// DELETE /docentes/:id/asignacion/:asignacionId existía sin vista.
+const quitandoAsignacion = ref<number | null>(null)
+
+async function quitarAsignacion(d: Docente, asignacionId: number, descripcion: string) {
+  const ok = await confirmar({
+    mensaje: `¿Quitar "${descripcion}" a ${d.nombre} ${d.apellido}?`,
+    textoConfirmar: 'Quitar',
+  })
+  if (!ok) return
+  quitandoAsignacion.value = asignacionId
+  try {
+    await docenteApi.removeAsignacion(d.id, asignacionId)
+    const idx = docentes.value.findIndex(x => x.id === d.id)
+    if (idx !== -1) {
+      docentes.value[idx] = {
+        ...docentes.value[idx],
+        asignaciones: (docentes.value[idx].asignaciones ?? []).filter(a => a.id !== asignacionId),
+      }
+    }
+    toast.success('Asignación eliminada')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al quitar asignación'
+  } finally {
+    quitandoAsignacion.value = null
+  }
 }
 
 // ─── Crear/editar perfil ──────────────────────────────────────────────────────
@@ -456,14 +486,21 @@ async function exportar() {
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
 <td>
-  <div class="flex flex-wrap gap-1 max-w-xs">
+  <div class="flex flex-wrap gap-1 max-w-xs items-center">
     <span
-      v-for="(c, i) in cursosDe(d)"
-      :key="i"
-      class="badge badge-sm badge-outline"
+      v-for="c in cursosDe(d)"
+      :key="c.id"
+      class="badge badge-sm badge-outline gap-1"
       :title="c.completo"
     >
       {{ c.corto }}
+      <button class="text-error font-bold leading-none"
+        :disabled="quitandoAsignacion === c.id"
+        :title="`Quitar ${c.completo}`"
+        @click="quitarAsignacion(d, c.id, c.completo)">
+        <span v-if="quitandoAsignacion === c.id" class="loading loading-spinner loading-xs"></span>
+        <span v-else>✕</span>
+      </button>
     </span>
     <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
   </div>
