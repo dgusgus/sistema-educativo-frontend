@@ -63,6 +63,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
 
     { label: 'Directores', to: '/director/directores', grupo: 'Administración', icon: 'personas' },
     { label: 'Secretarias', to: '/director/secretarias', grupo: 'Administración', icon: 'personas' },
+    { label: 'Usuarios', to: '/director/usuarios', grupo: 'Administración', icon: 'personas' },
     { label: 'Pagos', to: '/secretaria/pagos', grupo: 'Administración', icon: 'pagos' },
     { label: 'Boletines', to: '/secretaria/boletines', grupo: 'Administración', icon: 'documento' },
     { label: 'Institución', to: '/director/institucion', grupo: 'Administración', icon: 'institucion' },

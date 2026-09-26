@@ -250,6 +250,22 @@ async function eliminarCurso(c: Curso) {
   }
 }
 
+async function eliminarMateria(m: Materia) {
+  const ok = await confirmar({ mensaje: `¿Eliminar la materia "${m.nombre}" (${m.codigo})?`, peligroso: true })
+  if (!ok) return
+  eliminando.value = m.id
+  try {
+    await materiaApi.delete(m.id)
+    materias.value = materias.value.filter(x => x.id !== m.id)
+    toast.success('Materia eliminada')
+  } catch (e) {
+    // El backend rechaza (400) si tiene asignaciones activas
+    error.value = e instanceof Error ? e.message : 'Error al eliminar'
+  } finally {
+    eliminando.value = null
+  }
+}
+
 const NIVELES: Nivel[] = ['PRIMARIA', 'SECUNDARIA']
 const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
 const TURNOS: Turno[] = ['MANANA', 'TARDE', 'NOCHE']
@@ -363,7 +379,17 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
               <span class="badge badge-sm badge-ghost">{{ m._count?.asignaciones ?? 0 }}</span>
             </td>
             <td>
-              <button class="btn btn-ghost btn-xs" @click="abrirEditar(m)">Editar</button>
+              <div class="flex gap-1">
+                <button class="btn btn-ghost btn-xs" @click="abrirEditar(m)">Editar</button>
+                <button
+                  class="btn btn-ghost btn-xs text-error"
+                  :disabled="eliminando === m.id || (m._count?.asignaciones ?? 0) > 0"
+                  @click="eliminarMateria(m)"
+                >
+                  <span v-if="eliminando === m.id" class="loading loading-spinner loading-xs"></span>
+                  <span v-else>Eliminar</span>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>

@@ -54,6 +54,7 @@ const router = createRouter({
         { path: 'docentes',     name: 'director-docentes',     component: () => import('@/views/director/DocentesView.vue') },
         { path: 'directores',   name: 'director-directores',   component: () => import('@/views/director/Directoresview.vue') },
         { path: 'secretarias',  name: 'director-secretarias',  component: () => import('@/views/director/Secretariasview.vue') },
+        { path: 'usuarios',     name: 'director-usuarios',     component: () => import('@/views/director/UsuariosView.vue') },
         { path: 'reportes',     name: 'director-reportes',     component: () => import('@/views/director/ReportesView.vue') },
         { path: 'estructura',   name: 'director-estructura',   component: () => import('@/views/director/EstructuraView.vue') },
         { path: 'dimensiones',  name: 'director-dimensiones',  component: () => import('@/views/director/Dimensionesview.vue') },
