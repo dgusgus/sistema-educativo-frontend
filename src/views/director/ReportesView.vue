@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useGestionStore } from '@/stores/gestion.store'
 import { reporteApi, type ReporteAcademicoResponse } from '@/api/reporte.api'
+import { asistenciaApi, type ReporteCursoItem } from '@/api/asistencia.api'
 import { nombreCurso } from '@/api/estructura.api'
 import { descargarBlob } from '@/api/boletin.api'
 import type { Nivel, Turno } from '@/types'
@@ -65,6 +66,35 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string; tu
 
 function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>): number {
   return promediosFinales.reduce((s, p) => s + p.promedioFinal, 0) / promediosFinales.length
+}
+
+// ─── Reporte de asistencia por curso ──────────────────────────────────────────
+// GET /asistencia/reporte/:cursoId — consolidado con alerta <80%.
+// Solo Director/Secretaria (la ruta ya lo restringe en el backend).
+const cursoAsistenciaId = ref<number | ''>('')
+const reporteAsistencia = ref<{
+  totalEstudiantes: number
+  estudiantesEnRiesgo: number
+  reporte: ReporteCursoItem[]
+} | null>(null)
+const cargandoAsistencia = ref(false)
+const errorAsistencia    = ref<string | null>(null)
+
+async function cargarReporteAsistencia() {
+  if (!gestion.gestionId) { errorAsistencia.value = 'No hay gestión activa'; return }
+  if (!cursoAsistenciaId.value) { errorAsistencia.value = 'Seleccioná un curso'; return }
+  cargandoAsistencia.value = true
+  errorAsistencia.value = null
+  reporteAsistencia.value = null
+  try {
+    reporteAsistencia.value = await asistenciaApi.getReporteCurso(
+      Number(cursoAsistenciaId.value), gestion.gestionId
+    )
+  } catch (e) {
+    errorAsistencia.value = e instanceof Error ? e.message : 'Error al cargar reporte de asistencia'
+  } finally {
+    cargandoAsistencia.value = false
+  }
 }
 </script>
 
@@ -170,5 +200,72 @@ function promedioFinalGeneral(promediosFinales: Array<{ promedioFinal: number }>
     <div v-else-if="!cargando" class="text-center text-base-content/40 py-12">
       Seleccioná los filtros y presioná "Generar reporte"
     </div>
+
+    <!-- ── Reporte de asistencia por curso ─────────────────────────────────── -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body flex flex-col sm:flex-row gap-3 items-end">
+        <div class="flex-1">
+          <h3 class="font-semibold">Reporte de asistencia</h3>
+          <p class="text-xs text-base-content/50">Consolidado del curso con alerta de riesgo (&lt;80%)</p>
+        </div>
+        <fieldset class="fieldset flex-1">
+          <legend class="fieldset-legend text-xs">Curso *</legend>
+          <select v-model="cursoAsistenciaId" class="select select-bordered w-full">
+            <option :value="''" disabled>Seleccionar curso</option>
+            <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+          </select>
+        </fieldset>
+        <button class="btn btn-info" :disabled="cargandoAsistencia" @click="cargarReporteAsistencia">
+          <span v-if="cargandoAsistencia" class="loading loading-spinner loading-sm"></span>
+          Ver asistencia
+        </button>
+      </div>
+    </div>
+
+    <div v-if="errorAsistencia" role="alert" class="alert alert-error"><span>{{ errorAsistencia }}</span></div>
+
+    <template v-if="reporteAsistencia">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card bg-base-100 shadow">
+          <div class="card-body py-4">
+            <p class="text-xs text-base-content/50">Estudiantes</p>
+            <p class="text-3xl font-bold text-primary">{{ reporteAsistencia.totalEstudiantes }}</p>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow">
+          <div class="card-body py-4">
+            <p class="text-xs text-base-content/50">En riesgo (&lt;80%)</p>
+            <p class="text-3xl font-bold text-error">{{ reporteAsistencia.estudiantesEnRiesgo }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr><th>Estudiante</th><th>Promedio asistencia</th><th>Estado</th><th>Detalle por materia</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in reporteAsistencia.reporte" :key="item.inscripcionId" class="hover">
+              <td class="font-medium">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
+              <td><span :class="claseNota(item.promedioGeneral)">{{ item.promedioGeneral.toFixed(0) }}%</span></td>
+              <td>
+                <StatusBadge :estado="item.alertaCritica ? 'REPROBADO' : 'APROBADO'"
+                  :texto="item.alertaCritica ? 'En riesgo' : 'OK'" />
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  <span v-for="(d, idx) in item.detalleXMateria" :key="idx" class="badge badge-sm badge-ghost"
+                    :title="`${d.docenteMateriaCurso.materia.nombre}: T${d.trimestre.numero} ${d.trimestre.nombre}`">
+                    {{ d.docenteMateriaCurso.materia.nombre.substring(0, 3) }}: {{ Number(d.porcentaje).toFixed(0) }}%
+                  </span>
+                  <span v-if="!item.detalleXMateria.length" class="text-xs text-base-content/40">Sin datos</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </div>
 </template>
