@@ -7,6 +7,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Tutor } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
+import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import { descargarBlob } from '@/api/boletin.api.js'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -280,6 +282,14 @@ async function resetearPassword() {
     reseteando.value = false
   }
 }
+
+const modalImportar = ref(false)
+async function onImportar(archivo: File) { return tutorApi.importar(archivo) }
+function onImportacionCompletada() { cargar() }
+async function exportar() {
+  const blob = await tutorApi.exportar()
+  descargarBlob(blob, 'tutores.xlsx')
+}
 </script>
 
 <template>
@@ -290,6 +300,9 @@ async function resetearPassword() {
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" @click="abrirCrear">+ Solo perfil</button>
         <button class="btn btn-primary btn-sm" @click="abrirConCuenta">+ Con cuenta</button>
+        <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
+        <button class="btn btn-outline btn-sm" @click="modalImportar = true">Importar</button>
+
       </div>
     </div>
 
@@ -547,6 +560,16 @@ async function resetearPassword() {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
+   <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
+
+<!-- Tutoresview.vue -->
+<ImportarExcelModal
+  v-model="modalImportar"
+  titulo="Importar tutores"
+  :columnas="['CI', 'Nombre', 'Apellido', 'Ocupacion', 'GradoInstruccion', 'Email', 'Telefono', 'EstudianteCI', 'Parentesco']"
+  :plantilla="tutorApi.plantilla"
+  :importar="onImportar"
+  @completado="onImportacionCompletada"
+/>
 </template>

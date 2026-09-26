@@ -1,5 +1,6 @@
 import api from '@/api/axios'
 import type { Docente, DocenteMateriaCurso } from '@/types'
+import type { ResultadoImport } from '@/types/import'
 
 export interface DocentePayload {
   ci:            string
@@ -43,4 +44,12 @@ export const docenteApi = {
 
   removeAsignacion: (docenteId: number, asignacionId: number) =>
     api.delete(`/docentes/${docenteId}/asignacion/${asignacionId}`).then(r => r.data),
+
+  importar: (archivo: File) => {
+    const form = new FormData()
+    form.append('archivo', archivo)
+    return api.post<ResultadoImport>('/docentes/import', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+  },
+  exportar: () => api.get<Blob>('/docentes/export', { responseType: 'blob' }).then(r => r.data),
+  plantilla: () => api.get<Blob>('/docentes/plantilla', { responseType: 'blob' }).then(r => r.data),
 }

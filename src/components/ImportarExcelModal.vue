@@ -1,20 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-
+import type { ResultadoImport } from '@/types/import'
 // Forma genérica del reporte que ya devuelven los endpoints /import
 // del backend (ver estudiante.controller.ts → importEstudiantes).
-export interface ResultadoImport {
-  totalFilas: number
-  exitosas: number
-  fallidas: number
-  errores: Array<{ fila: number; error: string }>
-}
 
 const props = defineProps<{
   modelValue: boolean
   titulo: string
-  columnas: string[]
-  filaEjemplo?: string[]   // ← nuevo, opcional — mismo orden que columnas
+  columnas: string[]              // se sigue usando para el texto de ayuda
+  plantilla: () => Promise<Blob>  // ← nuevo: reemplaza filaEjemplo
   importar: (archivo: File) => Promise<ResultadoImport>
 }>()
 
@@ -38,15 +32,12 @@ function onSeleccionarArchivo(e: Event) {
 }
 
 // ImportarExcelModal.vue — reemplazar descargarPlantilla()
-function descargarPlantilla() {
-  const encabezado = props.columnas.join(',')
-  const ejemplo = props.filaEjemplo?.join(',') ?? ''
-  const contenido = ejemplo ? `${encabezado}\n${ejemplo}\n` : `${encabezado}\n`
-  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' })
+async function descargarPlantilla() {
+  const blob = await props.plantilla()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'plantilla.csv'
+  a.download = 'plantilla.xlsx'
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
@@ -84,10 +75,6 @@ function cerrar() {
         <p class="text-sm text-base-content/60">
           Columnas esperadas (primera fila del archivo): <span class="font-mono">{{ columnas.join(', ') }}</span>
         </p>
-        <p v-if="filaEjemplo" class="text-xs text-base-content/40">
-          Ejemplo: <span class="font-mono">{{ filaEjemplo.join(', ') }}</span>
-        </p>
-
         <button type="button" class="btn btn-outline btn-sm" @click="descargarPlantilla">
           Descargar plantilla
         </button>

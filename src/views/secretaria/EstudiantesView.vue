@@ -15,7 +15,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
-import ImportarExcelModal, { type ResultadoImport } from '@/components/ImportarExcelModal.vue'
+import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import type { ResultadoImport } from '@/types/import'
 import { descargarBlob } from '@/api/boletin.api'   // ya existe, reutilizado — es un helper genérico, no específico de boletines
 
 const gestion = useGestionStore()
@@ -865,8 +866,12 @@ async function exportar() {
     </div>
    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
-  <ImportarExcelModal v-model="modalImportar" titulo="Importar estudiantes"
-    :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']"
-    :fila-ejemplo="['4567890', 'Sofía', 'Condori Mamani', '15/03/2010', 'Av. 6 de Agosto 123', '12345678', '1AS']"
-    :importar="onImportar" @completado="onImportacionCompletada" />
+<ImportarExcelModal
+  v-model="modalImportar"
+  titulo="Importar estudiantes"
+  :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']"
+  :plantilla="estudianteApi.plantilla"
+  :importar="onImportar"
+  @completado="onImportacionCompletada"
+/>
 </template>

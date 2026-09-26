@@ -1,5 +1,6 @@
 import api from '@/api/axios'
 import type { Tutor } from '@/types'
+import type { ResultadoImport } from '@/types/import'
 
 export interface TutorPayload {
   ci:                string
@@ -38,4 +39,13 @@ export const tutorApi = {
 
   desvincularEstudiante: (tutorId: number, estudianteId: number) =>
     api.delete(`/tutores/${tutorId}/vincular/${estudianteId}`).then(r => r.data),
+
+  importar: (archivo: File) => {
+    const form = new FormData()
+    form.append('archivo', archivo)
+    return api.post<ResultadoImport>('/tutores/import', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+  },
+  exportar: () => api.get<Blob>('/tutores/export', { responseType: 'blob' }).then(r => r.data),
+  plantilla: () => api.get<Blob>('/tutores/plantilla', { responseType: 'blob' }).then(r => r.data),
 }
+

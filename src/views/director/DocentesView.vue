@@ -9,7 +9,8 @@ import type { Docente, Nivel, Materia } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { codigoCurso } from '@/lib/abreviar'
-
+import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import { descargarBlob } from '@/api/boletin.api.js'
 const toast = useToastStore()
 
 const gestion = useGestionStore()
@@ -384,6 +385,14 @@ async function resetearPassword() {
     reseteando.value = false
   }
 }
+
+const modalImportar = ref(false)
+async function onImportar(archivo: File) { return docenteApi.importar(archivo) }
+function onImportacionCompletada() { cargar() }
+async function exportar() {
+  const blob = await docenteApi.exportar()
+  descargarBlob(blob, 'docentes.xlsx')
+}
 </script>
 
 <template>
@@ -399,6 +408,9 @@ async function resetearPassword() {
         <button class="btn btn-primary btn-sm" @click="abrirConCuenta">
           + Con cuenta
         </button>
+        <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
+        <button class="btn btn-outline btn-sm" @click="modalImportar = true">Importar</button>
+
       </div>
     </div>
 
@@ -742,6 +754,16 @@ async function resetearPassword() {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
+   <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
+
+<!-- DocentesView.vue -->
+<ImportarExcelModal
+  v-model="modalImportar"
+  titulo="Importar docentes"
+  :columnas="['CI', 'Nombre', 'Apellido', 'Especialidad', 'Email', 'Telefono']"
+  :plantilla="docenteApi.plantilla"
+  :importar="onImportar"
+  @completado="onImportacionCompletada"
+/>
 </template>

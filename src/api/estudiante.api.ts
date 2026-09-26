@@ -80,4 +80,5 @@ export const estudianteApi = {
 
   exportar: (gestionId: number) =>
     api.get<Blob>('/estudiantes/export', { params: { gestionId }, responseType: 'blob' }).then(r => r.data),
+  plantilla: () => api.get<Blob>('/estudiantes/plantilla', { responseType: 'blob' }).then(r => r.data),
 }
