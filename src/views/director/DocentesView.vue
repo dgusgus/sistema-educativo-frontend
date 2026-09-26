@@ -763,6 +763,7 @@ async function exportar() {
   titulo="Importar docentes"
   :columnas="['CI', 'Nombre', 'Apellido', 'Especialidad', 'Email', 'Telefono']"
   :plantilla="docenteApi.plantilla"
+  nombre-plantilla="plantilla_docentes.xlsx"
   :importar="onImportar"
   @completado="onImportacionCompletada"
 />

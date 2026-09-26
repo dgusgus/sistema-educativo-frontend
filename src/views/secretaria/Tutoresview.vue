@@ -569,6 +569,7 @@ async function exportar() {
   titulo="Importar tutores"
   :columnas="['CI', 'Nombre', 'Apellido', 'Ocupacion', 'GradoInstruccion', 'Email', 'Telefono', 'EstudianteCI', 'Parentesco']"
   :plantilla="tutorApi.plantilla"
+  nombre-plantilla="plantilla_tutores.xlsx"
   :importar="onImportar"
   @completado="onImportacionCompletada"
 />

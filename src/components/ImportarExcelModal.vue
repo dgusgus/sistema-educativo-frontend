@@ -4,13 +4,16 @@ import type { ResultadoImport } from '@/types/import'
 // Forma genérica del reporte que ya devuelven los endpoints /import
 // del backend (ver estudiante.controller.ts → importEstudiantes).
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean
   titulo: string
   columnas: string[]              // se sigue usando para el texto de ayuda
-  plantilla: () => Promise<Blob>  // ← nuevo: reemplaza filaEjemplo
+  plantilla: () => Promise<Blob>  // descarga el .xlsx desde /plantilla
   importar: (archivo: File) => Promise<ResultadoImport>
-}>()
+  nombrePlantilla?: string        // ej. plantilla_docentes.xlsx
+}>(), {
+  nombrePlantilla: 'plantilla.xlsx',
+})
 
 const emit = defineEmits<{
   'update:modelValue': [valor: boolean]
@@ -19,6 +22,7 @@ const emit = defineEmits<{
 
 const archivo    = ref<File | null>(null)
 const importando = ref(false)
+const descargando = ref(false)
 const error      = ref<string | null>(null)
 const resultado  = ref<ResultadoImport | null>(null)
 
@@ -31,15 +35,29 @@ function onSeleccionarArchivo(e: Event) {
   resultado.value = null
 }
 
-// ImportarExcelModal.vue — reemplazar descargarPlantilla()
+// Descarga la plantilla .xlsx. Antes fallaba con 500 porque /plantilla
+// caía en GET /:id (ver fix en routes) y el error quedaba sin manejar
+// (Vue warn Unhandled error). Ahora muestra el mensaje en el modal.
 async function descargarPlantilla() {
-  const blob = await props.plantilla()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'plantilla.xlsx'
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  if (descargando.value) return
+  descargando.value = true
+  error.value = null
+  try {
+    const blob = await props.plantilla()
+    if (!blob || blob.size === 0) throw new Error('La plantilla descargada está vacía')
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = props.nombrePlantilla
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al descargar la plantilla'
+  } finally {
+    descargando.value = false
+  }
 }
 
 async function ejecutarImportacion() {
@@ -75,8 +93,9 @@ function cerrar() {
         <p class="text-sm text-base-content/60">
           Columnas esperadas (primera fila del archivo): <span class="font-mono">{{ columnas.join(', ') }}</span>
         </p>
-        <button type="button" class="btn btn-outline btn-sm" @click="descargarPlantilla">
-          Descargar plantilla
+        <button type="button" class="btn btn-outline btn-sm" :disabled="descargando" @click="descargarPlantilla">
+          <span v-if="descargando" class="loading loading-spinner loading-xs"></span>
+          {{ descargando ? 'Descargando…' : 'Descargar plantilla' }}
         </button>
 
         <div v-if="error" role="alert" class="alert alert-error py-2 text-sm">
