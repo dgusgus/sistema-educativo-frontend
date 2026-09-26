@@ -6,6 +6,7 @@ import api from '@/api/axios'
 import type { Nivel, ResultadoFinal } from '@/types'
 import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
 import HorarioSemanal from '@/components/HorarioSemanal.vue'
+import ResumenAsistencia from '@/components/ResumenAsistencia.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 const gestion = useGestionStore()
@@ -155,7 +156,10 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
     <HorarioSemanal :horarios="horarioEstudiante" :cargando="cargandoDatos" columna-extra="docente" />
   </div>
 </div>
-        <template v-else-if="datosEstudiante">
+        <!-- v-if (no v-else-if): el bloque de notas debe mostrarse JUNTO al
+             horario cuando termina de cargar — con v-else-if nunca se
+             renderizaba porque el div del horario ya consumía la rama -->
+        <template v-if="!cargandoDatos && datosEstudiante">
           <div v-for="insc in datosEstudiante" :key="insc.id" class="card bg-base-100 shadow">
             <div class="card-body">
               <div class="flex items-center justify-between mb-3">
@@ -196,6 +200,8 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
               </div>
 
               <p v-else class="text-sm text-base-content/40">Sin calificaciones finales aún</p>
+
+              <ResumenAsistencia :inscripcion-id="insc.id" />
             </div>
           </div>
         </template>

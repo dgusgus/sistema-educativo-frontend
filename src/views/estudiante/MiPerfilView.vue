@@ -6,6 +6,7 @@ import { calificacionApi } from '@/api/calificacion.api'
 import type { Nivel, ResultadoFinal } from '@/types'
 import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
 import HorarioSemanal from '@/components/HorarioSemanal.vue'
+import ResumenAsistencia from '@/components/ResumenAsistencia.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 const auth    = useAuthStore()
@@ -175,6 +176,8 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
           </div>
 
           <p v-else class="text-sm text-base-content/40 mt-2">Sin calificaciones registradas aún</p>
+
+          <ResumenAsistencia :inscripcion-id="insc.id" />
         </div>
       </div>
     </template>
