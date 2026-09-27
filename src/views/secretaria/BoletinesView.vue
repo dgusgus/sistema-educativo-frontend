@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { boletinApi, descargarBlob, type BoletinGeneralResponse, type MejoresEstudiantesResponse } from '@/api/boletin.api'
+import { boletinApi, descargarBlob, type BoletinGeneralResponse, type BoletinGeneralEstudiante, type MejoresEstudiantesResponse } from '@/api/boletin.api'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante.ts'
 import { useGestionStore } from '@/stores/gestion.store'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BoletinEstudianteCard from '@/components/BoletinEstudianteCard.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
@@ -36,32 +37,28 @@ async function descargarIndividual() {
   }
 }
 
-// Libreta anual — usa la gestión del trimestre elegido (todos los
-// trimestres de la lista pertenecen a la misma gestión activa).
-// ⚠️ Asume que los objetos de gestion.trimestres traen `gestionId`
-// (igual que el Trimestre real del backend) — si tu store lo omite al
-// mapear la respuesta, agregalo ahí.
-async function descargarLibreta() {
-  const estudianteId = buscadorInd.seleccionado.value?.id
-  const trimestre = gestion.trimestres.find(t => t.id === trimestreId.value) as { gestionId?: number } | undefined
-  const gestionId = trimestre?.gestionId ?? gestion.gestionId
-
-  if (!estudianteId || !gestionId) {
-    errorInd.value = 'Elegí un estudiante (la libreta usa la gestión activa)'
-    return
-  }
+async function descargarLibretaDe(estudianteId: number, gestionId: number, apellido: string, nombre: string) {
   descargandoLibreta.value = true
   errorInd.value = null
   try {
     const blob = await boletinApi.getLibreta(estudianteId, gestionId)
-    const nombreArchivo = `libreta_${buscadorInd.seleccionado.value!.apellido}_${buscadorInd.seleccionado.value!.nombre}.pdf`
-      .replace(/\s+/g, '_')
-    descargarBlob(blob, nombreArchivo)
+    descargarBlob(blob, `libreta_${apellido}_${nombre}.pdf`.replace(/\s+/g, '_'))
   } catch (e) {
     errorInd.value = e instanceof Error ? e.message : 'Error al generar la libreta'
   } finally {
     descargandoLibreta.value = false
   }
+}
+
+// Libreta desde la card individual (usa la gestión del curso seleccionado).
+async function descargarLibreta() {
+  const est = buscadorInd.seleccionado.value
+  const gestionId = boletinGeneral.value?.curso.gestionId
+  if (!est || !gestionId) {
+    errorInd.value = 'Elegí un estudiante (la libreta usa la gestión activa)'
+    return
+  }
+  await descargarLibretaDe(est.id, gestionId, est.apellido, est.nombre)
 }
 
 // ── Boletín masivo por curso ──────────────────────────────────────────────────
@@ -93,6 +90,7 @@ const cursoIdGeneral = ref<number | ''>('')
 const boletinGeneral = ref<BoletinGeneralResponse | null>(null)
 const cargandoGeneral = ref(false)
 const errorGeneral = ref<string | null>(null)
+const estudianteSeleccionado = ref<BoletinGeneralEstudiante | null>(null)
 
 async function verBoletinGeneral() {
   if (!cursoIdGeneral.value) { errorGeneral.value = 'Elegí un curso'; return }
@@ -113,6 +111,11 @@ function claseNota(nota: number | null): string {
   if (nota >= 71) return 'text-success font-semibold'
   if (nota >= 51) return 'text-warning font-semibold'
   return 'text-error font-semibold'
+}
+
+function nombrePartes(nombreCompleto: string): { apellido: string; nombre: string } {
+  const [apellido, ...resto] = nombreCompleto.split(' ')
+  return { apellido: apellido ?? nombreCompleto, nombre: resto.join(' ') }
 }
 
 // ── Mejores Estudiantes ───────────────────────────────────────────────────────
@@ -209,9 +212,6 @@ function medalla(puesto: number): string {
               {{ descargandoLibreta ? 'Generando...' : 'Libreta anual' }}
             </button>
           </div>
-          <p class="text-xs text-base-content/40">
-            La libreta anual junta los 3 trimestres + promedio anual de todas las materias, y no requiere elegir trimestre.
-          </p>
         </div>
       </div>
 
@@ -260,9 +260,9 @@ function medalla(puesto: number): string {
     <div class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
-          <h3 class="font-semibold text-lg">Boletín General (vista en pantalla)</h3>
+          <h3 class="font-semibold text-lg">Boletín General</h3>
           <p class="text-sm text-base-content/60">
-            Todas las materias x todos los trimestres del curso, para revisar antes de imprimir.
+            Todas las materias x todos los trimestres del curso — clickeá una fila para ver el detalle del estudiante.
           </p>
         </div>
 
@@ -311,7 +311,8 @@ function medalla(puesto: number): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="est in boletinGeneral.estudiantes" :key="est.inscripcionId" class="hover">
+              <tr v-for="est in boletinGeneral.estudiantes" :key="est.inscripcionId" class="hover cursor-pointer"
+                @click="estudianteSeleccionado = est">
                 <td class="font-medium whitespace-nowrap">{{ est.nombreCompleto }}</td>
                 <template v-for="m in est.materias" :key="`c-${est.inscripcionId}-${m.docenteMateriaCursoId}`">
                   <td v-for="t in boletinGeneral.trimestres" :key="`c-${est.inscripcionId}-${m.docenteMateriaCursoId}-${t.id}`"
@@ -343,6 +344,29 @@ function medalla(puesto: number): string {
             </tbody>
           </table>
         </div>
+
+        <!-- Tarjeta de detalle del estudiante clickeado -->
+  <BoletinEstudianteCard
+    v-if="estudianteSeleccionado"
+    :inscripcion-id="estudianteSeleccionado.inscripcionId"
+    @close="estudianteSeleccionado = null"
+  >
+    <template #acciones>
+      <button
+        class="btn btn-primary btn-sm"
+        :disabled="descargandoLibreta"
+        @click="descargarLibretaDe(
+          estudianteSeleccionado!.estudianteId,
+          boletinGeneral!.curso.gestionId,
+          nombrePartes(estudianteSeleccionado!.nombreCompleto).apellido,
+          nombrePartes(estudianteSeleccionado!.nombreCompleto).nombre
+        )"
+      >
+        <span v-if="descargandoLibreta" class="loading loading-spinner loading-xs"></span>
+        Descargar Libreta
+      </button>
+    </template>
+  </BoletinEstudianteCard>
       </div>
     </div>
 

@@ -49,36 +49,67 @@ export interface MejoresEstudiantesResponse {
   anual: MejorEstudianteItem[]
 }
 
-// El backend devuelve un blob PDF en estos tres
+// ── Detalle por estudiante (JSON, dimensiones + actividades) ─────────────────
+export interface DetalleActividad {
+  actividadEvaluativaId: number
+  nombre: string
+  nota: number | null
+  puntajeMaximo: number
+}
+
+export interface DetalleDimension {
+  dimensionId: number
+  nombre: string
+  promedio: number | null
+  actividades: DetalleActividad[]
+}
+
+export interface DetalleTrimestre {
+  trimestreId: number
+  numero: number
+  nombre: string
+  dimensiones: DetalleDimension[]
+  total: number | null
+}
+
+export interface DetalleMateria {
+  docenteMateriaCursoId: number
+  nombre: string
+  campoSaber: string | null
+  trimestres: DetalleTrimestre[]
+  promedioAnual: number | null
+  resultado: ResultadoFinal
+}
+
+export interface DetalleBoletinEstudiante {
+  inscripcionId: number
+  estudianteId: number
+  nombreCompleto: string
+  curso: BoletinGeneralResponse['curso']
+  materias: DetalleMateria[]
+}
+
 export const boletinApi = {
-  // GET /boletin/general/:cursoId → JSON, todas las materias x todos los trimestres
   getGeneral: (cursoId: number) =>
     api.get<BoletinGeneralResponse>(`/boletin/general/${cursoId}`).then(r => r.data),
 
-  // GET /boletin/mejores/:cursoId?limite= → JSON, ranking por trimestre + anual
   getMejores: (cursoId: number, limite = 3) =>
     api.get<MejoresEstudiantesResponse>(`/boletin/mejores/${cursoId}`, { params: { limite } }).then(r => r.data),
 
-  // GET /boletin/:estudianteId/:trimestreId → PDF individual (1 trimestre)
+  // GET /boletin/detalle/:inscripcionId → JSON, dimensiones + actividades por trimestre
+  getDetalle: (inscripcionId: number) =>
+    api.get<DetalleBoletinEstudiante>(`/boletin/detalle/${inscripcionId}`).then(r => r.data),
+
   getIndividual: (estudianteId: number, trimestreId: number) =>
-    api.get<Blob>(`/boletin/${estudianteId}/${trimestreId}`, {
-      responseType: 'blob',
-    }).then(r => r.data),
+    api.get<Blob>(`/boletin/${estudianteId}/${trimestreId}`, { responseType: 'blob' }).then(r => r.data),
 
-  // GET /boletin/curso/:cursoId/:trimestreId → PDF masivo (1 trimestre, todo el curso)
   getMasivo: (cursoId: number, trimestreId: number) =>
-    api.get<Blob>(`/boletin/curso/${cursoId}/${trimestreId}`, {
-      responseType: 'blob',
-    }).then(r => r.data),
+    api.get<Blob>(`/boletin/curso/${cursoId}/${trimestreId}`, { responseType: 'blob' }).then(r => r.data),
 
-  // GET /boletin/libreta/:estudianteId/:gestionId → PDF libreta anual (los 3 trimestres + anual)
   getLibreta: (estudianteId: number, gestionId: number) =>
-    api.get<Blob>(`/boletin/libreta/${estudianteId}/${gestionId}`, {
-      responseType: 'blob',
-    }).then(r => r.data),
+    api.get<Blob>(`/boletin/libreta/${estudianteId}/${gestionId}`, { responseType: 'blob' }).then(r => r.data),
 }
 
-// Helper: recibe un blob y lo descarga en el navegador
 export function descargarBlob(blob: Blob, nombre: string) {
   const url = URL.createObjectURL(blob)
   const a   = document.createElement('a')
