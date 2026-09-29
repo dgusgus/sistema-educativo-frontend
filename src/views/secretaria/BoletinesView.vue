@@ -336,6 +336,12 @@ function itemsRanking(): { titulo: string; items: MejoresEstudiantesResponse['an
         <!-- Vista: matriz del trimestre -->
         <div v-if="vistaCurso && trimestreIdMas">
           <CursoTrimestreMatriz :general="vistaCurso" :trimestre-id="Number(trimestreIdMas)" />
+          <p v-if="cursoId" class="text-xs text-base-content/40 text-center mt-2">
+            ¿Necesitás la asistencia de este curso?
+            <router-link :to="{ name: 'secretaria-asistencia', query: { cursoId: String(cursoId) } }" class="link link-primary">
+              Ver asistencia →
+            </router-link>
+          </p>
         </div>
 
         <!-- Reportes: al final, después de revisar -->
@@ -378,6 +384,12 @@ function itemsRanking(): { titulo: string; items: MejoresEstudiantesResponse['an
         </div>
 
         <ResumenAnual v-if="boletinGeneral" :general="boletinGeneral" />
+        <p v-if="boletinGeneral && cursoIdGeneral" class="text-xs text-base-content/40 text-center">
+          ¿Necesitás la asistencia de este curso?
+          <router-link :to="{ name: 'secretaria-asistencia', query: { cursoId: String(cursoIdGeneral) } }" class="link link-primary">
+            Ver asistencia →
+          </router-link>
+        </p>
       </div>
     </section>
 

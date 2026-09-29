@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { asistenciaApi, type ReporteCursoItem } from '@/api/asistencia.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import AsistenciaReporteCursoCards from '@/components/asistencia/Asistenciareportecursocards.vue'
 import AsistenciaReporteCursoTabla from '@/components/asistencia/Asistenciareportecursotabla.vue'
 
 const gestion = useGestionStore()
-onMounted(() => gestion.cargar())
+const route = useRoute()
 
 const cursoId = ref<number | ''>('')
 const cargando = ref(false)
@@ -35,6 +36,18 @@ async function verReporte() {
     cargando.value = false
   }
 }
+
+// Si se llega con ?cursoId= (ej: desde Boletines), preseleccionar el curso
+// y cargar el reporte directo — sin esto habría que elegirlo a mano otra vez.
+onMounted(async () => {
+  await gestion.cargar()
+  const q = route.query.cursoId
+  const id = Array.isArray(q) ? q[0] : q
+  if (id && gestion.cursos.some(c => c.id === Number(id))) {
+    cursoId.value = Number(id)
+    await verReporte()
+  }
+})
 </script>
 
 <template>
@@ -89,6 +102,11 @@ async function verReporte() {
               <AsistenciaReporteCursoTabla :reporte="respuesta.reporte" />
             </div>
           </details>
+
+          <p class="text-xs text-base-content/40 text-center">
+            ¿Necesitás las notas de este curso? Mirá los
+            <router-link :to="{ name: 'secretaria-boletines' }" class="link link-primary">Boletines</router-link>
+          </p>
         </div>
       </div>
     </section>
