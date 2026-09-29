@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { boletinApi, descargarBlob, type BoletinGeneralResponse, type BoletinGeneralEstudiante, type MejoresEstudiantesResponse } from '@/api/boletin.api'
+import { boletinApi, descargarBlob, type BoletinGeneralResponse, type MejoresEstudiantesResponse } from '@/api/boletin.api'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante.ts'
 import { useGestionStore } from '@/stores/gestion.store'
 import AppIcon from '@/components/AppIcon.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
-import BoletinEstudianteCard from '@/components/BoletinEstudianteCard.vue'
+import BoletinGeneralTabla from '@/components/boletines/BoletinGeneralTabla.vue'
+import BoletinGeneralCards from '@/components/boletines/BoletinGeneralCards.vue'
+import BoletinEstudianteCard from '@/components/boletines/BoletinEstudianteCard.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
+
+// ── Tabs (divide y vencerás: solo el tab activo se ve y se carga) ─────────────
+type Tab = 'individual' | 'curso' | 'general' | 'ranking'
+const tab = ref<Tab>('individual')
 
 // ── Boletín individual ────────────────────────────────────────────────────────
 const buscadorInd = useBuscadorEstudiante()
@@ -16,6 +21,7 @@ const trimestreId = ref<number | ''>('')
 const descargandoInd = ref(false)
 const descargandoLibreta = ref(false)
 const errorInd = ref<string | null>(null)
+const mostrarPreview = ref(false)
 
 async function descargarIndividual() {
   const estudianteId = buscadorInd.seleccionado.value?.id
@@ -37,28 +43,32 @@ async function descargarIndividual() {
   }
 }
 
-async function descargarLibretaDe(estudianteId: number, gestionId: number, apellido: string, nombre: string) {
+// Libreta anual — usa la gestión del trimestre elegido (todos los
+// trimestres de la lista pertenecen a la misma gestión activa).
+// ⚠️ Asume que los objetos de gestion.trimestres traen `gestionId`
+// (igual que el Trimestre real del backend) — si tu store lo omite al
+// mapear la respuesta, agregalo ahí.
+async function descargarLibreta() {
+  const estudianteId = buscadorInd.seleccionado.value?.id
+  const trimestre = gestion.trimestres.find(t => t.id === trimestreId.value) as { gestionId?: number } | undefined
+  const gestionId = trimestre?.gestionId ?? gestion.gestionId
+
+  if (!estudianteId || !gestionId) {
+    errorInd.value = 'Elegí un estudiante (la libreta usa la gestión activa)'
+    return
+  }
   descargandoLibreta.value = true
   errorInd.value = null
   try {
     const blob = await boletinApi.getLibreta(estudianteId, gestionId)
-    descargarBlob(blob, `libreta_${apellido}_${nombre}.pdf`.replace(/\s+/g, '_'))
+    const nombreArchivo = `libreta_${buscadorInd.seleccionado.value!.apellido}_${buscadorInd.seleccionado.value!.nombre}.pdf`
+      .replace(/\s+/g, '_')
+    descargarBlob(blob, nombreArchivo)
   } catch (e) {
     errorInd.value = e instanceof Error ? e.message : 'Error al generar la libreta'
   } finally {
     descargandoLibreta.value = false
   }
-}
-
-// Libreta desde la card individual (usa la gestión del curso seleccionado).
-async function descargarLibreta() {
-  const est = buscadorInd.seleccionado.value
-  const gestionId = boletinGeneral.value?.curso.gestionId
-  if (!est || !gestionId) {
-    errorInd.value = 'Elegí un estudiante (la libreta usa la gestión activa)'
-    return
-  }
-  await descargarLibretaDe(est.id, gestionId, est.apellido, est.nombre)
 }
 
 // ── Boletín masivo por curso ──────────────────────────────────────────────────
@@ -90,7 +100,6 @@ const cursoIdGeneral = ref<number | ''>('')
 const boletinGeneral = ref<BoletinGeneralResponse | null>(null)
 const cargandoGeneral = ref(false)
 const errorGeneral = ref<string | null>(null)
-const estudianteSeleccionado = ref<BoletinGeneralEstudiante | null>(null)
 
 async function verBoletinGeneral() {
   if (!cursoIdGeneral.value) { errorGeneral.value = 'Elegí un curso'; return }
@@ -104,18 +113,6 @@ async function verBoletinGeneral() {
   } finally {
     cargandoGeneral.value = false
   }
-}
-
-function claseNota(nota: number | null): string {
-  if (nota === null) return 'text-base-content/30'
-  if (nota >= 71) return 'text-success font-semibold'
-  if (nota >= 51) return 'text-warning font-semibold'
-  return 'text-error font-semibold'
-}
-
-function nombrePartes(nombreCompleto: string): { apellido: string; nombre: string } {
-  const [apellido, ...resto] = nombreCompleto.split(' ')
-  return { apellido: apellido ?? nombreCompleto, nombre: resto.join(' ') }
 }
 
 // ── Mejores Estudiantes ───────────────────────────────────────────────────────
@@ -145,233 +142,195 @@ function medalla(puesto: number): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <h2 class="text-2xl font-bold">Boletines</h2>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-      <!-- Boletín individual + Libreta anual -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body space-y-4">
-          <div>
-            <h3 class="font-semibold text-lg">Boletín Individual</h3>
-            <p class="text-sm text-base-content/60">PDF de un trimestre, o la libreta anual completa</p>
-          </div>
-
-          <div v-if="errorInd" role="alert" class="alert alert-error py-2 text-sm">
-            <span>{{ errorInd }}</span>
-          </div>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Estudiante</legend>
-            <div class="relative">
-              <label class="input input-bordered flex items-center gap-2 w-full">
-                <AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
-                <input v-model="buscadorInd.query.value" type="search" placeholder="Nombre o CI..." class="grow"
-                  @input="buscadorInd.onInput" />
-                <span v-if="buscadorInd.buscando.value" class="loading loading-spinner loading-xs"></span>
-              </label>
-              <ul v-if="buscadorInd.resultados.value.length"
-                class="absolute z-10 mt-1 w-full bg-base-100 rounded-box shadow-lg border border-base-300 max-h-56 overflow-y-auto">
-                <li v-for="e in buscadorInd.resultados.value" :key="e.id">
-                  <button class="w-full text-left px-4 py-2 hover:bg-base-200 flex justify-between items-center"
-                    @click="buscadorInd.seleccionar(e)">
-                    <span>{{ e.apellido }}, {{ e.nombre }}</span>
-                    <span class="font-mono text-xs text-base-content/50">{{ e.ci }}</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <p v-if="buscadorInd.seleccionado.value" class="text-xs text-success mt-1">
-              ✓ {{ buscadorInd.seleccionado.value.nombre }} {{ buscadorInd.seleccionado.value.apellido }}
-              <button type="button" class="link ml-1" @click="buscadorInd.limpiar">cambiar</button>
-            </p>
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Trimestre (para el boletín trimestral)</legend>
-            <select v-model="trimestreId" class="select select-bordered w-full">
-              <option value="" disabled>Seleccionar trimestre</option>
-              <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
-                {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
-              </option>
-            </select>
-          </fieldset>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button class="btn btn-primary" :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId"
-              @click="descargarIndividual">
-              <span v-if="descargandoInd" class="loading loading-spinner loading-sm"></span>
-              <AppIcon v-else nombre="documento" class="h-4 w-4" />
-              {{ descargandoInd ? 'Generando...' : 'Boletín trimestral' }}
-            </button>
-            <button class="btn btn-outline btn-primary" :disabled="descargandoLibreta || !buscadorInd.seleccionado.value"
-              @click="descargarLibreta">
-              <span v-if="descargandoLibreta" class="loading loading-spinner loading-sm"></span>
-              <AppIcon v-else nombre="documento" class="h-4 w-4" />
-              {{ descargandoLibreta ? 'Generando...' : 'Libreta anual' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Boletín masivo -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body space-y-4">
-          <div>
-            <h3 class="font-semibold text-lg">Boletines Masivos</h3>
-            <p class="text-sm text-base-content/60">Genera un PDF con todos los boletines del curso</p>
-          </div>
-
-          <div v-if="errorMas" role="alert" class="alert alert-error py-2 text-sm">
-            <span>{{ errorMas }}</span>
-          </div>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Curso</legend>
-            <select v-model="cursoId" class="select select-bordered w-full">
-              <option value="" disabled>Seleccionar curso</option>
-              <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-            </select>
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Trimestre</legend>
-            <select v-model="trimestreIdMas" class="select select-bordered w-full">
-              <option value="" disabled>Seleccionar trimestre</option>
-              <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
-                {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
-              </option>
-            </select>
-          </fieldset>
-
-          <button class="btn btn-secondary w-full" :disabled="descargandoMas || !cursoId || !trimestreIdMas"
-            @click="descargarMasivo">
-            <span v-if="descargandoMas" class="loading loading-spinner loading-sm"></span>
-            <AppIcon v-else nombre="descargar" class="h-4 w-4" />
-            {{ descargandoMas ? 'Generando PDFs...' : 'Descargar todos' }}
-          </button>
-        </div>
-      </div>
-
+  <div class="space-y-4">
+    <div>
+      <h2 class="text-2xl font-bold">Boletines</h2>
+      <p class="text-sm text-base-content/60">Elegí una pestaña según lo que necesites hacer</p>
     </div>
 
-    <!-- ── Boletín General en pantalla ─────────────────────────────────────── -->
-    <div class="card bg-base-100 shadow">
+    <!-- Tabs: 1 acción por pantalla, ideal en celular -->
+    <div role="tablist" class="tabs tabs-boxed w-full overflow-x-auto sticky top-0 z-10 bg-base-200/80 backdrop-blur p-1">
+      <a role="tab" class="tab whitespace-nowrap" :class="tab === 'individual' ? 'tab-active' : ''" @click="tab = 'individual'">Individual</a>
+      <a role="tab" class="tab whitespace-nowrap" :class="tab === 'curso' ? 'tab-active' : ''" @click="tab = 'curso'">Por curso</a>
+      <a role="tab" class="tab whitespace-nowrap" :class="tab === 'general' ? 'tab-active' : ''" @click="tab = 'general'">General</a>
+      <a role="tab" class="tab whitespace-nowrap" :class="tab === 'ranking' ? 'tab-active' : ''" @click="tab = 'ranking'">Ranking</a>
+    </div>
+
+    <!-- ── TAB: Individual + Libreta anual ─────────────────────────────────── -->
+    <section v-if="tab === 'individual'" class="card bg-base-100 shadow">
+      <div class="card-body space-y-4">
+        <div>
+          <h3 class="font-semibold text-lg">Boletín Individual</h3>
+          <p class="text-sm text-base-content/60">PDF de un trimestre, o la libreta anual completa</p>
+        </div>
+
+        <div v-if="errorInd" role="alert" class="alert alert-error py-2 text-sm">
+          <span>{{ errorInd }}</span>
+        </div>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Estudiante</legend>
+          <div class="relative">
+            <label class="input input-bordered flex items-center gap-2 w-full">
+              <AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
+              <input v-model="buscadorInd.query.value" type="search" placeholder="Nombre o CI..." class="grow"
+                @input="buscadorInd.onInput" />
+              <span v-if="buscadorInd.buscando.value" class="loading loading-spinner loading-xs"></span>
+            </label>
+            <ul v-if="buscadorInd.resultados.value.length"
+              class="absolute z-10 mt-1 w-full bg-base-100 rounded-box shadow-lg border border-base-300 max-h-56 overflow-y-auto">
+              <li v-for="e in buscadorInd.resultados.value" :key="e.id">
+                <button class="w-full text-left px-4 py-2 hover:bg-base-200 flex justify-between items-center"
+                  @click="buscadorInd.seleccionar(e)">
+                  <span>{{ e.apellido }}, {{ e.nombre }}</span>
+                  <span class="font-mono text-xs text-base-content/50">{{ e.ci }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+          <p v-if="buscadorInd.seleccionado.value" class="text-xs text-success mt-1">
+            ✓ {{ buscadorInd.seleccionado.value.nombre }} {{ buscadorInd.seleccionado.value.apellido }}
+            <button type="button" class="link ml-1" @click="buscadorInd.limpiar">cambiar</button>
+          </p>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Trimestre (para el boletín trimestral)</legend>
+          <select v-model="trimestreId" class="select select-bordered w-full">
+            <option value="" disabled>Seleccionar trimestre</option>
+            <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
+              {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
+            </option>
+          </select>
+        </fieldset>
+
+        <button class="btn btn-ghost w-full border border-base-300" :disabled="!buscadorInd.seleccionado.value"
+          @click="mostrarPreview = true">
+          <AppIcon nombre="ojoAbierto" class="h-4 w-4" />
+          Vista previa
+        </button>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button class="btn btn-primary w-full" :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId"
+            @click="descargarIndividual">
+            <span v-if="descargandoInd" class="loading loading-spinner loading-sm"></span>
+            <AppIcon v-else nombre="documento" class="h-4 w-4" />
+            {{ descargandoInd ? 'Generando...' : 'Boletín trimestral' }}
+          </button>
+          <button class="btn btn-outline btn-primary w-full" :disabled="descargandoLibreta || !buscadorInd.seleccionado.value"
+            @click="descargarLibreta">
+            <span v-if="descargandoLibreta" class="loading loading-spinner loading-sm"></span>
+            <AppIcon v-else nombre="documento" class="h-4 w-4" />
+            {{ descargandoLibreta ? 'Generando...' : 'Libreta anual' }}
+          </button>
+        </div>
+        <p class="text-xs text-base-content/40">
+          La libreta anual junta los 3 trimestres + promedio anual de todas las materias, y no requiere elegir trimestre.
+        </p>
+
+        <BoletinEstudianteCard
+          v-if="mostrarPreview && buscadorInd.seleccionado.value && gestion.gestionId"
+          :estudianteId="buscadorInd.seleccionado.value.id"
+          :gestionId="gestion.gestionId"
+          @close="mostrarPreview = false"
+        >
+          <template #acciones>
+            <button class="btn btn-primary btn-sm" :disabled="!trimestreId"
+              @click="mostrarPreview = false; descargarIndividual()">
+              Descargar PDF
+            </button>
+          </template>
+        </BoletinEstudianteCard>
+      </div>
+    </section>
+
+    <!-- ── TAB: Boletines masivos por curso ────────────────────────────────── -->
+    <section v-if="tab === 'curso'" class="card bg-base-100 shadow">
+      <div class="card-body space-y-4">
+        <div>
+          <h3 class="font-semibold text-lg">Boletines Masivos</h3>
+          <p class="text-sm text-base-content/60">Genera un PDF con todos los boletines del curso</p>
+        </div>
+
+        <div v-if="errorMas" role="alert" class="alert alert-error py-2 text-sm">
+          <span>{{ errorMas }}</span>
+        </div>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Curso</legend>
+          <select v-model="cursoId" class="select select-bordered w-full">
+            <option value="" disabled>Seleccionar curso</option>
+            <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+          </select>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Trimestre</legend>
+          <select v-model="trimestreIdMas" class="select select-bordered w-full">
+            <option value="" disabled>Seleccionar trimestre</option>
+            <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
+              {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
+            </option>
+          </select>
+        </fieldset>
+
+        <button class="btn btn-secondary w-full" :disabled="descargandoMas || !cursoId || !trimestreIdMas"
+          @click="descargarMasivo">
+          <span v-if="descargandoMas" class="loading loading-spinner loading-sm"></span>
+          <AppIcon v-else nombre="descargar" class="h-4 w-4" />
+          {{ descargandoMas ? 'Generando PDFs...' : 'Descargar todos' }}
+        </button>
+        <p class="text-xs text-base-content/40 text-center">
+          ¿Querés revisar las notas antes de generar? Mirá el tab
+          <button type="button" class="link link-primary" @click="tab = 'general'">General</button>
+        </p>
+      </div>
+    </section>
+
+    <!-- ── TAB: Boletín General ────────────────────────────────────────────── -->
+    <section v-if="tab === 'general'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
           <h3 class="font-semibold text-lg">Boletín General</h3>
           <p class="text-sm text-base-content/60">
-            Todas las materias x todos los trimestres del curso — clickeá una fila para ver el detalle del estudiante.
+            Todas las materias x todos los trimestres del curso, para revisar antes de imprimir.
           </p>
         </div>
 
         <div v-if="errorGeneral" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorGeneral }}</span></div>
 
-        <div class="flex flex-wrap gap-3 items-end">
-          <fieldset class="fieldset flex-1 min-w-48">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <fieldset class="fieldset flex-1">
             <legend class="fieldset-legend text-xs">Curso</legend>
             <select v-model="cursoIdGeneral" class="select select-bordered w-full">
               <option value="" disabled>Seleccionar curso</option>
               <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
           </fieldset>
-          <button class="btn btn-primary" :disabled="cargandoGeneral || !cursoIdGeneral" @click="verBoletinGeneral">
+          <button class="btn btn-primary w-full sm:w-auto" :disabled="cargandoGeneral || !cursoIdGeneral" @click="verBoletinGeneral">
             <span v-if="cargandoGeneral" class="loading loading-spinner loading-sm"></span>
             Ver boletín general
           </button>
         </div>
 
-        <div v-if="boletinGeneral" class="overflow-x-auto">
-          <table class="table table-xs table-pin-rows">
-            <thead>
-              <tr>
-                <th rowspan="2" class="align-bottom">Estudiante</th>
-                <th v-for="m in boletinGeneral.materias" :key="m.docenteMateriaCursoId"
-                  :colspan="boletinGeneral.trimestres.length + 1" class="text-center border-l border-base-300">
-                  {{ m.nombre }}
-                </th>
-                <th :colspan="boletinGeneral.trimestres.length + 1" class="text-center border-l border-base-300">
-                  Promedio General
-                </th>
-              </tr>
-              <tr>
-                <template v-for="m in boletinGeneral.materias" :key="`h-${m.docenteMateriaCursoId}`">
-                  <th v-for="t in boletinGeneral.trimestres" :key="`h-${m.docenteMateriaCursoId}-${t.id}`"
-                    class="text-center font-normal text-xs border-l border-base-300">
-                    T{{ t.numero }}
-                  </th>
-                  <th class="text-center text-xs">Anual</th>
-                </template>
-                <th v-for="t in boletinGeneral.trimestres" :key="`hg-${t.id}`"
-                  class="text-center font-normal text-xs border-l border-base-300">
-                  T{{ t.numero }}
-                </th>
-                <th class="text-center text-xs">Anual</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="est in boletinGeneral.estudiantes" :key="est.inscripcionId" class="hover cursor-pointer"
-                @click="estudianteSeleccionado = est">
-                <td class="font-medium whitespace-nowrap">{{ est.nombreCompleto }}</td>
-                <template v-for="m in est.materias" :key="`c-${est.inscripcionId}-${m.docenteMateriaCursoId}`">
-                  <td v-for="t in boletinGeneral.trimestres" :key="`c-${est.inscripcionId}-${m.docenteMateriaCursoId}-${t.id}`"
-                    class="text-center border-l border-base-300" :class="claseNota(m.notasPorTrimestre[t.id])">
-                    {{ m.notasPorTrimestre[t.id] ?? '—' }}
-                  </td>
-                  <td class="text-center" :class="claseNota(m.promedioAnual)">
-                    {{ m.promedioAnual ?? '—' }}
-                  </td>
-                </template>
-                <td v-for="t in boletinGeneral.trimestres" :key="`cg-${est.inscripcionId}-${t.id}`"
-                  class="text-center border-l border-base-300" :class="claseNota(est.promedioGeneralPorTrimestre[t.id])">
-                  {{ est.promedioGeneralPorTrimestre[t.id] ?? '—' }}
-                </td>
-                <td class="text-center" :class="claseNota(est.promedioGeneralAnual)">
-                  <div class="flex items-center justify-center gap-1">
-                    <span>{{ est.promedioGeneralAnual ?? '—' }}</span>
-                    <StatusBadge v-if="est.promedioGeneralAnual !== null"
-                      :estado="est.promedioGeneralAnual >= 51 ? 'PROMOVIDO' : 'REPROBADO'" tamano="xs" />
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!boletinGeneral.estudiantes.length">
-                <td :colspan="1 + boletinGeneral.materias.length * (boletinGeneral.trimestres.length + 1) + boletinGeneral.trimestres.length + 1"
-                  class="text-center text-base-content/40 py-8">
-                  Este curso no tiene estudiantes activos
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="boletinGeneral" class="space-y-3">
+          <!-- Cards con detalle SER/SABER/HACER por trimestre (celular y escritorio) -->
+          <BoletinGeneralCards :boletin="boletinGeneral" />
+          <!-- Tabla ancha original, solo desktop y colapsada -->
+          <details class="hidden md:block rounded-box border border-base-300">
+            <summary class="cursor-pointer px-4 py-2 text-sm font-medium text-base-content/70 hover:text-base-content">
+              Vista tabla completa (comparar todo el curso)
+            </summary>
+            <div class="p-2">
+              <BoletinGeneralTabla :boletin="boletinGeneral" />
+            </div>
+          </details>
         </div>
-
-        <!-- Tarjeta de detalle del estudiante clickeado -->
-  <BoletinEstudianteCard
-    v-if="estudianteSeleccionado"
-    :inscripcion-id="estudianteSeleccionado.inscripcionId"
-    @close="estudianteSeleccionado = null"
-  >
-    <template #acciones>
-      <button
-        class="btn btn-primary btn-sm"
-        :disabled="descargandoLibreta"
-        @click="descargarLibretaDe(
-          estudianteSeleccionado!.estudianteId,
-          boletinGeneral!.curso.gestionId,
-          nombrePartes(estudianteSeleccionado!.nombreCompleto).apellido,
-          nombrePartes(estudianteSeleccionado!.nombreCompleto).nombre
-        )"
-      >
-        <span v-if="descargandoLibreta" class="loading loading-spinner loading-xs"></span>
-        Descargar Libreta
-      </button>
-    </template>
-  </BoletinEstudianteCard>
       </div>
-    </div>
+    </section>
 
-    <!-- ── Mejores Estudiantes ─────────────────────────────────────────────── -->
-    <div class="card bg-base-100 shadow">
+    <!-- ── TAB: Mejores Estudiantes ────────────────────────────────────────── -->
+    <section v-if="tab === 'ranking'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
           <h3 class="font-semibold text-lg">Mejores Estudiantes</h3>
@@ -380,19 +339,19 @@ function medalla(puesto: number): string {
 
         <div v-if="errorMejores" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorMejores }}</span></div>
 
-        <div class="flex flex-wrap gap-3 items-end">
-          <fieldset class="fieldset flex-1 min-w-48">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <fieldset class="fieldset flex-1">
             <legend class="fieldset-legend text-xs">Curso</legend>
             <select v-model="cursoIdMejores" class="select select-bordered w-full">
               <option value="" disabled>Seleccionar curso</option>
               <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
           </fieldset>
-          <fieldset class="fieldset w-24">
+          <fieldset class="fieldset w-full sm:w-24">
             <legend class="fieldset-legend text-xs">Puestos</legend>
             <input v-model.number="limiteMejores" type="number" min="1" max="10" class="input input-bordered w-full" />
           </fieldset>
-          <button class="btn btn-primary" :disabled="cargandoMejores || !cursoIdMejores" @click="verMejores">
+          <button class="btn btn-primary w-full sm:w-auto" :disabled="cargandoMejores || !cursoIdMejores" @click="verMejores">
             <span v-if="cargandoMejores" class="loading loading-spinner loading-sm"></span>
             Ver ranking
           </button>
@@ -422,7 +381,7 @@ function medalla(puesto: number): string {
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
   </div>
 </template>

@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { boletinApi, type DetalleBoletinEstudiante, type DetalleMateria } from '@/api/boletin.api'
-import StatusBadge from './StatusBadge.vue'
+import StatusBadge from '../StatusBadge.vue'
 
+// Dos formas de identificar al estudiante: por inscripcionId directo (uso
+// original, desde Boletín General donde ya lo tenemos), o por
+// estudianteId + gestionId (uso desde el buscador del tab Individual,
+// donde solo conocemos el estudiante, no su inscripción).
 const props = defineProps<{
-  inscripcionId: number
+  inscripcionId?: number
+  estudianteId?: number
+  gestionId?: number
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -14,11 +20,15 @@ const cargando = ref(false)
 const error = ref<string | null>(null)
 
 async function cargar() {
+  if (!props.inscripcionId && !(props.estudianteId && props.gestionId)) return
+
   cargando.value = true
   error.value = null
   detalle.value = null
   try {
-    detalle.value = await boletinApi.getDetalle(props.inscripcionId)
+    detalle.value = props.inscripcionId
+      ? await boletinApi.getDetalle(props.inscripcionId)
+      : await boletinApi.getDetallePorEstudiante(props.estudianteId!, props.gestionId!)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar el detalle'
   } finally {
@@ -26,7 +36,7 @@ async function cargar() {
   }
 }
 
-watch(() => props.inscripcionId, cargar, { immediate: true })
+watch(() => [props.inscripcionId, props.estudianteId, props.gestionId], cargar, { immediate: true })
 
 // Un color por Campo de Saber — agrupa visualmente igual que la Libreta
 // impresa, sin tocar el rojo/verde de aprobado/reprobado.

@@ -77,6 +77,7 @@ const router = createRouter({
         { path: 'tutores',          name: 'secretaria-tutores',       component: () => import('@/views/secretaria/Tutoresview.vue') },
         { path: 'pagos',            name: 'secretaria-pagos',         component: () => import('@/views/secretaria/PagosView.vue') },
         { path: 'boletines',        name: 'secretaria-boletines',     component: () => import('@/views/secretaria/BoletinesView.vue') },
+        { path: 'asistencia',       name: 'secretaria-asistencia',    component: () => import('@/views/secretaria/AsistenciaReporteView.vue') },
         { path: 'correccion-notas', name: 'correccion-notas',         component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
         { path: 'promocion',        name: 'promocion',                component: () => import('@/views/secretaria/Promocionview.vue') },
       ],

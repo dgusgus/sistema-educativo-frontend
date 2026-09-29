@@ -100,6 +100,12 @@ export const boletinApi = {
   getDetalle: (inscripcionId: number) =>
     api.get<DetalleBoletinEstudiante>(`/boletin/detalle/${inscripcionId}`).then(r => r.data),
 
+  // GET /boletin/detalle-por-estudiante/:estudianteId/:gestionId → mismo detalle,
+  // para cuando solo tenés el estudianteId (ej: buscador de BoletinesView) y no
+  // el inscripcionId de la gestión activa.
+  getDetallePorEstudiante: (estudianteId: number, gestionId: number) =>
+    api.get<DetalleBoletinEstudiante>(`/boletin/detalle-por-estudiante/${estudianteId}/${gestionId}`).then(r => r.data),
+
   getIndividual: (estudianteId: number, trimestreId: number) =>
     api.get<Blob>(`/boletin/${estudianteId}/${trimestreId}`, { responseType: 'blob' }).then(r => r.data),
 
