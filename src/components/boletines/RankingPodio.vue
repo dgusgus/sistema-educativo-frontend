@@ -10,7 +10,6 @@ const props = defineProps<{
 }>()
 
 const podio = () => props.items.slice(0, 3)
-const resto = () => props.items.slice(3)
 
 function inicial(nombre: string): string {
   return (nombre.trim()[0] ?? '•').toUpperCase()
@@ -71,14 +70,28 @@ function estiloPuesto(puesto: number): string {
         </div>
       </div>
 
-      <!-- Puestos 4+ -->
-      <ul v-if="resto().length" class="mt-3 divide-y divide-base-200">
-        <li v-for="item in resto()" :key="item.inscripcionId" class="flex items-center gap-2 py-1.5 text-sm">
-          <span class="badge badge-sm" :class="estiloPuesto(item.puesto)">{{ item.puesto }}°</span>
-          <span class="flex-1 truncate">{{ item.nombreCompleto }}</span>
-          <span class="font-mono font-semibold">{{ item.promedio.toFixed(1) }}</span>
-        </li>
-      </ul>
+      <!-- Clasificación completa en lista (todos los puestos pedidos) -->
+      <div class="mt-3">
+        <p class="text-xs font-semibold text-base-content/60 mb-1">
+          Clasificación completa ({{ items.length }})
+        </p>
+        <ul class="divide-y divide-base-200 rounded-box border border-base-200 max-h-80 overflow-y-auto">
+          <li v-for="item in items" :key="item.inscripcionId"
+            class="flex items-center gap-2 px-2.5 py-1.5 text-sm hover:bg-base-200/50"
+            :class="item.puesto <= 3 ? 'bg-amber-400/5' : ''">
+            <span class="badge badge-sm font-bold shrink-0" :class="estiloPuesto(item.puesto)">
+              {{ item.puesto }}°
+            </span>
+            <span class="avatar placeholder shrink-0">
+              <span class="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center text-[11px] font-bold">
+                {{ inicial(item.nombreCompleto) }}
+              </span>
+            </span>
+            <span class="flex-1 truncate">{{ item.nombreCompleto }}</span>
+            <span class="font-mono font-semibold">{{ item.promedio.toFixed(1) }}</span>
+          </li>
+        </ul>
+      </div>
     </template>
   </div>
 </template>
