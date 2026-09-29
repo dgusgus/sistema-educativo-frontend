@@ -7,6 +7,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import BoletinGeneralTabla from '@/components/boletines/BoletinGeneralTabla.vue'
 import BoletinGeneralCards from '@/components/boletines/BoletinGeneralCards.vue'
 import BoletinDetalleVista from '@/components/boletines/BoletinDetalleVista.vue'
+import CursoTrimestreMatriz from '@/components/boletines/CursoTrimestreMatriz.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
@@ -94,11 +95,31 @@ async function descargarLibreta() {
   }
 }
 
-// ── Boletín masivo por curso ──────────────────────────────────────────────────
+// ── Por curso: vista matricial + masivo ───────────────────────────────────────
 const cursoId = ref<number | ''>('')
 const trimestreIdMas = ref<number | ''>('')
 const descargandoMas = ref(false)
 const errorMas = ref<string | null>(null)
+
+// Vista: matriz materia × estudiante del trimestre elegido (mismo
+// getGeneral del tab General, sin endpoint nuevo).
+const vistaCurso = ref<BoletinGeneralResponse | null>(null)
+const cargandoVista = ref(false)
+const errorVista = ref<string | null>(null)
+
+async function verVistaCurso() {
+  if (!cursoId.value || !trimestreIdMas.value) { errorVista.value = 'Elegí un curso y un trimestre'; return }
+  cargandoVista.value = true
+  errorVista.value = null
+  vistaCurso.value = null
+  try {
+    vistaCurso.value = await boletinApi.getGeneral(Number(cursoId.value))
+  } catch (e) {
+    errorVista.value = e instanceof Error ? e.message : 'Error al cargar la vista del curso'
+  } finally {
+    cargandoVista.value = false
+  }
+}
 
 async function descargarMasivo() {
   if (!cursoId.value || !trimestreIdMas.value) {
@@ -267,46 +288,59 @@ function medalla(puesto: number): string {
       </div>
     </section>
 
-    <!-- ── TAB: Boletines masivos por curso ────────────────────────────────── -->
+    <!-- ── TAB: Por curso ────────────────────────────────────────────────── -->
     <section v-if="tab === 'curso'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
-          <h3 class="font-semibold text-lg">Boletines Masivos</h3>
-          <p class="text-sm text-base-content/60">Genera un PDF con todos los boletines del curso</p>
+          <h3 class="font-semibold text-lg">Por curso</h3>
+          <p class="text-sm text-base-content/60">Notas del trimestre por materia, estudiante por estudiante</p>
         </div>
 
         <div v-if="errorMas" role="alert" class="alert alert-error py-2 text-sm">
           <span>{{ errorMas }}</span>
         </div>
+        <div v-if="errorVista" role="alert" class="alert alert-error py-2 text-sm">
+          <span>{{ errorVista }}</span>
+        </div>
 
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Curso</legend>
-          <select v-model="cursoId" class="select select-bordered w-full">
-            <option value="" disabled>Seleccionar curso</option>
-            <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-          </select>
-        </fieldset>
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <fieldset class="fieldset flex-1">
+            <legend class="fieldset-legend text-xs">Curso</legend>
+            <select v-model="cursoId" class="select select-bordered w-full">
+              <option value="" disabled>Seleccionar curso</option>
+              <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+            </select>
+          </fieldset>
+          <fieldset class="fieldset flex-1">
+            <legend class="fieldset-legend text-xs">Trimestre</legend>
+            <select v-model="trimestreIdMas" class="select select-bordered w-full">
+              <option value="" disabled>Seleccionar trimestre</option>
+              <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id">
+                {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto)' }}
+              </option>
+            </select>
+          </fieldset>
+          <button class="btn btn-primary w-full sm:w-auto" :disabled="cargandoVista || !cursoId || !trimestreIdMas" @click="verVistaCurso">
+            <span v-if="cargandoVista" class="loading loading-spinner loading-sm"></span>
+            Ver notas
+          </button>
+        </div>
 
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Trimestre</legend>
-          <select v-model="trimestreIdMas" class="select select-bordered w-full">
-            <option value="" disabled>Seleccionar trimestre</option>
-            <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
-              {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
-            </option>
-          </select>
-        </fieldset>
+        <!-- Vista: matriz del trimestre -->
+        <div v-if="vistaCurso && trimestreIdMas">
+          <CursoTrimestreMatriz :general="vistaCurso" :trimestre-id="Number(trimestreIdMas)" />
+        </div>
 
-        <button class="btn btn-secondary w-full" :disabled="descargandoMas || !cursoId || !trimestreIdMas"
-          @click="descargarMasivo">
-          <span v-if="descargandoMas" class="loading loading-spinner loading-sm"></span>
-          <AppIcon v-else nombre="descargar" class="h-4 w-4" />
-          {{ descargandoMas ? 'Generando PDFs...' : 'Descargar todos' }}
-        </button>
-        <p class="text-xs text-base-content/40 text-center">
-          ¿Querés revisar las notas antes de generar? Mirá el tab
-          <button type="button" class="link link-primary" @click="tab = 'general'">General</button>
-        </p>
+        <!-- Reportes: al final, después de revisar -->
+        <div v-if="vistaCurso" class="space-y-2">
+          <div class="divider text-xs text-base-content/50 my-1">Reportes</div>
+          <button class="btn btn-secondary w-full" :disabled="descargandoMas || !cursoId || !trimestreIdMas"
+            @click="descargarMasivo">
+            <span v-if="descargandoMas" class="loading loading-spinner loading-sm"></span>
+            <AppIcon v-else nombre="descargar" class="h-4 w-4" />
+            {{ descargandoMas ? 'Generando PDFs...' : 'Descargar boletines del curso' }}
+          </button>
+        </div>
       </div>
     </section>
 
