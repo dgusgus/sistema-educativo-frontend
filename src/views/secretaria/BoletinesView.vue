@@ -7,6 +7,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import BoletinDetalleVista from '@/components/boletines/BoletinDetalleVista.vue'
 import CursoTrimestreMatriz from '@/components/boletines/CursoTrimestreMatriz.vue'
 import ResumenAnual from '@/components/boletines/ResumenAnual.vue'
+import RankingPodio from '@/components/boletines/RankingPodio.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
@@ -164,6 +165,9 @@ const limiteMejores = ref(3)
 const mejores = ref<MejoresEstudiantesResponse | null>(null)
 const cargandoMejores = ref(false)
 const errorMejores = ref<string | null>(null)
+// Periodo visible del podio: un trimestre o el anual (un solo podio a la
+// vez en vez de 4 cajas).
+const periodoRanking = ref<number | 'anual'>('anual')
 
 async function verMejores() {
   if (!cursoIdMejores.value) { errorMejores.value = 'Elegí un curso'; return }
@@ -172,6 +176,7 @@ async function verMejores() {
   mejores.value = null
   try {
     mejores.value = await boletinApi.getMejores(Number(cursoIdMejores.value), limiteMejores.value)
+    periodoRanking.value = 'anual'
   } catch (e) {
     errorMejores.value = e instanceof Error ? e.message : 'Error al cargar el ranking'
   } finally {
@@ -179,8 +184,11 @@ async function verMejores() {
   }
 }
 
-function medalla(puesto: number): string {
-  return puesto === 1 ? '🥇' : puesto === 2 ? '🥈' : puesto === 3 ? '🥉' : `${puesto}°`
+function itemsRanking(): { titulo: string; items: MejoresEstudiantesResponse['anual'] } {
+  if (!mejores.value) return { titulo: '', items: [] }
+  if (periodoRanking.value === 'anual') return { titulo: 'Promedio Anual', items: mejores.value.anual }
+  const t = mejores.value.trimestres.find(x => x.id === periodoRanking.value)
+  return { titulo: t?.nombre ?? '', items: mejores.value.porTrimestre[Number(periodoRanking.value)] ?? [] }
 }
 </script>
 
@@ -373,12 +381,12 @@ function medalla(puesto: number): string {
       </div>
     </section>
 
-    <!-- ── TAB: Mejores Estudiantes ────────────────────────────────────────── -->
+    <!-- ── TAB: Ranking ──────────────────────────────────────────────────── -->
     <section v-if="tab === 'ranking'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
           <h3 class="font-semibold text-lg">Mejores Estudiantes</h3>
-          <p class="text-sm text-base-content/60">Ranking por trimestre y anual, a partir del Boletín General del curso</p>
+          <p class="text-sm text-base-content/60">Podio por trimestre y anual, a partir del Boletín General del curso</p>
         </div>
 
         <div v-if="errorMejores" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorMejores }}</span></div>
@@ -401,28 +409,21 @@ function medalla(puesto: number): string {
           </button>
         </div>
 
-        <div v-if="mejores" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div v-for="t in mejores.trimestres" :key="t.id" class="rounded-box border border-base-300 p-3">
-            <h4 class="font-semibold text-sm mb-2">{{ t.nombre }}</h4>
-            <ul class="space-y-1">
-              <li v-for="item in mejores.porTrimestre[t.id]" :key="`${t.id}-${item.inscripcionId}`"
-                class="flex justify-between text-sm">
-                <span>{{ medalla(item.puesto) }} {{ item.nombreCompleto }}</span>
-                <span class="font-mono font-semibold">{{ item.promedio.toFixed(1) }}</span>
-              </li>
-              <li v-if="!mejores.porTrimestre[t.id]?.length" class="text-xs text-base-content/40">Sin notas todavía</li>
-            </ul>
+        <div v-if="mejores" class="space-y-3">
+          <!-- Un podio a la vez -->
+          <div role="tablist" class="tabs tabs-boxed w-fit max-w-full overflow-x-auto">
+            <a v-for="t in mejores.trimestres" :key="t.id" role="tab" class="tab tab-sm whitespace-nowrap"
+              :class="periodoRanking === t.id ? 'tab-active' : ''" @click="periodoRanking = t.id">
+              T{{ t.numero }}
+            </a>
+            <a role="tab" class="tab tab-sm whitespace-nowrap"
+              :class="periodoRanking === 'anual' ? 'tab-active' : ''" @click="periodoRanking = 'anual'">
+              Anual
+            </a>
           </div>
-          <div class="rounded-box border border-primary/30 bg-primary/5 p-3">
-            <h4 class="font-semibold text-sm mb-2">Promedio Anual</h4>
-            <ul class="space-y-1">
-              <li v-for="item in mejores.anual" :key="`anual-${item.inscripcionId}`" class="flex justify-between text-sm">
-                <span>{{ medalla(item.puesto) }} {{ item.nombreCompleto }}</span>
-                <span class="font-mono font-semibold">{{ item.promedio.toFixed(1) }}</span>
-              </li>
-              <li v-if="!mejores.anual.length" class="text-xs text-base-content/40">Sin promedios anuales todavía</li>
-            </ul>
-          </div>
+
+          <RankingPodio :titulo="itemsRanking().titulo" :items="itemsRanking().items"
+            :destacado="periodoRanking === 'anual'" />
         </div>
       </div>
     </section>
