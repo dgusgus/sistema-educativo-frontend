@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { boletinApi, descargarBlob, type BoletinGeneralResponse, type MejoresEstudiantesResponse } from '@/api/boletin.api'
+import { ref, onMounted, watch } from 'vue'
+import { boletinApi, descargarBlob, type BoletinGeneralResponse, type DetalleBoletinEstudiante, type MejoresEstudiantesResponse } from '@/api/boletin.api'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante.ts'
 import { useGestionStore } from '@/stores/gestion.store'
 import AppIcon from '@/components/AppIcon.vue'
 import BoletinGeneralTabla from '@/components/boletines/BoletinGeneralTabla.vue'
 import BoletinGeneralCards from '@/components/boletines/BoletinGeneralCards.vue'
-import BoletinEstudianteCard from '@/components/boletines/BoletinEstudianteCard.vue'
+import BoletinDetalleVista from '@/components/boletines/BoletinDetalleVista.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
@@ -21,7 +21,30 @@ const trimestreId = ref<number | ''>('')
 const descargandoInd = ref(false)
 const descargandoLibreta = ref(false)
 const errorInd = ref<string | null>(null)
-const mostrarPreview = ref(false)
+
+// Detalle en línea: al elegir estudiante se cargan todas sus notas (cada
+// actividad de cada dimensión, materia y trimestre) con
+// getDetallePorEstudiante — sin modal.
+const detalleInd = ref<DetalleBoletinEstudiante | null>(null)
+const cargandoDetalle = ref(false)
+const errorDetalle = ref<string | null>(null)
+
+watch(
+  () => [buscadorInd.seleccionado.value?.id, gestion.gestionId],
+  async ([estudianteId, gestionId]) => {
+    detalleInd.value = null
+    errorDetalle.value = null
+    if (!estudianteId || !gestionId) return
+    cargandoDetalle.value = true
+    try {
+      detalleInd.value = await boletinApi.getDetallePorEstudiante(Number(estudianteId), Number(gestionId))
+    } catch (e) {
+      errorDetalle.value = e instanceof Error ? e.message : 'Error al cargar las notas del estudiante'
+    } finally {
+      cargandoDetalle.value = false
+    }
+  },
+)
 
 async function descargarIndividual() {
   const estudianteId = buscadorInd.seleccionado.value?.id
@@ -156,12 +179,12 @@ function medalla(puesto: number): string {
       <a role="tab" class="tab whitespace-nowrap" :class="tab === 'ranking' ? 'tab-active' : ''" @click="tab = 'ranking'">Ranking</a>
     </div>
 
-    <!-- ── TAB: Individual + Libreta anual ─────────────────────────────────── -->
+    <!-- ── TAB: Individual ─────────────────────────────────────────────── -->
     <section v-if="tab === 'individual'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
           <h3 class="font-semibold text-lg">Boletín Individual</h3>
-          <p class="text-sm text-base-content/60">PDF de un trimestre, o la libreta anual completa</p>
+          <p class="text-sm text-base-content/60">Todas las notas del estudiante, actividad por actividad</p>
         </div>
 
         <div v-if="errorInd" role="alert" class="alert alert-error py-2 text-sm">
@@ -194,53 +217,53 @@ function medalla(puesto: number): string {
           </p>
         </fieldset>
 
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Trimestre (para el boletín trimestral)</legend>
-          <select v-model="trimestreId" class="select select-bordered w-full">
-            <option value="" disabled>Seleccionar trimestre</option>
-            <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
-              {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
-            </option>
-          </select>
-        </fieldset>
-
-        <button class="btn btn-ghost w-full border border-base-300" :disabled="!buscadorInd.seleccionado.value"
-          @click="mostrarPreview = true">
-          <AppIcon nombre="ojoAbierto" class="h-4 w-4" />
-          Vista previa
-        </button>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button class="btn btn-primary w-full" :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId"
-            @click="descargarIndividual">
-            <span v-if="descargandoInd" class="loading loading-spinner loading-sm"></span>
-            <AppIcon v-else nombre="documento" class="h-4 w-4" />
-            {{ descargandoInd ? 'Generando...' : 'Boletín trimestral' }}
-          </button>
-          <button class="btn btn-outline btn-primary w-full" :disabled="descargandoLibreta || !buscadorInd.seleccionado.value"
-            @click="descargarLibreta">
-            <span v-if="descargandoLibreta" class="loading loading-spinner loading-sm"></span>
-            <AppIcon v-else nombre="documento" class="h-4 w-4" />
-            {{ descargandoLibreta ? 'Generando...' : 'Libreta anual' }}
-          </button>
+        <!-- Vista: detalle completo en línea -->
+        <div v-if="buscadorInd.seleccionado.value">
+          <div v-if="cargandoDetalle" class="space-y-2">
+            <div class="skeleton h-20 w-full"></div>
+            <div class="skeleton h-32 w-full"></div>
+          </div>
+          <div v-else-if="errorDetalle" role="alert" class="alert alert-error py-2 text-sm">
+            <span>{{ errorDetalle }}</span>
+          </div>
+          <BoletinDetalleVista v-else-if="detalleInd" :detalle="detalleInd" />
         </div>
-        <p class="text-xs text-base-content/40">
-          La libreta anual junta los 3 trimestres + promedio anual de todas las materias, y no requiere elegir trimestre.
+        <p v-else class="text-center text-base-content/40 text-sm py-4">
+          Buscá y elegí un estudiante para ver todas sus notas
         </p>
 
-        <BoletinEstudianteCard
-          v-if="mostrarPreview && buscadorInd.seleccionado.value && gestion.gestionId"
-          :estudianteId="buscadorInd.seleccionado.value.id"
-          :gestionId="gestion.gestionId"
-          @close="mostrarPreview = false"
-        >
-          <template #acciones>
-            <button class="btn btn-primary btn-sm" :disabled="!trimestreId"
-              @click="mostrarPreview = false; descargarIndividual()">
-              Descargar PDF
+        <!-- Reportes: al final, después de revisar -->
+        <div v-if="detalleInd" class="space-y-3">
+          <div class="divider text-xs text-base-content/50 my-1">Reportes</div>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Trimestre (solo para el boletín trimestral)</legend>
+            <select v-model="trimestreId" class="select select-bordered w-full">
+              <option value="" disabled>Seleccionar trimestre</option>
+              <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id" :disabled="!t.cerrado">
+                {{ t.nombre }} {{ t.cerrado ? '🔒 Cerrado' : '(abierto — no disponible aún)' }}
+              </option>
+            </select>
+          </fieldset>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button class="btn btn-primary w-full" :disabled="descargandoInd || !buscadorInd.seleccionado.value || !trimestreId"
+              @click="descargarIndividual">
+              <span v-if="descargandoInd" class="loading loading-spinner loading-sm"></span>
+              <AppIcon v-else nombre="documento" class="h-4 w-4" />
+              {{ descargandoInd ? 'Generando...' : 'Boletín trimestral' }}
             </button>
-          </template>
-        </BoletinEstudianteCard>
+            <button class="btn btn-outline btn-primary w-full" :disabled="descargandoLibreta || !buscadorInd.seleccionado.value"
+              @click="descargarLibreta">
+              <span v-if="descargandoLibreta" class="loading loading-spinner loading-sm"></span>
+              <AppIcon v-else nombre="documento" class="h-4 w-4" />
+              {{ descargandoLibreta ? 'Generando...' : 'Libreta anual' }}
+            </button>
+          </div>
+          <p class="text-xs text-base-content/40">
+            La libreta anual junta los 3 trimestres + promedio anual de todas las materias, y no requiere elegir trimestre.
+          </p>
+        </div>
       </div>
     </section>
 
