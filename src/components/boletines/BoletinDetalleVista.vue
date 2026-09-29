@@ -104,19 +104,20 @@ const promedioGeneralAnual = computed(() => {
                 <span class="text-sm font-bold" :class="claseNota(trimestre.total)">{{ trimestre.total ?? '—' }}</span>
               </div>
 
-              <div v-for="dim in trimestre.dimensiones" :key="dim.dimensionId" class="mb-1.5 last:mb-0">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-base-content/70">{{ dim.nombre }}</span>
-                  <span class="font-medium" :class="claseNota(dim.promedio)">{{ dim.promedio ?? '—' }}</span>
+              <div v-for="dim in trimestre.dimensiones" :key="dim.dimensionId"
+                class="rounded-lg bg-base-100 border border-base-200 p-2 mb-1.5 last:mb-0">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-bold uppercase tracking-wide">{{ dim.nombre }}</span>
+                  <span class="badge badge-sm badge-ghost font-mono">prom {{ dim.promedio ?? '—' }}</span>
                 </div>
-                <p class="text-[11px] text-base-content/40 pl-1 truncate">
-                  <span v-if="!dim.actividades.length">sin actividades</span>
-                  <template v-else>
-                    <span v-for="(act, i) in dim.actividades" :key="act.actividadEvaluativaId">
-                      {{ act.nota ?? '—' }}<span v-if="i < dim.actividades.length - 1">, </span>
-                    </span>
-                  </template>
-                </p>
+                <div v-if="dim.actividades.length" class="flex flex-wrap gap-1 mt-1.5">
+                  <span v-for="act in dim.actividades" :key="act.actividadEvaluativaId"
+                    class="badge badge-sm badge-outline font-normal"
+                    :title="`${act.nombre} (máx ${act.puntajeMaximo})`">
+                    {{ act.nombre }}: <strong class="ml-1 font-mono">{{ act.nota ?? '—' }}/{{ act.puntajeMaximo }}</strong>
+                  </span>
+                </div>
+                <p v-else class="text-xs text-base-content/40 mt-1">Sin actividades registradas</p>
               </div>
 
               <p v-if="!trimestre.dimensiones.length" class="text-xs text-base-content/30">Sin dimensiones configuradas</p>
