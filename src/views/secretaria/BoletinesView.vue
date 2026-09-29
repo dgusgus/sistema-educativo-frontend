@@ -4,10 +4,9 @@ import { boletinApi, descargarBlob, type BoletinGeneralResponse, type DetalleBol
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante.ts'
 import { useGestionStore } from '@/stores/gestion.store'
 import AppIcon from '@/components/AppIcon.vue'
-import BoletinGeneralTabla from '@/components/boletines/BoletinGeneralTabla.vue'
-import BoletinGeneralCards from '@/components/boletines/BoletinGeneralCards.vue'
 import BoletinDetalleVista from '@/components/boletines/BoletinDetalleVista.vue'
 import CursoTrimestreMatriz from '@/components/boletines/CursoTrimestreMatriz.vue'
+import ResumenAnual from '@/components/boletines/ResumenAnual.vue'
 
 const gestion = useGestionStore()
 onMounted(() => gestion.cargar())
@@ -344,13 +343,13 @@ function medalla(puesto: number): string {
       </div>
     </section>
 
-    <!-- ── TAB: Boletín General ────────────────────────────────────────────── -->
+    <!-- ── TAB: General (resumen anual) ──────────────────────────────────── -->
     <section v-if="tab === 'general'" class="card bg-base-100 shadow">
       <div class="card-body space-y-4">
         <div>
-          <h3 class="font-semibold text-lg">Boletín General</h3>
+          <h3 class="font-semibold text-lg">General</h3>
           <p class="text-sm text-base-content/60">
-            Todas las materias x todos los trimestres del curso, para revisar antes de imprimir.
+            Notas finales por materia + promedio anual. Lo trimestral está en Individual y Por curso.
           </p>
         </div>
 
@@ -366,23 +365,11 @@ function medalla(puesto: number): string {
           </fieldset>
           <button class="btn btn-primary w-full sm:w-auto" :disabled="cargandoGeneral || !cursoIdGeneral" @click="verBoletinGeneral">
             <span v-if="cargandoGeneral" class="loading loading-spinner loading-sm"></span>
-            Ver boletín general
+            Ver resumen anual
           </button>
         </div>
 
-        <div v-if="boletinGeneral" class="space-y-3">
-          <!-- Cards con detalle SER/SABER/HACER por trimestre (celular y escritorio) -->
-          <BoletinGeneralCards :boletin="boletinGeneral" />
-          <!-- Tabla ancha original, solo desktop y colapsada -->
-          <details class="hidden md:block rounded-box border border-base-300">
-            <summary class="cursor-pointer px-4 py-2 text-sm font-medium text-base-content/70 hover:text-base-content">
-              Vista tabla completa (comparar todo el curso)
-            </summary>
-            <div class="p-2">
-              <BoletinGeneralTabla :boletin="boletinGeneral" />
-            </div>
-          </details>
-        </div>
+        <ResumenAnual v-if="boletinGeneral" :general="boletinGeneral" />
       </div>
     </section>
 
