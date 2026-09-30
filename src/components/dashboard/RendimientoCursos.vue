@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { reporteApi, type ReporteAcademicoDetalle } from '@/api/reporte.api'
+import { computed } from 'vue'
+import type { ReporteAcademicoDetalle } from '@/api/reporte.api'
 import { nombreCurso } from '@/api/estructura.api'
 import AppIcon from '@/components/AppIcon.vue'
 
-// Rendimiento por curso derivado del reporte académico (1 sola request):
-// promedio general del curso + tasa de aprobación, con link al reporte.
-// Autocontenido: pide sus datos al montar para no engordar el Dashboard.
-const props = defineProps<{ gestionId: number }>()
+// Rendimiento por curso derivado del detalle del reporte académico:
+// promedio general del curso + tasa de aprobación. Recibe los datos ya
+// cargados por el Dashboard (1 sola request compartida con MejoresGestion
+// y EstadoInscripciones) — no pide nada por su cuenta.
+const props = defineProps<{ detalle: ReporteAcademicoDetalle[] }>()
 
 interface FilaCurso {
   cursoId: number
@@ -16,9 +17,6 @@ interface FilaCurso {
   promedio: number | null
   tasa: number | null
 }
-
-const filas = ref<FilaCurso[] | null>(null)
-const error = ref<string | null>(null)
 
 function promedioEstudiante(d: ReporteAcademicoDetalle): number | null {
   if (!d.promediosFinales.length) return null
@@ -29,31 +27,26 @@ function aprobado(d: ReporteAcademicoDetalle): boolean {
   return d.promediosFinales.length > 0 && d.promediosFinales.every(p => p.resultado === 'PROMOVIDO')
 }
 
-onMounted(async () => {
-  try {
-    const r = await reporteApi.getReporteAcademico({ gestionId: props.gestionId })
-    const porCurso = new Map<number, { nombre: string; detalle: ReporteAcademicoDetalle[] }>()
-    for (const d of r.detalle) {
-      const g = porCurso.get(d.cursoId) ?? { nombre: nombreCurso(d.curso), detalle: [] }
-      g.detalle.push(d)
-      porCurso.set(d.cursoId, g)
-    }
-    filas.value = Array.from(porCurso.values())
-      .map(g => {
-        const proms = g.detalle.map(promedioEstudiante).filter((v): v is number => v !== null)
-        const conNota = g.detalle.filter(d => promedioEstudiante(d) !== null)
-        return {
-          cursoId: g.detalle[0].cursoId,
-          nombre: g.nombre,
-          n: g.detalle.length,
-          promedio: proms.length ? proms.reduce((s, v) => s + v, 0) / proms.length : null,
-          tasa: conNota.length ? (conNota.filter(aprobado).length / conNota.length) * 100 : null,
-        }
-      })
-      .sort((a, b) => (b.promedio ?? -1) - (a.promedio ?? -1))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al cargar el rendimiento por curso'
+const filas = computed<FilaCurso[]>(() => {
+  const porCurso = new Map<number, { nombre: string; detalle: ReporteAcademicoDetalle[] }>()
+  for (const d of props.detalle) {
+    const g = porCurso.get(d.cursoId) ?? { nombre: nombreCurso(d.curso), detalle: [] }
+    g.detalle.push(d)
+    porCurso.set(d.cursoId, g)
   }
+  return Array.from(porCurso.values())
+    .map(g => {
+      const proms = g.detalle.map(promedioEstudiante).filter((v): v is number => v !== null)
+      const conNota = g.detalle.filter(d => promedioEstudiante(d) !== null)
+      return {
+        cursoId: g.detalle[0].cursoId,
+        nombre: g.nombre,
+        n: g.detalle.length,
+        promedio: proms.length ? proms.reduce((s, v) => s + v, 0) / proms.length : null,
+        tasa: conNota.length ? (conNota.filter(aprobado).length / conNota.length) * 100 : null,
+      }
+    })
+    .sort((a, b) => (b.promedio ?? -1) - (a.promedio ?? -1))
 })
 
 function claseNota(nota: number | null): string {
@@ -73,11 +66,7 @@ function claseNota(nota: number | null): string {
         <router-link to="/director/reportes" class="link link-primary text-xs">Reporte completo →</router-link>
       </div>
 
-      <div v-if="error" role="alert" class="alert alert-error py-2 text-sm"><span>{{ error }}</span></div>
-      <div v-else-if="!filas" class="space-y-2">
-        <div v-for="i in 3" :key="i" class="skeleton h-10 w-full"></div>
-      </div>
-      <p v-else-if="!filas.length" class="text-xs text-base-content/40 text-center py-4">
+      <p v-if="!filas.length" class="text-xs text-base-content/40 text-center py-4">
         Sin inscripciones en la gestión todavía
       </p>
       <ul v-else class="space-y-2.5">

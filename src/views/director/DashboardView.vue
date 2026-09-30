@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { reporteApi } from '@/api/reporte.api'
+import { reporteApi, type ReporteAcademicoDetalle } from '@/api/reporte.api'
 import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
 import { evaluacionApi } from '@/api/evaluacion.api'
 import { institucionApi } from '@/api/institucion.api'
+import { docenteApi } from '@/api/docente.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import type { DashboardResponse, DimensionEvaluacion, Materia, Curso, Institucion } from '@/types'
+import type { DashboardResponse, DimensionEvaluacion, Materia, Curso, Institucion, Docente } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import PendientesCierre from '@/components/dashboard/PendientesCierre.vue'
 import CursoExplorer from '@/components/dashboard/CursoExplorer.vue'
 import RendimientoCursos from '@/components/dashboard/RendimientoCursos.vue'
+import MejoresGestion from '@/components/dashboard/MejoresGestion.vue'
+import EstadoInscripciones from '@/components/dashboard/EstadoInscripciones.vue'
 import type { PendientesCierre as Pendientes } from '@/api/estructura.api'
 
 // Dashboard en 3 bloques: hero + alertas (lo que exige acción) → indicadores
@@ -26,6 +29,10 @@ const materias    = ref<Materia[] | null>(null)
 const cursos      = ref<Curso[] | null>(null)
 const pendientes  = ref<Pendientes | null>(null)
 const institucion = ref<Institucion | null>(null)
+// Detalle académico completo (1 sola request compartida por Rendimiento,
+// Mejores y Dona de inscripciones) + docentes para alerta de asignación.
+const detalleAcademico = ref<ReporteAcademicoDetalle[] | null>(null)
+const docentesSinAsignar = ref<string[]>([])
 
 const trimestreActivo = computed(() => datos.value?.trimestres.find(t => !t.cerrado) ?? null)
 
@@ -42,6 +49,10 @@ const dimensionesOk = computed(() => Math.abs(sumaDimensiones.value - 100) < 0.0
 
 const cursosSinInscritos = computed(() =>
   (cursos.value ?? []).filter(c => (c._count?.inscripciones ?? 0) === 0)
+)
+
+const materiasSinAsignar = computed(() =>
+  (materias.value ?? []).filter(m => (m._count?.asignaciones ?? 0) === 0)
 )
 
 const inicialesUE = computed(() =>
@@ -77,6 +88,12 @@ onMounted(async () => {
   cursoApi.getAll(gestionId).then(r => { cursos.value = r }).catch(() => {})
   institucionApi.get().then(r => { institucion.value = r }).catch(() => {})
   gestionStore.cargar().catch(() => {})
+  reporteApi.getReporteAcademico({ gestionId }).then(r => { detalleAcademico.value = r.detalle }).catch(() => {})
+  docenteApi.getAll().then((ds: Docente[]) => {
+    docentesSinAsignar.value = ds
+      .filter(d => !(d.asignaciones ?? []).length)
+      .map(d => `${d.nombre} ${d.apellido}`)
+  }).catch(() => {})
   if (trim) {
     trimestreApi.getPendientes(trim.id).then(r => { pendientes.value = r }).catch(() => {})
   }
@@ -142,6 +159,22 @@ onMounted(async () => {
           <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
           <span>
             Las dimensiones suman <strong>{{ sumaDimensiones }}%</strong> (deberían dar 100%) — revisá los pesos en Dimensiones.
+          </span>
+        </div>
+
+        <div v-if="materias && materiasSinAsignar.length" role="alert" class="alert alert-warning py-2 text-sm">
+          <AppIcon nombre="estructura" class="h-4 w-4 shrink-0" />
+          <span>
+            {{ materiasSinAsignar.length }} materia(s) sin asignar a ningún curso:
+            <strong>{{ materiasSinAsignar.map(m => m.nombre).join(', ') }}</strong>
+          </span>
+        </div>
+
+        <div v-if="docentesSinAsignar.length" role="alert" class="alert alert-warning py-2 text-sm">
+          <AppIcon nombre="personas" class="h-4 w-4 shrink-0" />
+          <span>
+            {{ docentesSinAsignar.length }} docente(s) sin asignación:
+            <strong>{{ docentesSinAsignar.join(', ') }}</strong>
           </span>
         </div>
       </div>
@@ -253,9 +286,22 @@ onMounted(async () => {
 
       <!-- ── 3. RENDIMIENTO + EXPLORADOR ──────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <RendimientoCursos v-if="datos" :gestion-id="datos.gestion.id" />
+        <RendimientoCursos v-if="detalleAcademico" :detalle="detalleAcademico" />
+        <div v-else class="skeleton h-48 w-full rounded-xl"></div>
         <CursoExplorer v-if="cursos" :cursos="cursos" />
         <div v-else class="skeleton h-32 w-full rounded-xl"></div>
+      </div>
+
+      <!-- ── 4. MEJORES + INSCRIPCIONES ────────────────────────────────────── -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <template v-if="detalleAcademico">
+          <MejoresGestion :detalle="detalleAcademico" />
+          <EstadoInscripciones :detalle="detalleAcademico" />
+        </template>
+        <template v-else>
+          <div class="skeleton h-48 w-full rounded-xl"></div>
+          <div class="skeleton h-48 w-full rounded-xl"></div>
+        </template>
       </div>
 
     </template>
