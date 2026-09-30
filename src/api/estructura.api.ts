@@ -1,5 +1,5 @@
 import api from '@/api/axios'
-import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
+import type { Curso, Materia, Trimestre, Nivel, Turno, EstadoInscripcion } from '@/types'
 
 // Helper de display — espeja curso.helper.ts → nombreCurso() del backend.
 // Úsalo donde el backend te devuelva un curso SIN pasar por conNombre()
@@ -43,7 +43,7 @@ export const cursoApi = {
 
   getById: (id: number) =>
     api.get<Curso & {
-      inscripciones: Array<{ id: number; estudiante: { id: number; nombre: string; apellido: string } }>
+      inscripciones: Array<{ id: number; estadoInscripcion: EstadoInscripcion; estudiante: { id: number; nombre: string; apellido: string } }>
       asignaciones: Array<{ id: number; materia: { id: number; nombre: string }; docente: { id: number; nombre: string; apellido: string } }>
     }>(`/cursos/${id}`).then(r => r.data),
 
@@ -107,4 +107,36 @@ export const trimestreApi = {
   // y devuelve el detalle de lo que falta si rechaza.
   cerrar: (id: number) =>
     api.post<{ message: string; trimestre: Trimestre }>(`/trimestres/${id}/cerrar`).then(r => r.data),
+
+  // Qué falta para poder cerrar (solo lectura — no modifica nada).
+  // Misma regla que `cerrar`, pero con nombres para el Dashboard.
+  getPendientes: (id: number) =>
+    api.get<PendientesCierre>(`/trimestres/${id}/pendientes`).then(r => r.data),
+}
+
+export interface PendienteFaltante {
+  inscripcionId: number
+  nombreCompleto: string
+}
+
+export interface PendienteMateria {
+  docenteMateriaCursoId: number
+  materia: { nombre: string; codigo: string }
+  curso: { grado: number; paralelo: string; nivel: string }
+  docente: string
+  totalEsperados: number
+  registrados: number
+  faltantes: PendienteFaltante[]
+}
+
+export interface PendientesCierre {
+  trimestre: { id: number; numero: number; nombre: string; cerrado: boolean; gestionId: number }
+  resumen: {
+    totalMaterias: number
+    materiasCompletas: number
+    totalEsperados: number
+    totalRegistrados: number
+    totalFaltantes: number
+  }
+  pendientes: PendienteMateria[]
 }

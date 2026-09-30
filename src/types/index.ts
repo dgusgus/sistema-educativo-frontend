@@ -416,6 +416,7 @@ export interface DashboardIndicadoresData {
 }
 
 export interface DashboardTrimestre {
+  id:      number
   numero:  number
   nombre:  string
   cerrado: boolean
