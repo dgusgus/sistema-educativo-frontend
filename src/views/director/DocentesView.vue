@@ -90,6 +90,9 @@ function cursosDe(d: Docente): Array<{ id: number; corto: string; completo: stri
   })
 }
 
+// Filas con muchas asignaciones se colapsan: se muestran 3 y el resto tras "+N más".
+const asignExpandido = ref<Record<number, boolean>>({})
+
 // ─── Quitar asignación ────────────────────────────────────────────────────────
 // DELETE /docentes/:id/asignacion/:asignacionId existía sin vista.
 const quitandoAsignacion = ref<number | null>(null)
@@ -486,23 +489,34 @@ async function exportar() {
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
 <td>
-  <div class="flex flex-wrap gap-1 max-w-xs items-center">
-    <span
-      v-for="c in cursosDe(d)"
-      :key="c.id"
-      class="badge badge-sm badge-outline gap-1"
-      :title="c.completo"
-    >
-      {{ c.corto }}
-      <button class="text-error font-bold leading-none"
-        :disabled="quitandoAsignacion === c.id"
-        :title="`Quitar ${c.completo}`"
-        @click="quitarAsignacion(d, c.id, c.completo)">
-        <span v-if="quitandoAsignacion === c.id" class="loading loading-spinner loading-xs"></span>
-        <span v-else>✕</span>
+  <div v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</div>
+  <div v-else class="max-w-xs">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <span
+        v-for="c in (asignExpandido[d.id] ? cursosDe(d) : cursosDe(d).slice(0, 3))"
+        :key="c.id"
+        class="badge badge-outline rounded-full py-2.5 pl-3 pr-1 text-xs font-medium"
+        :title="c.completo"
+      >
+        {{ c.corto }}
+        <button type="button"
+          class="grid h-7 w-7 place-items-center rounded-full text-error transition hover:bg-error/15 disabled:opacity-50"
+          :disabled="quitandoAsignacion === c.id"
+          :title="`Quitar ${c.completo}`"
+          :aria-label="`Quitar ${c.completo}`"
+          @click="quitarAsignacion(d, c.id, c.completo)">
+          <span v-if="quitandoAsignacion === c.id" class="loading loading-spinner loading-xs"></span>
+          <AppIcon v-else nombre="cerrar" class="h-3 w-3" />
+        </button>
+      </span>
+      <button v-if="cursosDe(d).length > 3" type="button"
+        class="btn btn-ghost btn-xs min-h-8 rounded-full px-2.5 text-xs"
+        :aria-expanded="!!asignExpandido[d.id]"
+        @click="asignExpandido[d.id] = !asignExpandido[d.id]">
+        {{ asignExpandido[d.id] ? 'Mostrar menos' : `+${cursosDe(d).length - 3} más` }}
       </button>
-    </span>
-    <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
+    </div>
+    <p class="mt-1 text-[11px] text-base-content/40 tabular-nums">{{ cursosDe(d).length }} curso(s) en total</p>
   </div>
 </td>
             <td>
@@ -518,17 +532,17 @@ async function exportar() {
               <StatusBadge :estado="d.activo ? 'ACTIVO' : 'INACTIVO'" :texto="d.activo ? 'Activo' : 'Inactivo'" />
             </td>
             <td>
-              <div class="flex gap-1 flex-wrap">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(d)">
+              <div class="flex gap-1 flex-nowrap whitespace-nowrap">
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(d)">
                   Editar
                 </button>
-                <button class="btn btn-outline btn-xs btn-info" @click="abrirAsignacion(d)">
+                <button class="btn btn-outline btn-sm min-h-11 btn-info" @click="abrirAsignacion(d)">
                   Asignar
                 </button>
-                <button v-if="!tieneCuenta(d)" class="btn btn-outline btn-xs btn-warning" @click="abrirVincular(d)">
+                <button v-if="!tieneCuenta(d)" class="btn btn-outline btn-sm min-h-11 btn-warning" @click="abrirVincular(d)">
                   Vincular cuenta
                 </button>
-                <button v-if="tieneCuenta(d)" class="btn btn-ghost btn-xs" @click="abrirReset(d)">
+                <button v-if="tieneCuenta(d)" class="btn btn-ghost btn-sm min-h-11" @click="abrirReset(d)">
                   Reset pass
                 </button>
               </div>
