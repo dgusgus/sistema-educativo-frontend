@@ -5,6 +5,7 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { asistenciaApi, type AsistenciaDiaResponse, type ListaItem } from '@/api/asistencia.api'
 import { useToastStore } from '@/stores/toast.store'
 import type { EstadoAsistencia, Nivel } from '@/types'
+import { hoyLocal } from '@/lib/fechas'
 
 const toast = useToastStore()
 
@@ -12,7 +13,7 @@ const docenteStore = useDocenteStore()
 const gestionStore = useGestionStore()
 
 // ── Fecha ─────────────────────────────────────────────────────────────────────
-const hoy  = new Date().toISOString().split('T')[0]
+const hoy  = hoyLocal()
 const fecha = ref(hoy)
 
 // ── Asignación seleccionada ───────────────────────────────────────────────────

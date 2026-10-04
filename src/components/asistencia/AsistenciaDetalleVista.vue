@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { fechaSoloDia, formatoFecha } from '@/lib/fechas'
 
 // Un registro crudo de GET /asistencia/historial: un día, una materia,
 // un estado. El padre ya lo filtró a la gestión activa.
@@ -46,7 +47,7 @@ const filtrados = computed(() => {
   return props.registros
     .filter(r => (tid === '' || r.trimestreId === tid) && (materiaId.value === '' || r.docenteMateriaCursoId === materiaId.value))
     .slice()
-    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+    .sort((a, b) => fechaSoloDia(a.fecha).getTime() - fechaSoloDia(b.fecha).getTime())
 })
 
 const resumen = computed(() => {
@@ -77,12 +78,12 @@ function letraEstado(estado: RegistroAsistencia['estado']): string {
 }
 
 function diaMes(fecha: string): string {
-  const d = new Date(fecha)
+  const d = fechaSoloDia(fecha)
   return `${d.getDate()} ${d.toLocaleDateString('es-BO', { month: 'short' })}`
 }
 
 function fechaLarga(fecha: string): string {
-  return new Date(fecha).toLocaleDateString('es-BO', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+  return formatoFecha(fecha, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 }
 </script>
 

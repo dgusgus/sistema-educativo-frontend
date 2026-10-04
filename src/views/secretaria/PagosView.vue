@@ -6,6 +6,7 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Nivel } from '@/types'
+import { formatoFecha } from '@/lib/fechas'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -111,12 +112,6 @@ async function anular(id: number) {
   } finally {
     anulando.value = null
   }
-}
-
-const badgeEstado: Record<string, string> = {
-  PAGADO:   'badge-success',
-  PENDIENTE:'badge-warning',
-  ANULADO:  'badge-ghost',
 }
 
 // ── Conceptos de pago (gestión aparte — usaba una API que no se llamaba
@@ -311,7 +306,7 @@ async function crearConcepto() {
                 <td>{{ p.conceptoPago.nombre }}</td>
                 <td class="font-semibold">Bs. {{ p.montoPagado.toLocaleString('es-BO') }}</td>
                 <td class="text-sm">{{ p.metodoPago }}</td>
-                <td class="text-sm text-base-content/60">{{ new Date(p.fechaPago).toLocaleDateString('es-BO') }}</td>
+                <td class="text-sm text-base-content/60">{{ formatoFecha(p.fechaPago) }}</td>
                 <td><StatusBadge :estado="p.estado" /></td>
                 <td>
                   <button v-if="p.estado === 'PAGADO'"

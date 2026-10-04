@@ -6,6 +6,7 @@ import { bitacoraApi, type BitacoraPayload } from '@/api/bitacora.api'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { BitacoraClase, Nivel } from '@/types'
+import { formatoFecha, hoyLocal } from '@/lib/fechas'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -58,7 +59,7 @@ const errorModal   = ref<string | null>(null)
 const idEditando   = ref<number | null>(null)
 
 const formVacio = () => ({
-  fecha: new Date().toISOString().split('T')[0],
+  fecha: hoyLocal(),
   tema: '', descripcion: '', tareaAsignada: '',
 })
 const form = ref(formVacio())
@@ -185,7 +186,7 @@ async function eliminar(r: BitacoraClase) {
           <div class="card-body py-3">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="text-xs text-base-content/50">{{ new Date(r.fecha).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
+                <p class="text-xs text-base-content/50">{{ formatoFecha(r.fecha, { weekday: 'long', day: 'numeric', month: 'long' }) }}</p>
                 <p class="font-semibold">{{ r.tema }}</p>
                 <p v-if="r.descripcion" class="text-sm text-base-content/70 mt-1">{{ r.descripcion }}</p>
                 <p v-if="r.tareaAsignada" class="text-sm mt-1">

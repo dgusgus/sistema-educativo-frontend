@@ -11,6 +11,7 @@ import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import StatusBadge from '@/components/StatusBadge.vue'
+import { formatoFecha } from '@/lib/fechas'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -421,8 +422,8 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
           <tr v-else v-for="t in trimestres" :key="t.id" class="hover">
             <td class="font-bold text-center">{{ t.numero }}</td>
             <td class="font-medium">{{ t.nombre }}</td>
-            <td class="text-sm">{{ t.fechaInicio ? new Date(t.fechaInicio).toLocaleDateString('es-BO') : '—' }}</td>
-            <td class="text-sm">{{ t.fechaFin    ? new Date(t.fechaFin).toLocaleDateString('es-BO')    : '—' }}</td>
+            <td class="text-sm">{{ formatoFecha(t.fechaInicio) }}</td>
+            <td class="text-sm">{{ formatoFecha(t.fechaFin) }}</td>
             <td>
               <StatusBadge :estado="t.cerrado ? 'CERRADO' : 'ABIERTO'" :texto="t.cerrado ? 'Cerrado' : 'Abierto'" />
             </td>
