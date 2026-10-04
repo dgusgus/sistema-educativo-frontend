@@ -206,7 +206,7 @@ onMounted(async () => {
         <div v-else-if="erroresBloque.pendientes" role="alert" class="alert alert-error py-2 text-sm">
           <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
           <span class="flex-1">No se pudieron revisar los pendientes: {{ erroresBloque.pendientes }}</span>
-          <button type="button" class="btn btn-xs btn-ghost" @click="cargarPendientes">Reintentar</button>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarPendientes">Reintentar</button>
         </div>
         <div v-else-if="trimestreActivo" class="flex items-center gap-2 text-sm text-base-content/50">
           <span class="loading loading-spinner loading-xs"></span> Revisando pendientes de cierre…
@@ -269,21 +269,21 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="card bg-base-100 border border-base-300/60 shadow-sm">
-        <dl class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-base-300">
-          <div class="px-4 py-3">
+      <div class="card bg-base-100 border border-base-300/60 shadow-sm overflow-hidden">
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-base-300">
+          <div class="bg-base-100 px-4 py-3">
             <dt class="text-[11px] font-medium text-base-content/55">Cursos</dt>
             <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.totalCursos }} <span class="text-xs font-medium text-base-content/50">· {{ cursosSinInscritos.length }} vacíos</span></dd>
           </div>
-          <div class="px-4 py-3">
+          <div class="bg-base-100 px-4 py-3">
             <dt class="text-[11px] font-medium text-base-content/55">En riesgo</dt>
             <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.estudiantesEnRiesgo }} <span class="text-xs font-medium text-base-content/50">· asistencia o notas</span></dd>
           </div>
-          <div class="px-4 py-3 border-t border-base-300 sm:border-t-0">
+          <div class="bg-base-100 px-4 py-3">
             <dt class="text-[11px] font-medium text-base-content/55">Asistencia prom.</dt>
             <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.promedioAsistencia.toFixed(0) }}% <span class="text-xs font-medium text-base-content/50">· todas las materias</span></dd>
           </div>
-          <div class="px-4 py-3 border-t border-base-300 sm:border-t-0">
+          <div class="bg-base-100 px-4 py-3">
             <dt class="text-[11px] font-medium text-base-content/55">Bajo rendimiento</dt>
             <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.bajosRendimiento }} <span class="text-xs font-medium text-base-content/50">· bajo la mínima</span></dd>
           </div>
@@ -331,7 +331,7 @@ onMounted(async () => {
               <AppIcon nombre="estructura" class="h-5 w-5 text-accent" />
               <h3 class="font-semibold">Estructura</h3>
             </div>
-            <div v-if="cursos && materias" class="stats stats-horizontal w-full shadow-none">
+            <div v-if="cursos && materias" class="stats stats-vertical min-[480px]:stats-horizontal w-full shadow-none">
               <div class="stat px-0">
                 <div class="stat-title text-xs">Cursos</div>
                 <div class="stat-value text-3xl">{{ cursos.length }}</div>
@@ -343,7 +343,7 @@ onMounted(async () => {
             </div>
             <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error py-2 text-sm">
               <span class="flex-1">No se pudo cargar la estructura: {{ erroresBloque.estructura }}</span>
-              <button type="button" class="btn btn-xs btn-ghost" @click="cargarEstructura">Reintentar</button>
+              <button type="button" class="btn btn-sm min-h-11" @click="cargarEstructura">Reintentar</button>
             </div>
             <div v-else class="skeleton h-12 w-full"></div>
             <router-link to="/director/estructura" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Estructura <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
@@ -370,7 +370,7 @@ onMounted(async () => {
             </div>
             <div v-else-if="erroresBloque.dimensiones" role="alert" class="alert alert-error py-2 text-sm">
               <span class="flex-1">No se pudieron cargar las dimensiones: {{ erroresBloque.dimensiones }}</span>
-              <button type="button" class="btn btn-xs btn-ghost" @click="cargarDimensiones">Reintentar</button>
+              <button type="button" class="btn btn-sm min-h-11" @click="cargarDimensiones">Reintentar</button>
             </div>
             <div v-else class="skeleton h-12 w-full"></div>
             <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Dimensiones <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
@@ -384,14 +384,14 @@ onMounted(async () => {
         <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error">
           <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
           <span class="flex-1 text-sm">No se pudo cargar el rendimiento: {{ erroresBloque.academico }}</span>
-          <button type="button" class="btn btn-xs btn-ghost" @click="cargarAcademico">Reintentar</button>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarAcademico">Reintentar</button>
         </div>
         <div v-else class="skeleton h-48 w-full rounded-xl"></div>
         <CursoExplorer v-if="cursos" :cursos="cursos" />
         <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error">
           <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
           <span class="flex-1 text-sm">No se pudieron cargar los cursos: {{ erroresBloque.estructura }}</span>
-          <button type="button" class="btn btn-xs btn-ghost" @click="cargarEstructura">Reintentar</button>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarEstructura">Reintentar</button>
         </div>
         <div v-else class="skeleton h-32 w-full rounded-xl"></div>
       </div>
@@ -405,7 +405,7 @@ onMounted(async () => {
         <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error xl:col-span-2">
           <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
           <span class="flex-1 text-sm">No se pudieron cargar los destacados ni inscripciones: {{ erroresBloque.academico }}</span>
-          <button type="button" class="btn btn-xs btn-ghost" @click="cargarAcademico">Reintentar</button>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarAcademico">Reintentar</button>
         </div>
         <template v-else>
           <div class="skeleton h-48 w-full rounded-xl"></div>
