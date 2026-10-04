@@ -165,15 +165,14 @@ onMounted(async () => {
 
     <!-- ── HERO institucional ─────────────────────────────────────────────── -->
     <div v-if="cargando" class="skeleton h-36 w-full rounded-box"></div>
-    <div v-else-if="datos" class="dash-hero relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(12,39,67,0.65)]"
-      style="background: linear-gradient(180deg, #102E4F 0%, #0C2743 60%, #081B30 100%)">
+    <div v-else-if="datos" class="dash-hero bg-marino relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(12,39,67,0.65)]">
       <div class="absolute inset-0" aria-hidden="true">
-        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%);"></div>
+        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%); background: radial-gradient(700px 260px at 12% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, color-mix(in srgb, var(--color-dorado) 13%, transparent) 0%, transparent 55%);"></div>
         <div class="absolute -right-16 -bottom-20 h-64 w-64 rounded-full border-[22px] border-white/[0.05]"></div>
       </div>
-      <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
+      <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-dorado via-dorado-claro to-dorado" aria-hidden="true"></div>
       <div class="relative p-5 sm:p-6 flex flex-wrap items-center gap-4">
-        <span class="w-14 h-14 rounded-2xl bg-white/10 border border-[#C9A227]/30 flex items-center justify-center text-xl font-bold shrink-0 text-[#E8C86A]">
+        <span class="w-14 h-14 rounded-2xl bg-white/10 border border-dorado/30 flex items-center justify-center text-xl font-bold shrink-0 text-dorado-claro">
           {{ inicialesUE }}
         </span>
         <div class="min-w-0 flex-1">
@@ -187,11 +186,11 @@ onMounted(async () => {
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="font-display text-3xl font-extrabold leading-none tabular-nums text-white">{{ avanceGestion }}<span class="text-[#E8C86A]">%</span></p>
+          <p class="font-display text-3xl font-extrabold leading-none tabular-nums text-white">{{ avanceGestion }}<span class="text-dorado-claro">%</span></p>
           <p class="text-white/65 text-xs mt-1">año lectivo ({{ trimestresCerrados }}/{{ datos.trimestres.length }} trim.)</p>
         </div>
       </div>
-      <progress class="progress h-1.5 w-full rounded-none [&::-webkit-progress-value]:bg-[#C9A227] [&::-moz-progress-bar]:bg-[#C9A227]" :value="avanceGestion" max="100" :aria-valuenow="avanceGestion" aria-label="Avance del año lectivo" />
+      <progress class="progress h-1.5 w-full rounded-none [&::-webkit-progress-value]:bg-dorado [&::-moz-progress-bar]:bg-dorado" :value="avanceGestion" max="100" :aria-valuenow="avanceGestion" aria-label="Avance del año lectivo" />
     </div>
 
     <!-- Error -->
@@ -420,6 +419,6 @@ onMounted(async () => {
 
 <style scoped>
 .font-display { font-family: var(--font-display); }
-.dash-hero ::selection { background: #C9A227; color: #0C2743; }
+.dash-hero ::selection { background: var(--color-dorado); color: var(--color-marino); }
 .tabular-nums { font-variant-numeric: tabular-nums; }
 </style>

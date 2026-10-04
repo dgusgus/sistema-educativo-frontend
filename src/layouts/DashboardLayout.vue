@@ -349,7 +349,7 @@ async function guardarPassword() {
       <label for="drawer-toggle" class="drawer-overlay" aria-label="Cerrar menú"></label>
 
       <aside class="side bg-base-100 border-r border-base-300 w-[17rem] min-h-full flex flex-col">
-        <div class="h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
+        <div class="h-[3px] bg-gradient-to-r from-dorado via-dorado-claro to-dorado" aria-hidden="true"></div>
 
         <div class="flex items-center gap-3 px-4 pt-4 pb-4 border-b border-base-300">
           <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-content shadow-[0_10px_24px_-12px_rgba(26,60,94,0.7)]">
@@ -461,8 +461,9 @@ async function guardarPassword() {
 .dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .side-link:hover { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
 .side-link:focus-visible {
-  outline: 2px solid #C9A227;
+  outline: 2px solid var(--color-dorado);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
 }
 .side-link.side-active {
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
@@ -477,20 +478,21 @@ async function guardarPassword() {
   bottom: 8px;
   width: 3px;
   border-radius: 999px;
-  background: #C9A227;
+  background: var(--color-dorado);
 }
 .topbar :focus-visible {
-  outline: 2px solid #C9A227;
+  outline: 2px solid var(--color-dorado);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
 }
-.topbar ::selection { background: #C9A227; color: #0C2743; }
+.topbar ::selection { background: var(--color-dorado); color: var(--color-marino); }
 
 .side nav::-webkit-scrollbar { width: 8px; }
 .side nav::-webkit-scrollbar-thumb {
   background: var(--color-base-300);
   border-radius: 999px;
 }
-.side ::selection { background: #C9A227; color: #0C2743; }
+.side ::selection { background: var(--color-dorado); color: var(--color-marino); }
 
 @media (prefers-reduced-motion: reduce) {
   .side * { transition: none !important; }
