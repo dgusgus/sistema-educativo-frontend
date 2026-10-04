@@ -15,6 +15,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
 import type { ResultadoImport } from '@/types/import'
 import { descargarBlob } from '@/api/boletin.api'   // ya existe, reutilizado — es un helper genérico, no específico de boletines
@@ -547,30 +548,34 @@ async function exportar() {
                   </svg>
                 </button>
                 <ul tabindex="0" role="menu"
-                  class="dropdown-content menu bg-base-100 rounded-2xl z-10 w-56 p-2 shadow-lg border border-base-300 text-left">
-                  <li><button role="menuitem" @click="abrirEditar(e)">Editar</button></li>
+                  class="dropdown-content menu bg-base-100 rounded-2xl z-10 w-64 p-2 shadow-lg border border-base-300 text-left">
+                  <li class="menu-title truncate px-3">{{ e.apellido }}, {{ e.nombre }}</li>
+                  <li><button role="menuitem" @click="abrirEditar(e)"><AppIcon nombre="editar" class="h-4 w-4" />Editar perfil</button></li>
+                  <li class="menu-title mt-1">Académico</li>
                   <li v-if="!inscritoEnGestionActiva(e)">
-                    <button role="menuitem" class="text-primary" @click="abrirInscribir(e)">Inscribir</button>
+                    <button role="menuitem" class="text-primary" @click="abrirInscribir(e)"><AppIcon nombre="agregar" class="h-4 w-4" />Inscribir</button>
                   </li>
                   <li v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA'">
-                    <button role="menuitem" class="text-warning" @click="abrirCambiarEstado(ultimaInscripcion(e)!)">Cambiar estado</button>
+                    <button role="menuitem" @click="abrirCambiarEstado(ultimaInscripcion(e)!)"><AppIcon nombre="documento" class="h-4 w-4" />Cambiar estado</button>
                   </li>
                   <li v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA' && ultimaInscripcion(e)?.resultado === 'PENDIENTE'">
-                    <button role="menuitem" class="text-info" @click="abrirResultado(ultimaInscripcion(e)!)">Registrar resultado</button>
-                  </li>
-                  <li v-if="!e.usuario">
-                    <button role="menuitem" class="text-warning" @click="abrirVincular(e)">Vincular cuenta</button>
-                  </li>
-                  <li v-if="e.usuario">
-                    <button role="menuitem" @click="abrirReset(e)">Reset pass</button>
+                    <button role="menuitem" class="text-info" @click="abrirResultado(ultimaInscripcion(e)!)"><AppIcon nombre="reportes" class="h-4 w-4" />Registrar resultado</button>
                   </li>
                   <li v-if="inscritoEnGestionActiva(e)">
                     <button role="menuitem" class="text-error"
                       :disabled="desinscribiendo === ultimaInscripcion(e)!.id"
                       @click="desinscribir(ultimaInscripcion(e)!)">
                       <span v-if="desinscribiendo === ultimaInscripcion(e)!.id" class="loading loading-xs loading-spinner"></span>
-                      <span v-else>Desinscribir</span>
+                      <AppIcon v-else nombre="eliminar" class="h-4 w-4" />
+                      <span>Desinscribir</span>
                     </button>
+                  </li>
+                  <li class="menu-title mt-1">Cuenta</li>
+                  <li v-if="!e.usuario">
+                    <button role="menuitem" class="text-warning" @click="abrirVincular(e)"><AppIcon nombre="personas" class="h-4 w-4" />Vincular cuenta</button>
+                  </li>
+                  <li v-if="e.usuario">
+                    <button role="menuitem" @click="abrirReset(e)"><AppIcon nombre="candado" class="h-4 w-4" />Reset pass</button>
                   </li>
                 </ul>
               </div>
