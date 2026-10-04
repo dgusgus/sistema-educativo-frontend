@@ -76,86 +76,87 @@ function usarCredencial(c: { u: string; p: string }) {
 </script>
 
 <template>
-<div class="min-h-screen bg-base-200 lg:grid lg:grid-cols-[1.08fr_1fr] relative overflow-hidden">
+<div class="login-root min-h-screen bg-base-200 lg:grid lg:grid-cols-[1.08fr_1fr] relative overflow-hidden">
 
   <!-- Fondo global sutil -->
   <div class="pointer-events-none absolute inset-0" aria-hidden="true">
     <div class="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl"></div>
     <div class="absolute -bottom-40 right-1/3 h-[28rem] w-[28rem] rounded-full bg-secondary/10 blur-3xl"></div>
-    <div class="login-grid absolute inset-0 opacity-[0.5]"></div>
+    <div class="login-grid absolute inset-0 opacity-50"></div>
   </div>
 
   <!-- ═════════ PANEL INSTITUCIONAL (desktop) ═════════ -->
-  <aside class="relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#0C2743] text-white p-10 xl:p-14">
+  <aside class="panel-enter relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#0C2743] text-white p-10 xl:p-14">
     <!-- Capas decorativas -->
     <div class="absolute inset-0" aria-hidden="true">
       <div class="absolute inset-0" style="background: radial-gradient(1100px 500px at 15% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(800px 600px at 110% 100%, #C9A22722 0%, transparent 55%), linear-gradient(180deg, #102E4F 0%, #0C2743 55%, #081B30 100%);"></div>
-      <div class="andean-pattern absolute inset-0 opacity-[0.16]"></div>
+      <div class="andean-pattern absolute inset-0 opacity-[0.12]"></div>
       <div class="absolute -right-24 -bottom-24 h-[26rem] w-[26rem] rounded-full border-[28px] border-white/[0.04]"></div>
       <div class="absolute -right-10 -bottom-10 h-[18rem] w-[18rem] rounded-full border border-[#C9A227]/20"></div>
-      <p class="absolute -bottom-8 left-6 font-display font-extrabold text-[7.5rem] leading-none tracking-tighter text-white/[0.05] select-none">NAZARIA</p>
+      <p class="absolute -bottom-6 left-6 font-display font-extrabold text-[6rem] leading-none tracking-tighter text-white/[0.06] select-none">NAZARIA</p>
     </div>
-    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
+    <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
 
     <!-- Cabecera -->
-    <div class="relative anim-rise" style="animation-delay:.05s">
+    <div class="relative">
       <div class="flex items-center gap-4">
-        <div class="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 border border-white/15 shadow-lg shadow-black/20 backdrop-blur">
+        <div class="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 border border-white/15 shadow-[0_12px_28px_-12px_rgba(0,0,0,0.55)]">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-[#E8C86A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0121 18.75c-2.674.616-5.322.616-8-.001v-3.749M12 14l-9-5m9 5v.001" />
           </svg>
         </div>
         <div>
           <p class="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E8C86A]">Plataforma Académica</p>
-          <h1 class="font-display text-xl font-bold leading-tight">U.E. “Los Ángeles<br class="hidden xl:block" /> de Nazaria Ignacia”</h1>
-          <p class="mt-1 text-xs text-white/55">Oruro · Bolivia — Ley N.º 070</p>
+          <h1 class="font-display text-xl font-bold leading-tight text-white">U.E. “Los Ángeles<br class="hidden xl:block" /> de Nazaria Ignacia”</h1>
+          <p class="mt-1 text-xs text-white/70">Oruro · Bolivia — Ley N.º 070</p>
         </div>
       </div>
     </div>
 
     <!-- Mensaje central -->
-    <div class="relative max-w-xl">
-      <div class="anim-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs backdrop-blur" style="animation-delay:.15s">
-        <span class="relative flex h-2 w-2">
-          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
-        </span>
-        Gestión 2026 · Portal unificado activo
-      </div>
-
-      <h2 class="anim-rise font-display mt-5 text-4xl xl:text-[2.9rem] font-extrabold leading-[1.08] tracking-tight" style="animation-delay:.25s">
+    <div class="relative max-w-xl mt-10">
+      <h2 class="font-display text-4xl xl:text-[2.9rem] font-extrabold leading-[1.08] tracking-tight text-white text-balance">
         Formamos con<br />
-        <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#E8C86A] to-[#FFF3C4]">disciplina, fe</span> y<br />
+        <span class="text-[#E8C86A]">disciplina, fe</span> y<br />
         excelencia académica.
       </h2>
-      <p class="anim-rise mt-4 max-w-md text-[15px] leading-relaxed text-white/70" style="animation-delay:.35s">
+      <p class="mt-4 max-w-md text-[15px] leading-relaxed text-white/75">
         Acceso seguro para Dirección, Secretaría, Docentes, Estudiantes y Tutores.
         Calificaciones, asistencia, pagos y boletines en un solo lugar.
       </p>
 
-      <div class="anim-rise mt-7 grid max-w-md grid-cols-2 gap-2.5" style="animation-delay:.45s">
-        <div v-for="p in PERFILES" :key="p.nombre" class="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3 backdrop-blur transition hover:border-[#C9A227]/40 hover:bg-white/[0.09]">
+      <ul class="mt-7 grid max-w-md grid-cols-2 gap-2.5" aria-label="Perfiles de acceso">
+        <li v-for="p in PERFILES" :key="p.nombre" class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 transition hover:border-[#C9A227]/40 hover:bg-white/[0.08]">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#C9A227]/15 text-[#E8C86A]">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="p.icon" />
             </svg>
           </span>
           <span>
-            <span class="block text-[13px] font-semibold leading-tight">{{ p.nombre }}</span>
-            <span class="block text-[11px] text-white/55">{{ p.detalle }}</span>
+            <span class="block text-[13px] font-semibold leading-tight text-white">{{ p.nombre }}</span>
+            <span class="block text-[11px] text-white/70">{{ p.detalle }}</span>
           </span>
-        </div>
-      </div>
+        </li>
+      </ul>
     </div>
 
     <!-- Pie del panel -->
-    <div class="relative anim-rise flex items-end justify-between gap-6" style="animation-delay:.55s">
+    <div class="relative mt-10 flex items-end justify-between gap-6">
       <div class="flex gap-8">
-        <div><p class="font-display text-2xl font-extrabold">1.2k<span class="text-[#E8C86A]">+</span></p><p class="text-[11px] uppercase tracking-wider text-white/50">Estudiantes</p></div>
-        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold">48</p><p class="text-[11px] uppercase tracking-wider text-white/50">Docentes</p></div>
-        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold">100<span class="text-[#E8C86A]">%</span></p><p class="text-[11px] uppercase tracking-wider text-white/50">Ley 070</p></div>
+        <div><p class="font-display text-2xl font-extrabold tracking-tight text-white">1.2k<span class="text-[#E8C86A]">+</span></p><p class="text-[11px] uppercase tracking-wider text-white/60">Estudiantes</p></div>
+        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold tracking-tight text-white">48</p><p class="text-[11px] uppercase tracking-wider text-white/60">Docentes</p></div>
+        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold tracking-tight text-white">100<span class="text-[#E8C86A]">%</span></p><p class="text-[11px] uppercase tracking-wider text-white/60">Ley 070</p></div>
       </div>
-      <p class="hidden xl:block text-right text-[11px] leading-relaxed text-white/45">Urb. Bustillos, Zona Los Ángeles<br />RUE 81230370 · Oruro</p>
+      <div class="hidden xl:block text-right">
+        <p class="inline-flex items-center gap-2 text-[11px] text-white/70">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+          </span>
+          Portal unificado · Gestión 2026
+        </p>
+        <p class="mt-1 text-[11px] leading-relaxed text-white/60">Urb. Bustillos, Zona Los Ángeles<br />RUE 81230370 · Oruro</p>
+      </div>
     </div>
   </aside>
 
@@ -163,8 +164,9 @@ function usarCredencial(c: { u: string; p: string }) {
   <main class="relative flex items-center justify-center px-4 py-10 sm:px-8">
     <button
       type="button"
-      class="btn btn-ghost btn-circle absolute top-4 right-4 border border-base-300 bg-base-100/70 backdrop-blur"
+      class="btn btn-ghost btn-circle absolute top-4 right-4 border border-base-300 bg-base-100/80"
       :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'"
+      :aria-pressed="tema !== 'colegio'"
       @click="alternar"
       title="Cambiar tema"
     >
@@ -176,7 +178,7 @@ function usarCredencial(c: { u: string; p: string }) {
       </svg>
     </button>
 
-    <div class="w-full max-w-[26rem] anim-rise" style="animation-delay:.1s">
+    <div class="form-enter w-full max-w-[26rem]">
       <!-- Marca móvil -->
       <div class="lg:hidden mb-6 flex items-center gap-3">
         <div class="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-content shadow-lg">
@@ -186,22 +188,22 @@ function usarCredencial(c: { u: string; p: string }) {
         </div>
         <div>
           <p class="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">U.E. Los Ángeles de Nazaria Ignacia</p>
-          <p class="text-xs text-base-content/55">Oruro · Bolivia</p>
+          <p class="text-xs text-base-content/60">Oruro · Bolivia</p>
         </div>
       </div>
 
-      <div class="card bg-base-100 border border-base-300 shadow-[0_24px_60px_-24px_rgba(26,60,94,0.35)] rounded-3xl overflow-hidden">
-        <div class="h-1 bg-gradient-to-r from-primary via-secondary to-[#C9A227]"></div>
+      <section class="login-card card bg-base-100 border border-base-300 rounded-3xl overflow-hidden" aria-labelledby="login-titulo">
+        <div class="h-[3px] bg-gradient-to-r from-primary via-secondary to-[#C9A227]" aria-hidden="true"></div>
         <div class="p-7 sm:p-8">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 class="font-display text-[22px] font-extrabold tracking-tight text-base-content">Bienvenido de nuevo</h2>
-              <p class="mt-1 text-sm text-base-content/60">Ingresa con tu usuario institucional.</p>
+              <h2 id="login-titulo" class="font-display text-[22px] font-extrabold tracking-tight text-base-content text-balance">Bienvenido de nuevo</h2>
+              <p class="mt-1.5 text-sm text-base-content/65">Ingresa con tu usuario institucional.</p>
             </div>
             <span class="badge badge-outline badge-sm shrink-0 mt-1 border-primary/25 text-primary">2026</span>
           </div>
 
-          <div v-if="error" role="alert" class="alert alert-error mt-5 py-2.5 text-sm login-shake">
+          <div v-if="error" :key="error" role="alert" aria-live="assertive" class="alert alert-error mt-5 py-2.5 text-sm login-shake">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"/>
             </svg>
@@ -212,7 +214,7 @@ function usarCredencial(c: { u: string; p: string }) {
             <div>
               <label for="login-user" class="mb-1.5 block text-[13px] font-semibold text-base-content/80">Usuario</label>
               <div class="group relative">
-                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/35 transition group-focus-within:text-primary">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/40 transition group-focus-within:text-primary">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -222,9 +224,12 @@ function usarCredencial(c: { u: string; p: string }) {
                   v-model="username"
                   type="text"
                   placeholder="Ej: director"
-                  class="input input-bordered w-full h-12 rounded-xl pl-11 bg-base-200/50 transition focus:bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none"
+                  class="input input-bordered w-full h-12 rounded-xl pl-11 bg-base-200/50 transition focus:bg-base-100 focus:border-primary placeholder:text-base-content/45"
                   autocomplete="username"
                   autofocus
+                  required
+                  aria-required="true"
+                  :aria-invalid="error ? 'true' : undefined"
                   :disabled="cargando"
                 />
               </div>
@@ -233,10 +238,10 @@ function usarCredencial(c: { u: string; p: string }) {
             <div>
               <div class="mb-1.5 flex items-center justify-between">
                 <label for="login-pass" class="block text-[13px] font-semibold text-base-content/80">Contraseña</label>
-                <span class="text-[11px] text-base-content/40">Mín. 8 caracteres</span>
+                <span class="text-[11px] text-base-content/50">Mín. 8 caracteres</span>
               </div>
               <div class="group relative">
-                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/35 transition group-focus-within:text-primary">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/40 transition group-focus-within:text-primary">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -246,15 +251,20 @@ function usarCredencial(c: { u: string; p: string }) {
                   v-model="password"
                   :type="mostrarPassword ? 'text' : 'password'"
                   placeholder="••••••••"
-                  class="input input-bordered w-full h-12 rounded-xl pl-11 pr-11 bg-base-200/50 transition focus:bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none"
+                  class="input input-bordered w-full h-12 rounded-xl pl-11 pr-12 bg-base-200/50 transition focus:bg-base-100 focus:border-primary placeholder:text-base-content/45"
                   autocomplete="current-password"
+                  required
+                  aria-required="true"
+                  :aria-invalid="error ? 'true' : undefined"
                   :disabled="cargando"
                 />
                 <button
                   type="button"
-                  class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-base-content/40 transition hover:bg-base-300 hover:text-base-content"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg text-base-content/50 transition hover:bg-base-300 hover:text-base-content"
                   @click="mostrarPassword = !mostrarPassword"
                   :aria-label="mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                  :aria-pressed="mostrarPassword"
+                  :disabled="cargando"
                 >
                   <svg v-if="!mostrarPassword" xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -266,19 +276,18 @@ function usarCredencial(c: { u: string; p: string }) {
               </div>
             </div>
 
-            <button type="submit" class="btn-login group relative h-12 w-full overflow-hidden rounded-xl bg-primary font-display text-[15px] font-bold text-white shadow-lg shadow-primary/25 transition hover:-translate-y-px hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 disabled:opacity-70 disabled:pointer-events-none" :disabled="cargando">
-              <span class="relative z-10 flex items-center justify-center gap-2">
+            <button type="submit" class="btn-login group relative h-12 w-full rounded-xl bg-primary font-display text-[15px] font-bold text-white shadow-[0_16px_32px_-16px_rgba(26,60,94,0.6)] transition hover:-translate-y-px hover:shadow-[0_20px_40px_-16px_rgba(26,60,94,0.65)] active:translate-y-0 disabled:opacity-70 disabled:pointer-events-none" :disabled="cargando" :aria-busy="cargando">
+              <span class="relative z-10 flex items-center justify-center gap-2" aria-live="polite">
                 <span v-if="cargando" class="loading loading-spinner loading-sm"></span>
                 <span>{{ cargando ? 'Verificando...' : 'Ingresar al sistema' }}</span>
                 <svg v-if="!cargando" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </span>
-              <span class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" aria-hidden="true"></span>
             </button>
           </form>
 
-          <div class="mt-5 flex items-center gap-3 text-[11px] text-base-content/45">
+          <div class="mt-5 flex items-center gap-3 text-[11px] text-base-content/55">
             <span class="h-px flex-1 bg-base-300"></span>
             <span class="inline-flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -306,14 +315,14 @@ function usarCredencial(c: { u: string; p: string }) {
                   </tbody>
                 </table>
               </div>
-              <p class="mt-1.5 text-[11px] text-base-content/45">Clic en un usuario para autocompletar.</p>
+              <p class="mt-1.5 text-[11px] text-base-content/55">Clic en un usuario para autocompletar.</p>
             </div>
           </details>
         </div>
-      </div>
+      </section>
 
-      <p class="mt-5 text-center text-xs text-base-content/45">
-        ¿Olvidaste tu contraseña? <span class="font-medium text-base-content/65">Contacta a Secretaría o Dirección.</span>
+      <p class="mt-5 text-center text-xs text-base-content/55">
+        ¿Olvidaste tu contraseña? <span class="font-medium text-base-content/75">Contacta a Secretaría o Dirección.</span>
       </p>
     </div>
   </main>
@@ -323,12 +332,15 @@ function usarCredencial(c: { u: string; p: string }) {
 <style scoped>
 .font-display { font-family: var(--font-display); }
 
+.login-root::selection { background: #C9A227; color: #0C2743; }
+
 .login-grid {
   background-image:
     linear-gradient(to right, rgb(26 60 94 / 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgb(26 60 94 / 0.06) 1px, transparent 1px);
   background-size: 36px 36px;
   mask-image: radial-gradient(ellipse 90% 80% at 50% 20%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 20%, black 30%, transparent 75%);
 }
 
 .andean-pattern {
@@ -336,14 +348,21 @@ function usarCredencial(c: { u: string; p: string }) {
   background-size: 72px 72px;
 }
 
-@keyframes rise {
-  from { opacity: 0; transform: translateY(18px); }
+.login-card {
+  box-shadow: 0 24px 60px -24px rgba(26,60,94,0.35), 0 2px 8px -2px rgba(26,60,94,0.12);
+}
+
+/* Un solo momento de entrada: panel funde, formulario eleva */
+@keyframes panelFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes formRise {
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.anim-rise {
-  opacity: 0;
-  animation: rise .7s cubic-bezier(.22,1,.36,1) forwards;
-}
+.panel-enter { animation: panelFade .8s ease-out both; }
+.form-enter { animation: formRise .65s cubic-bezier(.22,1,.36,1) both; }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -354,4 +373,24 @@ function usarCredencial(c: { u: string; p: string }) {
 
 .btn-login { border: none; cursor: pointer; }
 .btn-login:focus-visible { outline: 2px solid #C9A227; outline-offset: 2px; }
+
+/* Superficies de navegador: foco, caret, autofill, seleccion */
+.login-root input { caret-color: var(--color-primary); }
+.login-root :focus-visible {
+  outline: 2px solid #C9A227;
+  outline-offset: 2px;
+}
+.login-root input:-webkit-autofill,
+.login-root input:-webkit-autofill:hover,
+.login-root input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-base-content);
+  caret-color: var(--color-base-content);
+  transition: background-color 9999s ease-in-out 0s;
+}
+.login-root details summary::marker { color: var(--color-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-enter, .form-enter, .login-shake { animation: none; }
+  .login-root * { transition: none !important; }
+}
 </style>
