@@ -81,7 +81,7 @@ let focoPrevio: HTMLElement | null = null
 function abrirModal() {
   focoPrevio = document.activeElement as HTMLElement | null
   errorModal.value = null
-  abrirModal()
+  modalAbierto.value = true
 }
 
 function cerrarModal() {
