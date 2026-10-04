@@ -449,6 +449,10 @@ async function guardarPassword() {
 .font-display { font-family: var(--font-display); }
 
 /* Enlace lateral: indicador de activo a la izquierda, sin depender solo de color */
+/* daisy trae .menu con width:fit-content: el ul y sus filas se encogen
+   al texto. Se fuerza ancho completo para que activo/hover pinten la fila. */
+.side ul.menu { width: 100%; }
+.side ul.menu li { width: 100%; }
 .side-link {
   position: relative;
   display: flex;
