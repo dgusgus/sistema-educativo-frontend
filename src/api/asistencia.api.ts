@@ -49,7 +49,7 @@ export interface ResumenPorMateria {
   porcentaje:            number
   docenteMateriaCurso: {
     materia: { id: number; nombre: string }
-    docente: { id: number; nombre: string; apellido: string }
+    docente?: { id: number; nombre: string; apellido: string }   // el reporte del curso no lo incluye
   }
   trimestre: { id: number; numero: number; nombre: string }
 }
