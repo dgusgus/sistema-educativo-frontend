@@ -290,9 +290,15 @@ onMounted(async () => {
       </div>
 
       <!-- ── Línea de tiempo de trimestres ────────────────────────────────── -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body">
-          <h3 class="font-semibold mb-3">Trimestres</h3>
+      <details class="card colapsable group bg-base-100 shadow" open>
+        <summary class="flex cursor-pointer list-none items-center gap-2 p-4 font-semibold sm:p-5 [&::-webkit-details-marker]:hidden">
+          <AppIcon nombre="gestiones" class="h-5 w-5 text-primary" />
+          <span class="flex-1">Trimestres</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="px-4 pb-4 sm:px-5 sm:pb-5">
           <ol class="flex flex-col sm:flex-row sm:items-start gap-3">
             <li v-for="(t, i) in (gestionStore.trimestres.length ? gestionStore.trimestres : datos.trimestres)" :key="t.id ?? t.numero"
               class="flex sm:flex-col sm:flex-1 sm:text-center items-start sm:items-center gap-2 sm:gap-0">
@@ -320,10 +326,18 @@ onMounted(async () => {
             </li>
           </ol>
         </div>
-      </div>
+      </details>
 
       <!-- ── Estructura + dimensiones ─────────────────────────────────────── -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <details class="colapsable group" open>
+        <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl px-1 py-2 font-semibold [&::-webkit-details-marker]:hidden">
+          <AppIcon nombre="estructura" class="h-5 w-5 text-primary" />
+          <span class="flex-1">Estructura y dimensiones</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="card bg-base-100 shadow">
           <div class="card-body">
             <div class="flex items-center gap-2 mb-1">
@@ -375,7 +389,8 @@ onMounted(async () => {
             <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Dimensiones <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
         </div>
-      </div>
+        </div>
+      </details>
 
       <!-- ── 3. RENDIMIENTO + EXPLORADOR ──────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
@@ -421,4 +436,9 @@ onMounted(async () => {
 .font-display { font-family: var(--font-display); }
 .dash-hero ::selection { background: var(--color-dorado); color: var(--color-marino); }
 .tabular-nums { font-variant-numeric: tabular-nums; }
+.colapsable > summary:focus-visible {
+  outline: 2px solid var(--color-dorado);
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+}
 </style>
