@@ -70,6 +70,77 @@ function fechaCorta(fecha: string | null | undefined): string {
   return formatoFecha(fecha, { day: 'numeric', month: 'short' })
 }
 
+// Errores por bloque con reintento — ningún bloque tumba al resto,
+// pero ninguno falla en silencio: cada uno muestra su error y su reintento.
+const erroresBloque = ref({
+  dimensiones: null as string | null,
+  estructura: null as string | null,
+  academico: null as string | null,
+  pendientes: null as string | null,
+})
+
+function mensajeError(e: unknown): string {
+  return e instanceof Error ? e.message : 'Error al cargar los datos'
+}
+
+function gestionIdActual(): number | null {
+  return datos.value?.gestion.id ?? gestionStore.gestionId
+}
+
+async function cargarDimensiones() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.dimensiones = null
+  try {
+    dimensiones.value = await evaluacionApi.getDimensiones(id)
+  } catch (e) {
+    erroresBloque.value.dimensiones = mensajeError(e)
+  }
+}
+
+async function cargarEstructura() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.estructura = null
+  try {
+    const [ms, cs] = await Promise.all([materiaApi.getAll(), cursoApi.getAll(id)])
+    materias.value = ms
+    cursos.value = cs
+  } catch (e) {
+    erroresBloque.value.estructura = mensajeError(e)
+  }
+}
+
+async function cargarAcademico() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.academico = null
+  try {
+    const [rep, ds] = await Promise.all([
+      reporteApi.getReporteAcademico({ gestionId: id }),
+      docenteApi.getAll(),
+    ])
+    detalleAcademico.value = rep.detalle
+    docentesSinAsignar.value = (ds as Docente[])
+      .filter(d => !(d.asignaciones ?? []).length)
+      .map(d => `${d.nombre} ${d.apellido}`)
+  } catch (e) {
+    erroresBloque.value.academico = mensajeError(e)
+  }
+}
+
+async function cargarPendientes() {
+  const trim = datos.value?.trimestres.find(t => !t.cerrado)
+    ?? gestionStore.trimestreActivo
+  if (!trim) return
+  erroresBloque.value.pendientes = null
+  try {
+    pendientes.value = await trimestreApi.getPendientes(trim.id)
+  } catch (e) {
+    erroresBloque.value.pendientes = mensajeError(e)
+  }
+}
+
 onMounted(async () => {
   try {
     datos.value = await reporteApi.getDashboard()
@@ -80,24 +151,12 @@ onMounted(async () => {
   }
   cargando.value = false
 
-  const gestionId = datos.value.gestion.id
-  const trim = datos.value.trimestres.find(t => !t.cerrado) ?? null
-
-  // Bloques independientes — cada uno falla por su cuenta sin tumbar al resto
-  evaluacionApi.getDimensiones(gestionId).then(r => { dimensiones.value = r }).catch(() => {})
-  materiaApi.getAll().then(r => { materias.value = r }).catch(() => {})
-  cursoApi.getAll(gestionId).then(r => { cursos.value = r }).catch(() => {})
   institucionApi.get().then(r => { institucion.value = r }).catch(() => {})
   gestionStore.cargar().catch(() => {})
-  reporteApi.getReporteAcademico({ gestionId }).then(r => { detalleAcademico.value = r.detalle }).catch(() => {})
-  docenteApi.getAll().then((ds: Docente[]) => {
-    docentesSinAsignar.value = ds
-      .filter(d => !(d.asignaciones ?? []).length)
-      .map(d => `${d.nombre} ${d.apellido}`)
-  }).catch(() => {})
-  if (trim) {
-    trimestreApi.getPendientes(trim.id).then(r => { pendientes.value = r }).catch(() => {})
-  }
+  cargarDimensiones()
+  cargarEstructura()
+  cargarAcademico()
+  cargarPendientes()
 })
 </script>
 
@@ -144,6 +203,11 @@ onMounted(async () => {
       <!-- ── 1. ALERTAS ───────────────────────────────────────────────────── -->
       <div class="space-y-3">
         <PendientesCierre v-if="pendientes" :datos="pendientes" />
+        <div v-else-if="erroresBloque.pendientes" role="alert" class="alert alert-error py-2 text-sm">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1">No se pudieron revisar los pendientes: {{ erroresBloque.pendientes }}</span>
+          <button type="button" class="btn btn-xs btn-ghost" @click="cargarPendientes">Reintentar</button>
+        </div>
         <div v-else-if="trimestreActivo" class="flex items-center gap-2 text-sm text-base-content/50">
           <span class="loading loading-spinner loading-xs"></span> Revisando pendientes de cierre…
         </div>
@@ -277,6 +341,10 @@ onMounted(async () => {
                 <div class="stat-value text-3xl">{{ materias.length }}</div>
               </div>
             </div>
+            <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error py-2 text-sm">
+              <span class="flex-1">No se pudo cargar la estructura: {{ erroresBloque.estructura }}</span>
+              <button type="button" class="btn btn-xs btn-ghost" @click="cargarEstructura">Reintentar</button>
+            </div>
             <div v-else class="skeleton h-12 w-full"></div>
             <router-link to="/director/estructura" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Estructura <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
@@ -300,6 +368,10 @@ onMounted(async () => {
                 <progress class="progress progress-primary h-1.5 w-full" :value="d.pesoEnPromedio * 100" max="100" />
               </div>
             </div>
+            <div v-else-if="erroresBloque.dimensiones" role="alert" class="alert alert-error py-2 text-sm">
+              <span class="flex-1">No se pudieron cargar las dimensiones: {{ erroresBloque.dimensiones }}</span>
+              <button type="button" class="btn btn-xs btn-ghost" @click="cargarDimensiones">Reintentar</button>
+            </div>
             <div v-else class="skeleton h-12 w-full"></div>
             <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Dimensiones <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
@@ -309,8 +381,18 @@ onMounted(async () => {
       <!-- ── 3. RENDIMIENTO + EXPLORADOR ──────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <RendimientoCursos v-if="detalleAcademico" :detalle="detalleAcademico" />
+        <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudo cargar el rendimiento: {{ erroresBloque.academico }}</span>
+          <button type="button" class="btn btn-xs btn-ghost" @click="cargarAcademico">Reintentar</button>
+        </div>
         <div v-else class="skeleton h-48 w-full rounded-xl"></div>
         <CursoExplorer v-if="cursos" :cursos="cursos" />
+        <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudieron cargar los cursos: {{ erroresBloque.estructura }}</span>
+          <button type="button" class="btn btn-xs btn-ghost" @click="cargarEstructura">Reintentar</button>
+        </div>
         <div v-else class="skeleton h-32 w-full rounded-xl"></div>
       </div>
 
@@ -320,6 +402,11 @@ onMounted(async () => {
           <MejoresGestion :detalle="detalleAcademico" />
           <EstadoInscripciones :detalle="detalleAcademico" />
         </template>
+        <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error xl:col-span-2">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudieron cargar los destacados ni inscripciones: {{ erroresBloque.academico }}</span>
+          <button type="button" class="btn btn-xs btn-ghost" @click="cargarAcademico">Reintentar</button>
+        </div>
         <template v-else>
           <div class="skeleton h-48 w-full rounded-xl"></div>
           <div class="skeleton h-48 w-full rounded-xl"></div>
