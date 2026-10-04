@@ -7,6 +7,7 @@ import { evaluacionApi } from '@/api/evaluacion.api'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { DimensionEvaluacion, ActividadEvaluativa, Nivel } from '@/types'
+import { hoyLocal } from '@/lib/fechas'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
@@ -88,7 +89,7 @@ watch(dimensionActiva, () => { actividadParaNotas.value = null })
 
 // ── Alta de actividad evaluativa ──────────────────────────────────────────────
 const actividadFormAbierto = ref(false)
-const nuevaActividad = ref({ nombre: '', fecha: new Date().toISOString().split('T')[0], puntajeMaximo: 100, peso: 1, esRecuperatorio: false })
+const nuevaActividad = ref({ nombre: '', fecha: hoyLocal(), puntajeMaximo: 100, peso: 1, esRecuperatorio: false })
 const guardandoActividad = ref(false)
 
 async function crearActividad() {
@@ -109,7 +110,7 @@ async function crearActividad() {
     })
     actividades.value.push(creada)
     actividadFormAbierto.value = false
-    nuevaActividad.value = { nombre: '', fecha: new Date().toISOString().split('T')[0], puntajeMaximo: 100, peso: 1, esRecuperatorio: false }
+    nuevaActividad.value = { nombre: '', fecha: hoyLocal(), puntajeMaximo: 100, peso: 1, esRecuperatorio: false }
     toast.success('Actividad creada')
     abrirNotas(creada)
   } catch (e) {

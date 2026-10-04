@@ -1,5 +1,6 @@
-import api from '@/api/axios'
+import api, { TIMEOUT_IMPORT } from '@/api/axios'
 import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal } from '@/types'
+import type { ResultadoImport } from '@/types/import'
 
 export interface EstudiantePayload {
   ci:               string
@@ -73,8 +74,8 @@ export const estudianteApi = {
     const form = new FormData()
     form.append('archivo', archivo)
     form.append('gestionId', String(gestionId))
-    return api.post<{ totalFilas: number; exitosas: number; fallidas: number; errores: Array<{ fila: number; error: string }> }>(
-      '/estudiantes/import', form, { headers: { 'Content-Type': 'multipart/form-data' } }
+    return api.post<ResultadoImport>(
+      '/estudiantes/import', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: TIMEOUT_IMPORT }
     ).then(r => r.data)
   },
 

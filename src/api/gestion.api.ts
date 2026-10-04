@@ -46,6 +46,7 @@ export interface GestionResumen {
   anio:        number
   activa:      boolean
   descripcion: string | null
+  notaMinimaAprobacion?: number
   director:    { id: number; nombre: string; apellido: string } | null
   _count:      { cursos: number; inscripciones: number; trimestres: number }
 }

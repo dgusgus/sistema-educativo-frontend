@@ -3,4 +3,5 @@ export interface ResultadoImport {
   exitosas: number
   fallidas: number
   errores: Array<{ fila: number; error: string }>
+  advertencias?: string[]
 }

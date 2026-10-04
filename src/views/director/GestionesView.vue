@@ -236,7 +236,9 @@ const formEditar    = ref({ descripcion: '', notaMinimaAprobacion: 51 })
 
 function abrirEditar(g: GestionResumen) {
   gestionEditar.value = g
-  formEditar.value    = { descripcion: g.descripcion ?? '', notaMinimaAprobacion: 51 }
+  // Antes se cargaba 51 fijo: si la gestión usaba otra nota mínima (p. ej. 60) y
+  // solo se corregía la descripción, al guardar se pisaba silenciosamente con 51.
+  formEditar.value    = { descripcion: g.descripcion ?? '', notaMinimaAprobacion: g.notaMinimaAprobacion ?? 51 }
   errorEditar.value   = null
   modalEditar.value   = true
 }
@@ -251,7 +253,10 @@ async function guardarEdicion() {
       notaMinimaAprobacion: Number(formEditar.value.notaMinimaAprobacion),
     })
     const idx = gestiones.value.findIndex(x => x.id === gestionEditar.value!.id)
-    if (idx !== -1) gestiones.value[idx].descripcion = formEditar.value.descripcion || null
+    if (idx !== -1) {
+      gestiones.value[idx].descripcion = formEditar.value.descripcion || null
+      gestiones.value[idx].notaMinimaAprobacion = Number(formEditar.value.notaMinimaAprobacion)
+    }
     if (gestionEditar.value.activa) await gestionStore.recargar()
     modalEditar.value = false
     toast.success(`Gestión ${gestionEditar.value.anio} actualizada`)

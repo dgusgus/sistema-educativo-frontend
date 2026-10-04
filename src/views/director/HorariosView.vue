@@ -7,7 +7,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { horarioApi, DIAS_SEMANA, DIA_TEXTO, type HorarioDetalle, type DiaSemana } from '@/api/horario.api'
 import { docenteApi } from '@/api/docente.api'
-import { nombreCurso } from '@/api/estructura.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'

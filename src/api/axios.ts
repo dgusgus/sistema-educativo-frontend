@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ApiError, mensajeDesdeDetalles, type DetalleError } from '@/lib/errores'
 
 // ─── Instancia base ───────────────────────────────────────────────────────────
 //
@@ -58,30 +59,52 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token vencido o inválido → limpiar sesión y redirigir
+    const status: number | undefined = error.response?.status
+    const data = error.response?.data
+    const esLogin = error.config?.url === '/auth/login'
+
+    // Texto que envió el backend (o uno propio si ni siquiera hubo respuesta).
+    // Desde que el backend valida con zod, un 400 puede traer `detalles` con
+    // TODOS los campos inválidos: se traducen a etiquetas legibles
+    // ("Fecha de inicio: es obligatorio"). El login conserva su frase propia.
+    const detalles: DetalleError[] = Array.isArray(data?.detalles) ? data.detalles : []
+
+    let mensaje: string
+    if (detalles.length > 0 && !esLogin) {
+      mensaje = mensajeDesdeDetalles(detalles)
+    } else if (data?.message || data?.error) {
+      mensaje = data.message || data.error
+    } else if (error.code === 'ECONNABORTED') {
+      mensaje = 'El servidor tardó demasiado en responder. Intenta de nuevo.'
+    } else if (!error.response) {
+      mensaje = 'No se pudo conectar con el servidor. Revisa tu conexión.'
+    } else {
+      mensaje = error.message || 'Error desconocido'
+    }
+
+    if (status === 401 && !esLogin) {
+      // Sesión inválida: token vencido, contraseña cambiada, cuenta
+      // desactivada o eliminada (el backend ahora lo comprueba en cada petición).
       localStorage.removeItem('token')
       localStorage.removeItem('usuario')
 
-      // Redirigimos directamente con window.location para evitar
-      // importar el router acá (evita dependencias circulares:
-      // router → store → api → router)
+      // Se guarda el motivo para que el login explique por qué se cerró la
+      // sesión (sessionStorage y no la URL: un texto en la URL podría ser
+      // manipulado para mostrar mensajes falsos en la pantalla de login).
       if (window.location.pathname !== '/login') {
+        sessionStorage.setItem('motivoSesion', mensaje)
+        // window.location y no el router: evita el ciclo router → store → api → router
         window.location.href = '/login'
       }
     }
 
-    // Extraemos el mensaje de error del backend si existe,
-    // o usamos el mensaje genérico de Axios como fallback.
-    // Las vistas pueden leer error.message para mostrar en un toast.
-    const mensaje =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      error.message ||
-      'Error desconocido'
-
-    return Promise.reject(new Error(mensaje))
+    return Promise.reject(new ApiError(mensaje, status, detalles))
   },
 )
+
+// Las importaciones de Excel procesan fila por fila en el servidor y pueden tardar
+// más que los 10 s generales: con el tiempo global, la pantalla decía "tardó
+// demasiado" mientras el servidor seguía importando, y al reintentar todo salía "Ya existe".
+export const TIMEOUT_IMPORT = 120_000
 
 export default api

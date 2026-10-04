@@ -14,6 +14,7 @@ import RendimientoCursos from '@/components/dashboard/RendimientoCursos.vue'
 import MejoresGestion from '@/components/dashboard/MejoresGestion.vue'
 import EstadoInscripciones from '@/components/dashboard/EstadoInscripciones.vue'
 import type { PendientesCierre as Pendientes } from '@/api/estructura.api'
+import { diasHasta, formatoFecha } from '@/lib/fechas'
 
 // Dashboard en 3 bloques: hero + alertas (lo que exige acción) → indicadores
 // y estado → rendimiento y explorador por curso. Cada bloque carga
@@ -61,12 +62,12 @@ const inicialesUE = computed(() =>
 
 function diasRestantes(fechaFin: string | null | undefined): number | null {
   if (!fechaFin) return null
-  return Math.ceil((new Date(fechaFin).getTime() - Date.now()) / 86400000)
+  return diasHasta(fechaFin)
 }
 
 function fechaCorta(fecha: string | null | undefined): string {
   if (!fecha) return '—'
-  return new Date(fecha).toLocaleDateString('es-BO', { day: 'numeric', month: 'short' })
+  return formatoFecha(fecha, { day: 'numeric', month: 'short' })
 }
 
 onMounted(async () => {
