@@ -334,12 +334,15 @@ async function exportar() {
             <td class="text-sm">{{ t.ocupacion ?? '—' }}</td>
 <td>
   <div v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</div>
-  <ul v-else class="flex min-w-44 flex-col gap-1.5" :aria-label="`Estudiantes de ${t.nombre} ${t.apellido}`">
+  <ul v-else class="min-w-52 divide-y divide-base-300/60 rounded-2xl border border-base-300/70 bg-base-200/40" :aria-label="`Hijos de ${t.nombre} ${t.apellido}`">
     <li
       v-for="v in t.estudiantes"
       :key="v.estudiante?.id"
-      class="flex items-center gap-2 rounded-2xl border border-base-300/70 bg-base-200/50 py-1 pl-3 pr-1"
+      class="flex items-center gap-2.5 py-1.5 pl-2.5 pr-1.5"
     >
+      <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[11px] font-bold text-primary" aria-hidden="true">
+        {{ `${v.estudiante?.nombre?.[0] ?? ''}${v.estudiante?.apellido?.[0] ?? ''}`.toUpperCase() }}
+      </span>
       <span class="min-w-0 flex-1">
         <span class="block truncate text-xs font-semibold leading-tight">{{ v.estudiante?.nombre }} {{ v.estudiante?.apellido }}</span>
         <span class="block text-[11px] capitalize leading-tight text-base-content/50">{{ v.parentesco.toLowerCase() }}</span>
