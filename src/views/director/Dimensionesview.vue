@@ -7,12 +7,13 @@
  * y la siguiente 3, sin ningún conflicto — simplemente se configuran
  * de cero para cada gestión nueva.
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { gestionApi, type GestionResumen } from '@/api/gestion.api'
 import { evaluacionApi, type DimensionPayload } from '@/api/evaluacion.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
+import AppIcon from '@/components/AppIcon.vue'
 import type { DimensionEvaluacion } from '@/types'
 
 const gestionStore = useGestionStore()
@@ -87,11 +88,55 @@ const idEditando   = ref<number | null>(null)
 const formVacio = () => ({ nombre: '', puntajeMaximo: 100, porcentaje: porcentajeSugerido.value, orden: dimensiones.value.length, esAutoevaluada: false })
 const form = ref(formVacio())
 
+const dialogoDimension = ref<HTMLDialogElement | null>(null)
+const inputNombreDimension = ref<HTMLInputElement | null>(null)
+let focoPrevio: HTMLElement | null = null
+
+function abrirModal() {
+  focoPrevio = document.activeElement as HTMLElement | null
+  errorModal.value = null
+  modalAbierto.value = true
+}
+
+function cerrarModal() {
+  modalAbierto.value = false
+  focoPrevio?.focus?.()
+}
+
+watch(modalAbierto, async (abierto) => {
+  if (!abierto) return
+  await nextTick()
+  inputNombreDimension.value?.focus()
+})
+
+function atraparTeclas(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    cerrarModal()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogoDimension.value) return
+  const focos = Array.from(
+    dialogoDimension.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null)
+  if (!focos.length) return
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  if (e.shiftKey && document.activeElement === primero) {
+    e.preventDefault()
+    ultimo.focus()
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault()
+    primero.focus()
+  }
+}
+
 function abrirCrear() {
   idEditando.value = null
   form.value = formVacio()
-  errorModal.value = null
-  modalAbierto.value = true
+  abrirModal()
 }
 
 function abrirEditar(d: DimensionEvaluacion) {
@@ -101,8 +146,7 @@ function abrirEditar(d: DimensionEvaluacion) {
     porcentaje: Math.round(d.pesoEnPromedio * 1000) / 10,
     orden: d.orden, esAutoevaluada: d.esAutoevaluada,
   }
-  errorModal.value = null
-  modalAbierto.value = true
+  abrirModal()
 }
 
 async function guardar() {
@@ -162,21 +206,24 @@ async function eliminar(d: DimensionEvaluacion) {
 <template>
   <div class="space-y-4">
     <div>
-      <h2 class="text-2xl font-bold">Dimensiones de Evaluación</h2>
-      <p class="text-sm text-base-content/60">Ser / Saber / Hacer / Decidir — configurables por gestión, con pesos que deben sumar 100%.</p>
+      <h2 class="font-display text-2xl font-bold tracking-tight">Dimensiones de Evaluación</h2>
+      <p class="mt-0.5 text-sm text-base-content/60">Ser / Saber / Hacer / Decidir — configurables por gestión, con pesos que deben sumar 100%.</p>
     </div>
 
     <div class="flex flex-wrap gap-3 items-end">
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">Gestión</legend>
-        <select v-model="gestionSeleccionada" class="select select-bordered select-sm">
+        <select v-model="gestionSeleccionada" class="select select-bordered" aria-label="Gestión">
           <option value="" disabled>Seleccionar</option>
           <option v-for="g in gestiones" :key="g.id" :value="g.id">{{ g.anio }} {{ g.activa ? '(activa)' : '' }}</option>
         </select>
       </fieldset>
-      <button class="btn btn-primary btn-sm" :disabled="!gestionSeleccionada" @click="abrirCrear">+ Nueva dimensión</button>
+      <button class="btn btn-primary min-h-11" :disabled="!gestionSeleccionada" @click="abrirCrear">
+        <AppIcon nombre="agregar" class="h-4 w-4" />
+        Nueva dimensión
+      </button>
       <button
-        class="btn btn-outline btn-sm"
+        class="btn btn-outline min-h-11"
         :disabled="!dimensiones.length || distribuyendo"
         @click="distribuirEquitativamente"
       >
@@ -195,8 +242,8 @@ async function eliminar(d: DimensionEvaluacion) {
     </div>
 
     <div v-if="error" role="alert" class="alert alert-error">
-      <span>{{ error }}</span>
-      <button class="btn btn-sm btn-ghost" @click="cargarDimensiones">Reintentar</button>
+      <span class="flex-1">{{ error }}</span>
+      <button type="button" class="btn btn-sm btn-ghost min-h-11" @click="cargarDimensiones">Reintentar</button>
     </div>
 
     <div class="card bg-base-100 shadow overflow-x-auto">
@@ -223,8 +270,8 @@ async function eliminar(d: DimensionEvaluacion) {
             </td>
             <td>
               <div class="flex gap-1">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(d)">Editar</button>
-                <button class="btn btn-ghost btn-xs text-error" :disabled="eliminando === d.id" @click="eliminar(d)">
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(d)">Editar</button>
+                <button class="btn btn-ghost btn-sm min-h-11 text-error" :disabled="eliminando === d.id" @click="eliminar(d)">
                   <span v-if="eliminando === d.id" class="loading loading-xs loading-spinner"></span>
                   <span v-else>Eliminar</span>
                 </button>
@@ -237,14 +284,15 @@ async function eliminar(d: DimensionEvaluacion) {
   </div>
 
   <!-- Modal crear/editar -->
-  <dialog :open="modalAbierto" class="modal modal-bottom sm:modal-middle">
+  <dialog ref="dialogoDimension" :open="modalAbierto" class="modal modal-bottom sm:modal-middle"
+    role="dialog" aria-modal="true" aria-labelledby="dimension-titulo" @keydown="atraparTeclas">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">{{ idEditando ? 'Editar dimensión' : 'Nueva dimensión' }}</h3>
+      <h3 id="dimension-titulo" class="font-bold text-lg mb-4">{{ idEditando ? 'Editar dimensión' : 'Nueva dimensión' }}</h3>
       <div v-if="errorModal" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorModal }}</span></div>
       <form class="space-y-3" @submit.prevent="guardar">
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Nombre *</legend>
-          <input v-model="form.nombre" type="text" placeholder="Ej: Ser, Saber, Hacer, Decidir" class="input input-bordered w-full" :disabled="guardando" />
+          <input ref="inputNombreDimension" v-model="form.nombre" type="text" placeholder="Ej: Ser, Saber, Hacer, Decidir" class="input input-bordered w-full" :disabled="guardando" />
         </fieldset>
         <div class="grid grid-cols-2 gap-3">
           <fieldset class="fieldset">
@@ -266,7 +314,7 @@ async function eliminar(d: DimensionEvaluacion) {
           <span class="text-sm">Es autoevaluada por el estudiante</span>
         </label>
         <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="modalAbierto = false">Cancelar</button>
+          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="cerrarModal">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="guardando">
             <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
             {{ idEditando ? 'Guardar cambios' : 'Crear dimensión' }}
@@ -274,6 +322,6 @@ async function eliminar(d: DimensionEvaluacion) {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalAbierto = false"><button>cerrar</button></form>
+    <form method="dialog" class="modal-backdrop" @click="cerrarModal"><button>cerrar</button></form>
   </dialog>
 </template>
