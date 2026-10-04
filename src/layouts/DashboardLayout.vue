@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useGestionStore } from '@/stores/gestion.store'
@@ -158,13 +158,54 @@ const cambiandoPassword = ref(false)
 const errorPassword = ref<string | null>(null)
 const exitoPassword = ref(false)
 
+const dialogoPassword = ref<HTMLDialogElement | null>(null)
+const inputPasswordActual = ref<HTMLInputElement | null>(null)
+let focoPrevio: HTMLElement | null = null
+
 function abrirModalPassword() {
+  focoPrevio = document.activeElement as HTMLElement | null
   passwordActual.value = ''
   passwordNueva.value = ''
   passwordConfirma.value = ''
   errorPassword.value = null
   exitoPassword.value = false
   modalPassword.value = true
+}
+
+function cerrarModalPassword() {
+  modalPassword.value = false
+  focoPrevio?.focus?.()
+}
+
+// Al abrir: foco al primer campo. Trampa de foco simple + Esc dentro del diálogo.
+watch(modalPassword, async (abierto) => {
+  if (!abierto) return
+  await nextTick()
+  inputPasswordActual.value?.focus()
+})
+
+function atraparTab(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    cerrarModalPassword()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogoPassword.value) return
+  const focos = Array.from(
+    dialogoPassword.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null)
+  if (!focos.length) return
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  if (e.shiftKey && document.activeElement === primero) {
+    e.preventDefault()
+    ultimo.focus()
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault()
+    primero.focus()
+  }
 }
 
 async function guardarPassword() {
@@ -357,16 +398,17 @@ async function guardarPassword() {
   </div>
 
   <!-- ── Modal cambiar contraseña ─────────────────────────────────────────── -->
-  <dialog :open="modalPassword" class="modal modal-bottom sm:modal-middle">
+  <dialog ref="dialogoPassword" :open="modalPassword" class="modal modal-bottom sm:modal-middle"
+    role="dialog" aria-modal="true" aria-labelledby="cambiar-pass-titulo" @keydown="atraparTab">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">Cambiar contraseña</h3>
+      <h3 id="cambiar-pass-titulo" class="font-bold text-lg mb-4">Cambiar contraseña</h3>
 
       <div v-if="exitoPassword" class="space-y-4">
         <div role="alert" class="alert alert-success">
           <span>Contraseña actualizada correctamente</span>
         </div>
         <div class="modal-action">
-          <button class="btn btn-primary" @click="modalPassword = false">Cerrar</button>
+          <button class="btn btn-primary" @click="cerrarModalPassword">Cerrar</button>
         </div>
       </div>
 
@@ -376,7 +418,7 @@ async function guardarPassword() {
         </div>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Contraseña actual</legend>
-          <input v-model="passwordActual" type="password" autocomplete="current-password"
+          <input ref="inputPasswordActual" v-model="passwordActual" type="password" autocomplete="current-password"
             class="input input-bordered w-full" :disabled="cambiandoPassword" />
         </fieldset>
         <fieldset class="fieldset">
@@ -391,7 +433,7 @@ async function guardarPassword() {
         </fieldset>
         <div class="modal-action mt-6">
           <button type="button" class="btn btn-ghost" :disabled="cambiandoPassword"
-            @click="modalPassword = false">Cancelar</button>
+            @click="cerrarModalPassword">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="cambiandoPassword">
             <span v-if="cambiandoPassword" class="loading loading-spinner loading-sm"></span>
             Guardar
@@ -399,7 +441,7 @@ async function guardarPassword() {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalPassword = false"><button>cerrar</button></form>
+    <form method="dialog" class="modal-backdrop" @click="cerrarModalPassword"><button>cerrar</button></form>
   </dialog>
 </template>
 
