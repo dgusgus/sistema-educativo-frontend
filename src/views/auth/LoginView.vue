@@ -12,7 +12,11 @@ const auth   = useAuthStore()
 const username  = ref('')
 const password  = ref('')
 const cargando  = ref(false)
-const error     = ref<string | null>(null)
+// Si el interceptor cerró la sesión por un 401, deja el motivo en sessionStorage
+// ("Sesión expirada", "cuenta desactivada"...) y aquí se muestra una sola vez.
+const motivoSesion = sessionStorage.getItem('motivoSesion')
+sessionStorage.removeItem('motivoSesion')
+const error     = ref<string | null>(motivoSesion)
 const mostrarPassword = ref(false)
 
 async function handleLogin() {
@@ -52,13 +56,17 @@ const PERFILES = [
   { nombre: 'Familias',   detalle: 'Seguimiento', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
 ]
 
-const CREDENCIALES_PRUEBA = [
+// SOLO en desarrollo: en el build de producción Vite sustituye
+// import.meta.env.DEV por false y el arreglo (con las contraseñas) desaparece del
+// bundle. Antes quedaba en texto plano en dist/assets/LoginView-*.js aunque el
+// panel estuviera oculto con v-if.
+const CREDENCIALES_PRUEBA: { u: string; p: string; r: string }[] = import.meta.env.DEV ? [
   { u: 'director',   p: 'admin1234', r: 'Director' },
   { u: 'secretaria', p: 'sec1234',   r: 'Secretaria' },
   { u: 'doc_mamani', p: 'doc1234',   r: 'Docente' },
   { u: 'est_ana',    p: 'est1234',   r: 'Estudiante' },
   { u: 'tut_rosa',   p: 'tut1234',   r: 'Tutor' },
-]
+] : []
 const esDesarrollo = import.meta.env.DEV
 
 function usarCredencial(c: { u: string; p: string }) {

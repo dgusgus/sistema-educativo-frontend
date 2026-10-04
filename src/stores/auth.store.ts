@@ -99,8 +99,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Cambio de contraseña por el propio usuario (requiere saber la actual —
   // distinto de resetearPassword, que usa Director/Secretaria sin conocerla)
+  //
+  // IMPORTANTE: al cambiar la contraseña el backend invalida TODOS los tokens
+  // anteriores (incluido el que se usó en esta petición) y devuelve uno nuevo.
+  // Hay que guardarlo; si no, la siguiente petición daría 401 y el usuario
+  // saldría al login sin entender por qué.
   async function cambiarPassword(passwordActual: string, passwordNueva: string): Promise<void> {
-    await api.put('/auth/password', { passwordActual, passwordNueva })
+    const { data } = await api.put<{ message: string; token?: string }>(
+      '/auth/password',
+      { passwordActual, passwordNueva }
+    )
+    if (data.token) {
+      token.value = data.token
+      localStorage.setItem('token', data.token)
+    }
   }
 
   return {

@@ -93,6 +93,10 @@ function cerrar() {
         <p class="text-sm text-base-content/60">
           Columnas esperadas (primera fila del archivo): <span class="font-mono">{{ columnas.join(', ') }}</span>
         </p>
+        <p class="text-xs text-base-content/50">
+          Solo archivos .xlsx, máximo 1000 filas. La plantilla trae una hoja "Instrucciones" con el detalle de cada columna.
+          Si tu archivo es .xls o .csv, ábrelo en Excel y guárdalo como "Libro de Excel (.xlsx)".
+        </p>
         <button type="button" class="btn btn-outline btn-sm" :disabled="descargando" @click="descargarPlantilla">
           <span v-if="descargando" class="loading loading-spinner loading-xs"></span>
           {{ descargando ? 'Descargando…' : 'Descargar plantilla' }}
@@ -106,7 +110,7 @@ function cerrar() {
           <legend class="fieldset-legend text-xs">Archivo (.xlsx)</legend>
           <input
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             class="file-input file-input-bordered w-full"
             :disabled="importando"
             @change="onSeleccionarArchivo"
@@ -137,6 +141,13 @@ function cerrar() {
             <div class="stat-title text-xs">Fallidas</div>
             <div class="stat-value text-lg text-error">{{ resultado.fallidas }}</div>
           </div>
+        </div>
+
+        <!-- Avisos que no impiden importar (p. ej. una columna que no se reconoció) -->
+        <div v-if="resultado.advertencias?.length" role="alert" class="alert alert-warning py-2 text-sm">
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li v-for="(a, i) in resultado.advertencias" :key="i">{{ a }}</li>
+          </ul>
         </div>
 
         <div v-if="resultado.errores.length" class="overflow-y-auto max-h-64 border border-base-300 rounded-box">
