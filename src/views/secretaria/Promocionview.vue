@@ -170,8 +170,8 @@ async function confirmarMatricula() {
 <template>
   <div class="space-y-4">
     <div>
-      <h2 class="text-2xl font-bold">Promoción de Gestión</h2>
-      <p class="text-sm text-base-content/60">
+      <h2 class="font-display text-2xl font-bold tracking-tight">Promoción de Gestión</h2>
+      <p class="mt-0.5 text-sm text-base-content/60">
         Matricula masivamente a la gestión siguiente usando la progresión automática
         (1°→2°→...→6° Primaria → 1°→...→6° Secundaria → egresado). El Estudiante no se
         duplica ni se vuelve a crear — solo se genera su inscripción nueva.
@@ -207,7 +207,10 @@ async function confirmarMatricula() {
       </div>
     </div>
 
-    <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
+    <div v-if="error" role="alert" class="alert alert-error">
+      <span class="flex-1">{{ error }}</span>
+      <button type="button" class="btn btn-sm btn-ghost min-h-11" @click="cargarPropuesta">Reintentar</button>
+    </div>
 
     <template v-if="propuesta">
       <!-- Resumen -->
@@ -229,18 +232,18 @@ async function confirmarMatricula() {
           <div class="flex flex-wrap items-center gap-3 mb-2">
             <h3 class="font-semibold">{{ grupo }}</h3>
             <span class="badge badge-ghost">{{ itemsDelGrupo(grupo).length }} estudiante(s)</span>
-            <select v-model="mapeoDestino[grupo]" class="select select-bordered select-sm ml-auto">
+            <select v-model="mapeoDestino[grupo]" class="select select-bordered ml-auto max-w-full" :aria-label="`Curso destino para ${grupo}`">
               <option value="" disabled>Curso destino real *</option>
               <option v-for="c in cursosDestino" :key="c.id" :value="c.id">{{ c.nombre }}</option>
             </select>
-            <button class="btn btn-ghost btn-xs" @click="marcarTodosDelGrupo(grupo, true)">Marcar todos</button>
-            <button class="btn btn-ghost btn-xs" @click="marcarTodosDelGrupo(grupo, false)">Desmarcar todos</button>
+            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosDelGrupo(grupo, true)">Marcar todos</button>
+            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosDelGrupo(grupo, false)">Desmarcar todos</button>
           </div>
           <div class="overflow-x-auto max-h-64 overflow-y-auto">
             <table class="table table-xs">
               <tbody>
                 <tr v-for="p in itemsDelGrupo(grupo)" :key="p.estudianteId" class="hover">
-                  <td class="w-8"><input v-model="seleccionados[p.estudianteId]" type="checkbox" class="checkbox checkbox-sm" /></td>
+                  <td class="w-12 text-center"><input v-model="seleccionados[p.estudianteId]" type="checkbox" class="checkbox checkbox-md" :aria-label="`Seleccionar a ${p.estudiante}`" /></td>
                   <td>{{ p.estudiante }}</td>
                   <td class="font-mono text-xs text-base-content/50">{{ p.ci }}</td>
                   <td class="text-xs text-base-content/50">{{ p.cursoActual }}</td>
