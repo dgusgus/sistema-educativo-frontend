@@ -25,3 +25,12 @@ dist-ssr
 
 *.agents/
 *skills-lock.json
+
+# Skills y agentes locales (no versionar)
+.agent/
+.agents/
+.claude/
+.codex/
+.gemini/
+.opencode/
+.impeccable/
