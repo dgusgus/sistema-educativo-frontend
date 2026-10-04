@@ -106,29 +106,33 @@ onMounted(async () => {
 
     <!-- ── HERO institucional ─────────────────────────────────────────────── -->
     <div v-if="cargando" class="skeleton h-36 w-full rounded-box"></div>
-    <div v-else-if="datos" class="rounded-box overflow-hidden text-white shadow"
-      style="background: linear-gradient(135deg, #1A3C5E 0%, #2E6DA4 60%, #3F8F5F 130%)">
-      <div class="p-5 sm:p-6 flex flex-wrap items-center gap-4">
-        <span class="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-xl font-bold shrink-0">
+    <div v-else-if="datos" class="dash-hero relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(12,39,67,0.65)]"
+      style="background: linear-gradient(180deg, #102E4F 0%, #0C2743 60%, #081B30 100%)">
+      <div class="absolute inset-0" aria-hidden="true">
+        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%);"></div>
+        <div class="absolute -right-16 -bottom-20 h-64 w-64 rounded-full border-[22px] border-white/[0.05]"></div>
+      </div>
+      <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
+      <div class="relative p-5 sm:p-6 flex flex-wrap items-center gap-4">
+        <span class="w-14 h-14 rounded-2xl bg-white/10 border border-[#C9A227]/30 flex items-center justify-center text-xl font-bold shrink-0 text-[#E8C86A]">
           {{ inicialesUE }}
         </span>
         <div class="min-w-0 flex-1">
-          <p class="text-white/70 text-xs uppercase tracking-wider">Unidad Educativa</p>
-          <h2 class="text-lg sm:text-2xl font-bold leading-tight truncate">
+          <h2 class="font-display text-lg sm:text-2xl font-bold leading-tight truncate text-white">
             {{ institucion?.nombre ?? 'Panel institucional' }}
           </h2>
-          <p class="text-white/70 text-xs sm:text-sm mt-0.5">
+          <p class="text-white/75 text-xs sm:text-sm mt-1">
             Gestión {{ datos.gestion.anio }}
             <span v-if="gestionStore.director"> · Dir. {{ gestionStore.director.nombre }} {{ gestionStore.director.apellido }}</span>
             <span v-if="trimestreActivo"> · {{ trimestreActivo.nombre }} en curso</span>
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-3xl font-bold leading-none">{{ avanceGestion }}%</p>
-          <p class="text-white/60 text-xs mt-1">año lectivo ({{ trimestresCerrados }}/{{ datos.trimestres.length }} trim.)</p>
+          <p class="font-display text-3xl font-extrabold leading-none tabular-nums text-white">{{ avanceGestion }}<span class="text-[#E8C86A]">%</span></p>
+          <p class="text-white/65 text-xs mt-1">año lectivo ({{ trimestresCerrados }}/{{ datos.trimestres.length }} trim.)</p>
         </div>
       </div>
-      <progress class="progress progress-warning h-1.5 w-full rounded-none" :value="avanceGestion" max="100" />
+      <progress class="progress h-1.5 w-full rounded-none [&::-webkit-progress-value]:bg-[#C9A227] [&::-moz-progress-bar]:bg-[#C9A227]" :value="avanceGestion" max="100" :aria-valuenow="avanceGestion" aria-label="Avance del año lectivo" />
     </div>
 
     <!-- Error -->
@@ -185,24 +189,41 @@ onMounted(async () => {
         <div v-for="card in [
           { label: 'Estudiantes', valor: String(datos.indicadores.totalEstudiantes), icono: 'estudiantes', fondo: 'bg-primary/10 text-primary', nota: `${cursos?.length ?? 0} cursos` },
           { label: 'Docentes', valor: String(datos.indicadores.totalDocentes), icono: 'personas', fondo: 'bg-secondary/10 text-secondary', nota: 'planta activa' },
-          { label: 'Cursos', valor: String(datos.indicadores.totalCursos), icono: 'estructura', fondo: 'bg-accent/10 text-accent', nota: `${cursosSinInscritos.length} vacíos` },
-          { label: 'En riesgo', valor: String(datos.indicadores.estudiantesEnRiesgo), icono: 'alerta', fondo: 'bg-warning/10 text-warning', nota: 'asistencia o notas' },
           { label: 'Promedio general', valor: datos.indicadores.promedioGeneral.toFixed(1), icono: 'reportes', fondo: 'bg-info/10 text-info', nota: 'escala 1–100' },
-          { label: 'Asistencia prom.', valor: `${datos.indicadores.promedioAsistencia.toFixed(0)}%`, icono: 'asistencia', fondo: 'bg-success/10 text-success', nota: 'todas las materias' },
-          { label: 'Bajo rendimiento', valor: String(datos.indicadores.bajosRendimiento), icono: 'escuela', fondo: 'bg-error/10 text-error', nota: 'bajo la nota mínima' },
           { label: 'Recaudado', valor: `Bs. ${datos.indicadores.totalRecaudado.toLocaleString('es-BO')}`, icono: 'pagos', fondo: 'bg-success/10 text-success', nota: `${datos.indicadores.pagosPendientes} pago(s) pendiente(s)` },
-        ]" :key="card.label" class="card bg-base-100 shadow hover:shadow-md transition-shadow">
+        ]" :key="card.label" class="card bg-base-100 border border-base-300/60 shadow-[0_16px_36px_-24px_rgba(26,60,94,0.5)] hover:shadow-[0_20px_44px_-24px_rgba(26,60,94,0.55)] transition-shadow">
           <div class="card-body p-4 flex-row items-center gap-3">
             <span class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" :class="card.fondo">
               <AppIcon :nombre="card.icono" class="h-5 w-5" />
             </span>
             <span class="min-w-0">
-              <span class="block text-xs text-base-content/60">{{ card.label }}</span>
-              <span class="block text-xl sm:text-2xl font-bold truncate">{{ card.valor }}</span>
-              <span v-if="card.nota" class="block text-[11px] text-base-content/40 truncate">{{ card.nota }}</span>
+              <span class="block text-xs font-medium text-base-content/60">{{ card.label }}</span>
+              <span class="block font-display text-xl sm:text-2xl font-extrabold tabular-nums truncate">{{ card.valor }}</span>
+              <span v-if="card.nota" class="block text-[11px] text-base-content/50 truncate">{{ card.nota }}</span>
             </span>
           </div>
         </div>
+      </div>
+
+      <div class="card bg-base-100 border border-base-300/60 shadow-sm">
+        <dl class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-base-300">
+          <div class="px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">Cursos</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.totalCursos }} <span class="text-xs font-medium text-base-content/50">· {{ cursosSinInscritos.length }} vacíos</span></dd>
+          </div>
+          <div class="px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">En riesgo</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.estudiantesEnRiesgo }} <span class="text-xs font-medium text-base-content/50">· asistencia o notas</span></dd>
+          </div>
+          <div class="px-4 py-3 border-t border-base-300 sm:border-t-0">
+            <dt class="text-[11px] font-medium text-base-content/55">Asistencia prom.</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.promedioAsistencia.toFixed(0) }}% <span class="text-xs font-medium text-base-content/50">· todas las materias</span></dd>
+          </div>
+          <div class="px-4 py-3 border-t border-base-300 sm:border-t-0">
+            <dt class="text-[11px] font-medium text-base-content/55">Bajo rendimiento</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.bajosRendimiento }} <span class="text-xs font-medium text-base-content/50">· bajo la mínima</span></dd>
+          </div>
+        </dl>
       </div>
 
       <!-- ── Línea de tiempo de trimestres ────────────────────────────────── -->
@@ -257,7 +278,7 @@ onMounted(async () => {
               </div>
             </div>
             <div v-else class="skeleton h-12 w-full"></div>
-            <router-link to="/director/estructura" class="link link-primary text-xs mt-2">Ir a Estructura →</router-link>
+            <router-link to="/director/estructura" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Estructura <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
         </div>
 
@@ -280,7 +301,7 @@ onMounted(async () => {
               </div>
             </div>
             <div v-else class="skeleton h-12 w-full"></div>
-            <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2">Ir a Dimensiones →</router-link>
+            <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Dimensiones <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
         </div>
       </div>
@@ -309,3 +330,9 @@ onMounted(async () => {
 
   </div>
 </template>
+
+<style scoped>
+.font-display { font-family: var(--font-display); }
+.dash-hero ::selection { background: #C9A227; color: #0C2743; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
