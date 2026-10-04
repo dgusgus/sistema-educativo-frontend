@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useGestionStore } from '@/stores/gestion.store'
+import AppIcon from '@/components/AppIcon.vue'
 import { cursoApi } from '@/api/estructura.api'
 import { calificacionApi, type PlanillaResponse, type PlanillaItem, type HistorialItem } from '@/api/calificacion.api'
 import { useToastStore } from '@/stores/toast.store'
@@ -83,8 +84,48 @@ const motivo         = ref('')
 const guardando       = ref(false)
 const errorModal      = ref<string | null>(null)
 
+const dialogoCorreccion = ref<HTMLDialogElement | null>(null)
+const inputPromedio = ref<HTMLInputElement | null>(null)
+let focoPrevio: HTMLElement | null = null
+
+function cerrarModal() {
+  modalAbierto.value = false
+  focoPrevio?.focus?.()
+}
+
+watch(modalAbierto, async (abierto) => {
+  if (!abierto) return
+  await nextTick()
+  inputPromedio.value?.focus()
+})
+
+function atraparTeclas(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    cerrarModal()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogoCorreccion.value) return
+  const focos = Array.from(
+    dialogoCorreccion.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null)
+  if (!focos.length) return
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  if (e.shiftKey && document.activeElement === primero) {
+    e.preventDefault()
+    ultimo.focus()
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault()
+    primero.focus()
+  }
+}
+
 async function abrirCorreccion(item: PlanillaItem) {
   if (!item.calificacionId) return
+  focoPrevio = document.activeElement as HTMLElement | null
   alumnoActivo.value  = item
   nuevoPromedio.value = item.promedio ?? ''
   motivo.value        = ''
@@ -116,7 +157,7 @@ async function guardarCorreccion() {
   errorModal.value = null
   try {
     await calificacionApi.corregirPromedio(alumnoActivo.value.calificacionId, Number(nuevoPromedio.value), motivo.value.trim())
-    modalAbierto.value = false
+    cerrarModal()
     toast.success('Corrección guardada')
     await cargarPlanilla()
   } catch (e) {
@@ -129,8 +170,8 @@ async function guardarCorreccion() {
 
 <template>
   <div class="space-y-4">
-    <h2 class="text-2xl font-bold">Corrección de Notas</h2>
-    <p class="text-sm text-base-content/60">
+    <h2 class="font-display text-2xl font-bold tracking-tight">Corrección de Notas</h2>
+    <p class="mt-0.5 text-sm text-base-content/60">
       Corrección manual de promedios con el trimestre ya cerrado — queda registrada con motivo en el historial.
     </p>
 
@@ -177,7 +218,8 @@ async function guardarCorreccion() {
     </div>
 
     <div v-if="error" role="alert" class="alert" :class="error.includes('cerrado') ? 'alert-warning' : 'alert-error'">
-      <span>{{ error }}</span>
+      <span class="flex-1">{{ error }}</span>
+      <button type="button" class="btn btn-sm btn-ghost min-h-11" @click="cargarPlanilla">Reintentar</button>
     </div>
 
     <!-- Planilla -->
@@ -193,7 +235,7 @@ async function guardarCorreccion() {
 <StatusBadge v-if="item.promedio !== null" :estado="item.promedio >= gestion.notaMinima ? 'APROBADO' : 'REPROBADO'" />
               </td>
               <td>
-                <button class="btn btn-ghost btn-xs" :disabled="!item.calificacionId" @click="abrirCorreccion(item)">
+                <button class="btn btn-ghost btn-sm min-h-11" :disabled="!item.calificacionId" @click="abrirCorreccion(item)">
                   Corregir
                 </button>
               </td>
@@ -205,9 +247,10 @@ async function guardarCorreccion() {
   </div>
 
   <!-- Modal de corrección -->
-  <dialog :open="modalAbierto" class="modal modal-bottom sm:modal-middle">
+  <dialog ref="dialogoCorreccion" :open="modalAbierto" class="modal modal-bottom sm:modal-middle"
+    role="dialog" aria-modal="true" aria-labelledby="correccion-titulo" @keydown="atraparTeclas">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Corregir promedio</h3>
+      <h3 id="correccion-titulo" class="font-bold text-lg mb-1">Corregir promedio</h3>
       <p class="text-sm text-base-content/60 mb-4">
         {{ alumnoActivo?.estudiante.apellido }}, {{ alumnoActivo?.estudiante.nombre }}
         — actual: <strong>{{ alumnoActivo?.promedio?.toFixed(1) ?? '—' }}</strong>
@@ -218,7 +261,7 @@ async function guardarCorreccion() {
       <form class="space-y-3" @submit.prevent="guardarCorreccion">
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Nuevo promedio (0–100) *</legend>
-          <input v-model.number="nuevoPromedio" type="number" min="0" max="100" step="0.1"
+          <input ref="inputPromedio" v-model.number="nuevoPromedio" type="number" min="0" max="100" step="0.1"
             class="input input-bordered w-full" :disabled="guardando" />
         </fieldset>
         <fieldset class="fieldset">
@@ -228,7 +271,7 @@ async function guardarCorreccion() {
         </fieldset>
 
         <div class="modal-action mt-4">
-          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="modalAbierto = false">Cancelar</button>
+          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="cerrarModal">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="guardando">
             <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
             Guardar corrección
@@ -243,7 +286,7 @@ async function guardarCorreccion() {
         <div v-for="h in historial" :key="h.id" class="text-sm border-l-2 border-base-300 pl-3 py-1">
           <p>
             <span class="font-mono">{{ h.promedioAnterior ?? '—' }}</span>
-            →
+            <AppIcon nombre="promocion" class="inline h-3.5 w-3.5 text-base-content/40" />
             <span class="font-mono font-semibold">{{ h.promedioNuevo }}</span>
             <span class="text-base-content/50 ml-2">{{ new Date(h.fecha).toLocaleDateString('es-BO') }}</span>
           </p>
@@ -252,6 +295,6 @@ async function guardarCorreccion() {
       </div>
       <p v-else class="text-sm text-base-content/40">Sin correcciones previas.</p>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalAbierto = false"><button>cerrar</button></form>
+    <form method="dialog" class="modal-backdrop" @click="cerrarModal"><button>cerrar</button></form>
   </dialog>
 </template>
