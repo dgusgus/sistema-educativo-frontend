@@ -381,7 +381,7 @@ async function guardarPassword() {
               <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
                 <RouterLink :to="item.to" class="side-link" :class="esActivo(item.to) ? 'side-active' : ''" :aria-current="esActivo(item.to) ? 'page' : undefined">
                   <AppIcon :nombre="item.icon" class="h-[18px] w-[18px] shrink-0" />
-                  <span class="flex-1 truncate">{{ item.label }}</span>
+                  <span class="flex-1 min-w-0 truncate">{{ item.label }}</span>
                   <span v-if="badgeDe(item)" class="badge badge-error badge-sm tabular-nums">{{ badgeDe(item) }}</span>
                 </RouterLink>
               </li>
@@ -451,6 +451,8 @@ async function guardarPassword() {
 /* Enlace lateral: indicador de activo a la izquierda, sin depender solo de color */
 .side-link {
   position: relative;
+  display: flex;
+  width: 100%;
   border-radius: 0.75rem;
   font-weight: 500;
   min-height: 2.75rem;
