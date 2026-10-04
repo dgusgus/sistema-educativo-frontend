@@ -306,7 +306,7 @@ async function guardarPassword() {
                   <p class="truncate text-[11px] text-base-content/55">{{ rolesTexto }}</p>
                 </div>
               </div>
-              <ul class="menu menu-sm gap-0.5 mt-1">
+              <ul class="menu gap-0.5 mt-1">
                 <li>
                   <button role="menuitem" @click="abrirModalPassword">
                     <AppIcon nombre="candado" class="h-4 w-4" />
@@ -364,7 +364,7 @@ async function guardarPassword() {
         <!-- Selector de vista — solo aparece si el usuario tiene más de un rol -->
         <div v-if="auth.roles.length > 1" class="px-3 pt-3">
           <label for="vista-activa" class="text-[10px] font-semibold uppercase tracking-[0.12em] text-base-content/50 px-1">Viendo como</label>
-          <select id="vista-activa" class="select select-bordered select-sm w-full mt-1.5 border-base-300 focus:border-primary" :value="auth.vistaEfectiva ?? ''"
+          <select id="vista-activa" class="select select-bordered w-full mt-1.5 border-base-300 focus:border-primary" :value="auth.vistaEfectiva ?? ''"
             @change="cambiarVista(($event.target as HTMLSelectElement).value)">
             <option v-for="r in auth.roles" :key="r" :value="r">{{ NOMBRE_ROL[r] }}</option>
           </select>
@@ -453,7 +453,12 @@ async function guardarPassword() {
   position: relative;
   border-radius: 0.75rem;
   font-weight: 500;
+  min-height: 2.75rem;
+  align-items: center;
 }
+/* Dock móvil: área táctil mínima + zona segura del notch */
+.dock a, .dock label { min-height: 2.75rem; }
+.dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .side-link:hover { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
 .side-link:focus-visible {
   outline: 2px solid #C9A227;
