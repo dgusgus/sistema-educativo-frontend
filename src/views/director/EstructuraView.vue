@@ -4,8 +4,9 @@
  * y trimestres. Sin esto, Secretaria no puede inscribir (no hay cursos),
  * el docente no puede pasar asistencia (no hay trimestres), etc.
  */
-import { ref, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
+import AppIcon from '@/components/AppIcon.vue'
 import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
@@ -74,6 +75,52 @@ async function cargarTrimestres() {
   }
 }
 
+const dialogoEstructura = ref<HTMLDialogElement | null>(null)
+let focoPrevio: HTMLElement | null = null
+
+function abrirModal() {
+  focoPrevio = document.activeElement as HTMLElement | null
+  errorModal.value = null
+  abrirModal()
+}
+
+function cerrarModal() {
+  modalAbierto.value = false
+  focoPrevio?.focus?.()
+}
+
+watch(modalAbierto, async (abierto) => {
+  if (!abierto || !dialogoEstructura.value) return
+  await nextTick()
+  dialogoEstructura.value.querySelector<HTMLElement>(
+    'input:not([disabled]), select:not([disabled]), button:not([disabled])'
+  )?.focus()
+})
+
+function atraparTeclas(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    cerrarModal()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogoEstructura.value) return
+  const focos = Array.from(
+    dialogoEstructura.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null)
+  if (!focos.length) return
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  if (e.shiftKey && document.activeElement === primero) {
+    e.preventDefault()
+    ultimo.focus()
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault()
+    primero.focus()
+  }
+}
+
 function abrirCrear() {
   modoEdicion.value = false
   idEditando.value  = null
@@ -91,7 +138,7 @@ function abrirCrear() {
       fechaFin: '',
     }
   }
-  modalAbierto.value = true
+  abrirModal()
 }
 
 function abrirEditar(item: Curso | Materia | Trimestre) {
@@ -113,7 +160,7 @@ function abrirEditar(item: Curso | Materia | Trimestre) {
       fechaFin:    t.fechaFin    ?? '',
     }
   }
-  modalAbierto.value = true
+  abrirModal()
 }
 
 async function guardar() {
@@ -277,28 +324,31 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
   <div class="space-y-4">
 
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-      <div class="flex-1">
-        <h2 class="text-2xl font-bold">Estructura académica</h2>
-        <p class="text-sm text-base-content/60">Gestión {{ gestion.anio ?? '—' }}</p>
+      <div class="flex-1 min-w-0">
+        <h2 class="font-display text-2xl font-bold tracking-tight">Estructura académica</h2>
+        <p class="mt-0.5 text-sm text-base-content/60">Gestión {{ gestion.anio ?? '—' }}</p>
       </div>
-      <button class="btn btn-primary btn-sm" @click="abrirCrear">
-        + Nuevo {{ tab === 'cursos' ? 'curso' : tab === 'materias' ? 'materia' : 'trimestre' }}
+      <button class="btn btn-primary min-h-11" @click="abrirCrear">
+        <AppIcon nombre="agregar" class="h-4 w-4" />
+        Nuevo {{ tab === 'cursos' ? 'curso' : tab === 'materias' ? 'materia' : 'trimestre' }}
       </button>
     </div>
 
     <div v-if="error" role="alert" class="alert alert-error">
-      <span>{{ error }}</span>
-      <button class="btn btn-sm btn-ghost" @click="error = null">×</button>
+      <span class="flex-1">{{ error }}</span>
+      <button type="button" class="btn btn-sm btn-ghost min-h-11" aria-label="Descartar error" @click="error = null">
+        <AppIcon nombre="cerrar" class="h-4 w-4" />
+      </button>
     </div>
 
     <div role="tablist" class="tabs tabs-boxed w-fit">
-      <button role="tab" class="tab" :class="{ 'tab-active': tab === 'cursos' }" @click="tab = 'cursos'">
+      <button role="tab" class="tab min-h-11" :class="{ 'tab-active': tab === 'cursos' }" :aria-selected="tab === 'cursos'" @click="tab = 'cursos'">
         Cursos <span class="ml-1 badge badge-xs badge-ghost">{{ cursos.length }}</span>
       </button>
-      <button role="tab" class="tab" :class="{ 'tab-active': tab === 'materias' }" @click="tab = 'materias'">
+      <button role="tab" class="tab min-h-11" :class="{ 'tab-active': tab === 'materias' }" :aria-selected="tab === 'materias'" @click="tab = 'materias'">
         Materias <span class="ml-1 badge badge-xs badge-ghost">{{ materias.length }}</span>
       </button>
-      <button role="tab" class="tab" :class="{ 'tab-active': tab === 'trimestres' }" @click="tab = 'trimestres'">
+      <button role="tab" class="tab min-h-11" :class="{ 'tab-active': tab === 'trimestres' }" :aria-selected="tab === 'trimestres'" @click="tab = 'trimestres'">
         Trimestres <span class="ml-1 badge badge-xs badge-ghost">{{ trimestres.length }}</span>
       </button>
     </div>
@@ -335,9 +385,9 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
             </td>
             <td>
               <div class="flex gap-1">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(c)">Editar</button>
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(c)">Editar</button>
                 <button
-                  class="btn btn-ghost btn-xs text-error"
+                  class="btn btn-ghost btn-sm min-h-11 text-error"
                   :disabled="eliminando === c.id || (c._count?.inscripciones ?? 0) > 0"
                   @click="eliminarCurso(c)"
                 >
@@ -381,9 +431,9 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
             </td>
             <td>
               <div class="flex gap-1">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(m)">Editar</button>
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(m)">Editar</button>
                 <button
-                  class="btn btn-ghost btn-xs text-error"
+                  class="btn btn-ghost btn-sm min-h-11 text-error"
                   :disabled="eliminando === m.id || (m._count?.asignaciones ?? 0) > 0"
                   @click="eliminarMateria(m)"
                 >
@@ -429,10 +479,10 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
             </td>
             <td>
               <div class="flex gap-1">
-                <button class="btn btn-ghost btn-xs" :disabled="t.cerrado" @click="abrirEditar(t)">Editar</button>
+                <button class="btn btn-ghost btn-sm min-h-11" :disabled="t.cerrado" @click="abrirEditar(t)">Editar</button>
                 <button
                   v-if="!t.cerrado"
-                  class="btn btn-ghost btn-xs text-error"
+                  class="btn btn-ghost btn-sm min-h-11 text-error"
                   :disabled="cerrando === t.id"
                   @click="cerrarTrimestre(t)"
                 >
@@ -448,9 +498,10 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
   </div>
 
   <!-- ── Modal crear/editar ─────────────────────────────────────────────────── -->
-  <dialog :open="modalAbierto" class="modal modal-bottom sm:modal-middle">
+  <dialog ref="dialogoEstructura" :open="modalAbierto" class="modal modal-bottom sm:modal-middle"
+    role="dialog" aria-modal="true" aria-labelledby="estructura-titulo" @keydown="atraparTeclas">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">
+      <h3 id="estructura-titulo" class="font-bold text-lg mb-4">
         {{ modoEdicion ? 'Editar' : 'Nuevo' }}
         {{ tab === 'cursos' ? 'curso' : tab === 'materias' ? 'materia' : 'trimestre' }}
       </h3>
@@ -542,7 +593,7 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
         </template>
 
         <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="modalAbierto = false">Cancelar</button>
+          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="cerrarModal">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="guardando">
             <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
             {{ modoEdicion ? 'Guardar cambios' : 'Crear' }}
@@ -550,6 +601,6 @@ const TURNO_TEXTO: Record<Turno, string> = { MANANA: 'Mañana', TARDE: 'Tarde', 
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalAbierto = false"><button>cerrar</button></form>
+    <form method="dialog" class="modal-backdrop" @click="cerrarModal"><button>cerrar</button></form>
   </dialog>
 </template>
