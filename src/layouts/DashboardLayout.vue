@@ -282,56 +282,52 @@ async function guardarPassword() {
 
     <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
     <div class="drawer-side z-20">
-      <label for="drawer-toggle" class="drawer-overlay"></label>
+      <label for="drawer-toggle" class="drawer-overlay" aria-label="Cerrar menú"></label>
 
-      <aside class="bg-base-100 border-r border-base-300 w-64 min-h-full flex flex-col">
+      <aside class="side bg-base-100 border-r border-base-300 w-[17rem] min-h-full flex flex-col">
+        <div class="h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
 
-        <div class="p-4 border-b border-base-300">
-          <h1 class="font-bold text-sm leading-tight text-base-content">Unidad Educativa</h1>
-          <p class="text-xs text-primary font-semibold mt-0.5">Los Ángeles de Nazaria Ignacia</p>
+        <div class="flex items-center gap-3 px-4 pt-4 pb-4 border-b border-base-300">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-content shadow-[0_10px_24px_-12px_rgba(26,60,94,0.7)]">
+            <AppIcon nombre="escuela" class="h-5 w-5" />
+          </span>
+          <span class="min-w-0">
+            <span class="block font-display text-[13px] font-bold leading-tight text-base-content truncate">U.E. Los Ángeles de Nazaria Ignacia</span>
+            <span class="mt-0.5 block text-[11px] text-base-content/55">Oruro · Ley 070</span>
+          </span>
         </div>
 
         <!-- Selector de vista — solo aparece si el usuario tiene más de un rol -->
         <div v-if="auth.roles.length > 1" class="px-3 pt-3">
-          <label class="text-[10px] uppercase tracking-wide text-base-content/40 px-1">Viendo como</label>
-          <select class="select select-bordered select-sm w-full mt-1" :value="auth.vistaEfectiva ?? ''"
+          <label for="vista-activa" class="text-[10px] font-semibold uppercase tracking-[0.12em] text-base-content/50 px-1">Viendo como</label>
+          <select id="vista-activa" class="select select-bordered select-sm w-full mt-1.5 border-base-300 focus:border-primary" :value="auth.vistaEfectiva ?? ''"
             @change="cambiarVista(($event.target as HTMLSelectElement).value)">
             <option v-for="r in auth.roles" :key="r" :value="r">{{ NOMBRE_ROL[r] }}</option>
           </select>
         </div>
 
         <!-- Ítems del menú, agrupados -->
-        <ul class="menu menu-sm p-3 flex-1 gap-1 overflow-y-auto">
-          <template v-for="grupo in grupos" :key="grupo ?? '_sin_grupo'">
-            <li v-if="grupo"
-              class="menu-title text-[10px] uppercase tracking-wide text-base-content/40 mt-2 first:mt-0">
-              <span>{{ grupo }}</span>
-            </li>
-            <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
-              <RouterLink :to="item.to" :class="esActivo(item.to) ? 'active' : ''">
-                <AppIcon :nombre="item.icon" class="h-4 w-4" />
-                <span class="flex-1">{{ item.label }}</span>
-                <span v-if="badgeDe(item)" class="badge badge-error badge-sm">{{ badgeDe(item) }}</span>
-              </RouterLink>
-            </li>
-          </template>
-        </ul>
+        <nav class="flex-1 overflow-y-auto px-3 py-3" aria-label="Navegación principal">
+          <ul class="menu menu-sm gap-0.5">
+            <template v-for="grupo in grupos" :key="grupo ?? '_sin_grupo'">
+              <li v-if="grupo"
+                class="menu-title px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-base-content/45">
+                <span>{{ grupo }}</span>
+              </li>
+              <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
+                <RouterLink :to="item.to" class="side-link" :class="esActivo(item.to) ? 'side-active' : ''" :aria-current="esActivo(item.to) ? 'page' : undefined">
+                  <AppIcon :nombre="item.icon" class="h-[18px] w-[18px] shrink-0" />
+                  <span class="flex-1 truncate">{{ item.label }}</span>
+                  <span v-if="badgeDe(item)" class="badge badge-error badge-sm tabular-nums">{{ badgeDe(item) }}</span>
+                </RouterLink>
+              </li>
+            </template>
+          </ul>
+        </nav>
 
-        <div class="p-4 border-t border-base-300 flex items-center justify-between">
-          <span class="text-xs text-base-content/40">Sistema Educativo v1.0</span>
-          <button type="button" class="btn btn-ghost btn-sm btn-circle"
-            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" @click="alternar">
-            <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </button>
+        <div class="border-t border-base-300 px-4 py-3">
+          <p class="text-[11px] text-base-content/50">Sistema Educativo · v1.0</p>
+          <p v-if="auth.vistaEfectiva" class="mt-0.5 text-[11px] font-medium text-base-content/70">Vista: {{ NOMBRE_ROL[auth.vistaEfectiva] }}</p>
         </div>
       </aside>
     </div>
@@ -383,3 +379,44 @@ async function guardarPassword() {
     <form method="dialog" class="modal-backdrop" @click="modalPassword = false"><button>cerrar</button></form>
   </dialog>
 </template>
+
+<style scoped>
+.font-display { font-family: var(--font-display); }
+
+/* Enlace lateral: indicador de activo a la izquierda, sin depender solo de color */
+.side-link {
+  position: relative;
+  border-radius: 0.75rem;
+  font-weight: 500;
+}
+.side-link:hover { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
+.side-link:focus-visible {
+  outline: 2px solid #C9A227;
+  outline-offset: 2px;
+}
+.side-link.side-active {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.side-link.side-active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: #C9A227;
+}
+.side nav::-webkit-scrollbar { width: 8px; }
+.side nav::-webkit-scrollbar-thumb {
+  background: var(--color-base-300);
+  border-radius: 999px;
+}
+.side ::selection { background: #C9A227; color: #0C2743; }
+
+@media (prefers-reduced-motion: reduce) {
+  .side * { transition: none !important; }
+}
+</style>
