@@ -486,24 +486,30 @@ async function exportar() {
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
 <td>
-  <div class="flex flex-wrap gap-1 max-w-xs items-center">
-    <span
-      v-for="c in cursosDe(d)"
-      :key="c.id"
-      class="badge badge-sm badge-outline gap-1"
-      :title="c.completo"
-    >
-      {{ c.corto }}
-      <button class="text-error font-bold leading-none"
-        :disabled="quitandoAsignacion === c.id"
-        :title="`Quitar ${c.completo}`"
-        @click="quitarAsignacion(d, c.id, c.completo)">
-        <span v-if="quitandoAsignacion === c.id" class="loading loading-spinner loading-xs"></span>
-        <span v-else>✕</span>
-      </button>
-    </span>
-    <span v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</span>
-  </div>
+  <div v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</div>
+  <details v-else class="collapse-arrow collapse min-w-52 rounded-2xl border border-base-300/70 bg-base-200/40">
+    <summary class="collapse-title flex min-h-11 items-center gap-2 py-2 pl-3 pr-9 text-xs font-semibold">
+      <span class="badge badge-sm badge-primary tabular-nums">{{ cursosDe(d).length }}</span>
+      <span>{{ cursosDe(d).length === 1 ? 'curso' : 'cursos' }}</span>
+      <span class="truncate font-normal text-base-content/45">{{ cursosDe(d).slice(0, 2).map(c => c.corto).join(' · ') }}</span>
+    </summary>
+    <ul class="collapse-content list gap-0.5">
+      <li v-for="c in cursosDe(d)" :key="c.id" class="list-row items-center gap-2 rounded-xl px-2 py-1 hover:bg-base-300/40" :title="c.completo">
+        <span class="badge badge-xs badge-outline font-mono">{{ c.corto }}</span>
+        <span class="list-col-grow min-w-0">
+          <span class="block truncate text-xs">{{ c.completo }}</span>
+        </span>
+        <button type="button" class="btn btn-circle btn-ghost btn-sm"
+          :disabled="quitandoAsignacion === c.id"
+          :title="`Quitar ${c.completo}`"
+          :aria-label="`Quitar ${c.completo} a ${d.nombre} ${d.apellido}`"
+          @click="quitarAsignacion(d, c.id, c.completo)">
+          <span v-if="quitandoAsignacion === c.id" class="loading loading-spinner loading-xs"></span>
+          <AppIcon v-else nombre="cerrar" class="h-3.5 w-3.5 text-error" />
+        </button>
+      </li>
+    </ul>
+  </details>
 </td>
             <td>
               <div v-if="tieneCuenta(d)" class="flex items-center gap-2">
@@ -518,17 +524,17 @@ async function exportar() {
               <StatusBadge :estado="d.activo ? 'ACTIVO' : 'INACTIVO'" :texto="d.activo ? 'Activo' : 'Inactivo'" />
             </td>
             <td>
-              <div class="flex gap-1 flex-wrap">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(d)">
+              <div class="flex gap-1 flex-nowrap whitespace-nowrap">
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(d)">
                   Editar
                 </button>
-                <button class="btn btn-outline btn-xs btn-info" @click="abrirAsignacion(d)">
+                <button class="btn btn-outline btn-sm min-h-11 btn-info" @click="abrirAsignacion(d)">
                   Asignar
                 </button>
-                <button v-if="!tieneCuenta(d)" class="btn btn-outline btn-xs btn-warning" @click="abrirVincular(d)">
+                <button v-if="!tieneCuenta(d)" class="btn btn-outline btn-sm min-h-11 btn-warning" @click="abrirVincular(d)">
                   Vincular cuenta
                 </button>
-                <button v-if="tieneCuenta(d)" class="btn btn-ghost btn-xs" @click="abrirReset(d)">
+                <button v-if="tieneCuenta(d)" class="btn btn-ghost btn-sm min-h-11" @click="abrirReset(d)">
                   Reset pass
                 </button>
               </div>

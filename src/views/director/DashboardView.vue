@@ -70,6 +70,77 @@ function fechaCorta(fecha: string | null | undefined): string {
   return formatoFecha(fecha, { day: 'numeric', month: 'short' })
 }
 
+// Errores por bloque con reintento — ningún bloque tumba al resto,
+// pero ninguno falla en silencio: cada uno muestra su error y su reintento.
+const erroresBloque = ref({
+  dimensiones: null as string | null,
+  estructura: null as string | null,
+  academico: null as string | null,
+  pendientes: null as string | null,
+})
+
+function mensajeError(e: unknown): string {
+  return e instanceof Error ? e.message : 'Error al cargar los datos'
+}
+
+function gestionIdActual(): number | null {
+  return datos.value?.gestion.id ?? gestionStore.gestionId
+}
+
+async function cargarDimensiones() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.dimensiones = null
+  try {
+    dimensiones.value = await evaluacionApi.getDimensiones(id)
+  } catch (e) {
+    erroresBloque.value.dimensiones = mensajeError(e)
+  }
+}
+
+async function cargarEstructura() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.estructura = null
+  try {
+    const [ms, cs] = await Promise.all([materiaApi.getAll(), cursoApi.getAll(id)])
+    materias.value = ms
+    cursos.value = cs
+  } catch (e) {
+    erroresBloque.value.estructura = mensajeError(e)
+  }
+}
+
+async function cargarAcademico() {
+  const id = gestionIdActual()
+  if (!id) return
+  erroresBloque.value.academico = null
+  try {
+    const [rep, ds] = await Promise.all([
+      reporteApi.getReporteAcademico({ gestionId: id }),
+      docenteApi.getAll(),
+    ])
+    detalleAcademico.value = rep.detalle
+    docentesSinAsignar.value = (ds as Docente[])
+      .filter(d => !(d.asignaciones ?? []).length)
+      .map(d => `${d.nombre} ${d.apellido}`)
+  } catch (e) {
+    erroresBloque.value.academico = mensajeError(e)
+  }
+}
+
+async function cargarPendientes() {
+  const trim = datos.value?.trimestres.find(t => !t.cerrado)
+    ?? gestionStore.trimestreActivo
+  if (!trim) return
+  erroresBloque.value.pendientes = null
+  try {
+    pendientes.value = await trimestreApi.getPendientes(trim.id)
+  } catch (e) {
+    erroresBloque.value.pendientes = mensajeError(e)
+  }
+}
+
 onMounted(async () => {
   try {
     datos.value = await reporteApi.getDashboard()
@@ -80,24 +151,12 @@ onMounted(async () => {
   }
   cargando.value = false
 
-  const gestionId = datos.value.gestion.id
-  const trim = datos.value.trimestres.find(t => !t.cerrado) ?? null
-
-  // Bloques independientes — cada uno falla por su cuenta sin tumbar al resto
-  evaluacionApi.getDimensiones(gestionId).then(r => { dimensiones.value = r }).catch(() => {})
-  materiaApi.getAll().then(r => { materias.value = r }).catch(() => {})
-  cursoApi.getAll(gestionId).then(r => { cursos.value = r }).catch(() => {})
   institucionApi.get().then(r => { institucion.value = r }).catch(() => {})
   gestionStore.cargar().catch(() => {})
-  reporteApi.getReporteAcademico({ gestionId }).then(r => { detalleAcademico.value = r.detalle }).catch(() => {})
-  docenteApi.getAll().then((ds: Docente[]) => {
-    docentesSinAsignar.value = ds
-      .filter(d => !(d.asignaciones ?? []).length)
-      .map(d => `${d.nombre} ${d.apellido}`)
-  }).catch(() => {})
-  if (trim) {
-    trimestreApi.getPendientes(trim.id).then(r => { pendientes.value = r }).catch(() => {})
-  }
+  cargarDimensiones()
+  cargarEstructura()
+  cargarAcademico()
+  cargarPendientes()
 })
 </script>
 
@@ -106,29 +165,32 @@ onMounted(async () => {
 
     <!-- ── HERO institucional ─────────────────────────────────────────────── -->
     <div v-if="cargando" class="skeleton h-36 w-full rounded-box"></div>
-    <div v-else-if="datos" class="rounded-box overflow-hidden text-white shadow"
-      style="background: linear-gradient(135deg, #1A3C5E 0%, #2E6DA4 60%, #3F8F5F 130%)">
-      <div class="p-5 sm:p-6 flex flex-wrap items-center gap-4">
-        <span class="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-xl font-bold shrink-0">
+    <div v-else-if="datos" class="dash-hero bg-marino relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(12,39,67,0.65)]">
+      <div class="absolute inset-0" aria-hidden="true">
+        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%); background: radial-gradient(700px 260px at 12% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, color-mix(in srgb, var(--color-dorado) 13%, transparent) 0%, transparent 55%);"></div>
+        <div class="absolute -right-16 -bottom-20 h-64 w-64 rounded-full border-[22px] border-white/[0.05]"></div>
+      </div>
+      <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-dorado via-dorado-claro to-dorado" aria-hidden="true"></div>
+      <div class="relative p-5 sm:p-6 flex flex-wrap items-center gap-4">
+        <span class="w-14 h-14 rounded-2xl bg-white/10 border border-dorado/30 flex items-center justify-center text-xl font-bold shrink-0 text-dorado-claro">
           {{ inicialesUE }}
         </span>
         <div class="min-w-0 flex-1">
-          <p class="text-white/70 text-xs uppercase tracking-wider">Unidad Educativa</p>
-          <h2 class="text-lg sm:text-2xl font-bold leading-tight truncate">
+          <h2 class="font-display text-lg sm:text-2xl font-bold leading-tight truncate text-white">
             {{ institucion?.nombre ?? 'Panel institucional' }}
           </h2>
-          <p class="text-white/70 text-xs sm:text-sm mt-0.5">
+          <p class="text-white/75 text-xs sm:text-sm mt-1">
             Gestión {{ datos.gestion.anio }}
             <span v-if="gestionStore.director"> · Dir. {{ gestionStore.director.nombre }} {{ gestionStore.director.apellido }}</span>
             <span v-if="trimestreActivo"> · {{ trimestreActivo.nombre }} en curso</span>
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-3xl font-bold leading-none">{{ avanceGestion }}%</p>
-          <p class="text-white/60 text-xs mt-1">año lectivo ({{ trimestresCerrados }}/{{ datos.trimestres.length }} trim.)</p>
+          <p class="font-display text-3xl font-extrabold leading-none tabular-nums text-white">{{ avanceGestion }}<span class="text-dorado-claro">%</span></p>
+          <p class="text-white/65 text-xs mt-1">año lectivo ({{ trimestresCerrados }}/{{ datos.trimestres.length }} trim.)</p>
         </div>
       </div>
-      <progress class="progress progress-warning h-1.5 w-full rounded-none" :value="avanceGestion" max="100" />
+      <progress class="progress h-1.5 w-full rounded-none [&::-webkit-progress-value]:bg-dorado [&::-moz-progress-bar]:bg-dorado" :value="avanceGestion" max="100" :aria-valuenow="avanceGestion" aria-label="Avance del año lectivo" />
     </div>
 
     <!-- Error -->
@@ -140,6 +202,11 @@ onMounted(async () => {
       <!-- ── 1. ALERTAS ───────────────────────────────────────────────────── -->
       <div class="space-y-3">
         <PendientesCierre v-if="pendientes" :datos="pendientes" />
+        <div v-else-if="erroresBloque.pendientes" role="alert" class="alert alert-error py-2 text-sm">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1">No se pudieron revisar los pendientes: {{ erroresBloque.pendientes }}</span>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarPendientes">Reintentar</button>
+        </div>
         <div v-else-if="trimestreActivo" class="flex items-center gap-2 text-sm text-base-content/50">
           <span class="loading loading-spinner loading-xs"></span> Revisando pendientes de cierre…
         </div>
@@ -185,30 +252,53 @@ onMounted(async () => {
         <div v-for="card in [
           { label: 'Estudiantes', valor: String(datos.indicadores.totalEstudiantes), icono: 'estudiantes', fondo: 'bg-primary/10 text-primary', nota: `${cursos?.length ?? 0} cursos` },
           { label: 'Docentes', valor: String(datos.indicadores.totalDocentes), icono: 'personas', fondo: 'bg-secondary/10 text-secondary', nota: 'planta activa' },
-          { label: 'Cursos', valor: String(datos.indicadores.totalCursos), icono: 'estructura', fondo: 'bg-accent/10 text-accent', nota: `${cursosSinInscritos.length} vacíos` },
-          { label: 'En riesgo', valor: String(datos.indicadores.estudiantesEnRiesgo), icono: 'alerta', fondo: 'bg-warning/10 text-warning', nota: 'asistencia o notas' },
           { label: 'Promedio general', valor: datos.indicadores.promedioGeneral.toFixed(1), icono: 'reportes', fondo: 'bg-info/10 text-info', nota: 'escala 1–100' },
-          { label: 'Asistencia prom.', valor: `${datos.indicadores.promedioAsistencia.toFixed(0)}%`, icono: 'asistencia', fondo: 'bg-success/10 text-success', nota: 'todas las materias' },
-          { label: 'Bajo rendimiento', valor: String(datos.indicadores.bajosRendimiento), icono: 'escuela', fondo: 'bg-error/10 text-error', nota: 'bajo la nota mínima' },
           { label: 'Recaudado', valor: `Bs. ${datos.indicadores.totalRecaudado.toLocaleString('es-BO')}`, icono: 'pagos', fondo: 'bg-success/10 text-success', nota: `${datos.indicadores.pagosPendientes} pago(s) pendiente(s)` },
-        ]" :key="card.label" class="card bg-base-100 shadow hover:shadow-md transition-shadow">
+        ]" :key="card.label" class="card bg-base-100 border border-base-300/60 shadow-[0_16px_36px_-24px_rgba(26,60,94,0.5)] hover:shadow-[0_20px_44px_-24px_rgba(26,60,94,0.55)] transition-shadow">
           <div class="card-body p-4 flex-row items-center gap-3">
             <span class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" :class="card.fondo">
               <AppIcon :nombre="card.icono" class="h-5 w-5" />
             </span>
             <span class="min-w-0">
-              <span class="block text-xs text-base-content/60">{{ card.label }}</span>
-              <span class="block text-xl sm:text-2xl font-bold truncate">{{ card.valor }}</span>
-              <span v-if="card.nota" class="block text-[11px] text-base-content/40 truncate">{{ card.nota }}</span>
+              <span class="block text-xs font-medium text-base-content/60">{{ card.label }}</span>
+              <span class="block font-display text-xl sm:text-2xl font-extrabold tabular-nums truncate">{{ card.valor }}</span>
+              <span v-if="card.nota" class="block text-[11px] text-base-content/50 truncate">{{ card.nota }}</span>
             </span>
           </div>
         </div>
       </div>
 
+      <div class="card bg-base-100 border border-base-300/60 shadow-sm overflow-hidden">
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-base-300">
+          <div class="bg-base-100 px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">Cursos</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.totalCursos }} <span class="text-xs font-medium text-base-content/50">· {{ cursosSinInscritos.length }} vacíos</span></dd>
+          </div>
+          <div class="bg-base-100 px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">En riesgo</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.estudiantesEnRiesgo }} <span class="text-xs font-medium text-base-content/50">· asistencia o notas</span></dd>
+          </div>
+          <div class="bg-base-100 px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">Asistencia prom.</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.promedioAsistencia.toFixed(0) }}% <span class="text-xs font-medium text-base-content/50">· todas las materias</span></dd>
+          </div>
+          <div class="bg-base-100 px-4 py-3">
+            <dt class="text-[11px] font-medium text-base-content/55">Bajo rendimiento</dt>
+            <dd class="font-display text-lg font-bold tabular-nums">{{ datos.indicadores.bajosRendimiento }} <span class="text-xs font-medium text-base-content/50">· bajo la mínima</span></dd>
+          </div>
+        </dl>
+      </div>
+
       <!-- ── Línea de tiempo de trimestres ────────────────────────────────── -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body">
-          <h3 class="font-semibold mb-3">Trimestres</h3>
+      <details class="card colapsable group bg-base-100 shadow" open>
+        <summary class="flex cursor-pointer list-none items-center gap-2 p-4 font-semibold sm:p-5 [&::-webkit-details-marker]:hidden">
+          <AppIcon nombre="gestiones" class="h-5 w-5 text-primary" />
+          <span class="flex-1">Trimestres</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="px-4 pb-4 sm:px-5 sm:pb-5">
           <ol class="flex flex-col sm:flex-row sm:items-start gap-3">
             <li v-for="(t, i) in (gestionStore.trimestres.length ? gestionStore.trimestres : datos.trimestres)" :key="t.id ?? t.numero"
               class="flex sm:flex-col sm:flex-1 sm:text-center items-start sm:items-center gap-2 sm:gap-0">
@@ -236,17 +326,25 @@ onMounted(async () => {
             </li>
           </ol>
         </div>
-      </div>
+      </details>
 
       <!-- ── Estructura + dimensiones ─────────────────────────────────────── -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <details class="colapsable group" open>
+        <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl px-1 py-2 font-semibold [&::-webkit-details-marker]:hidden">
+          <AppIcon nombre="estructura" class="h-5 w-5 text-primary" />
+          <span class="flex-1">Estructura y dimensiones</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="card bg-base-100 shadow">
           <div class="card-body">
             <div class="flex items-center gap-2 mb-1">
               <AppIcon nombre="estructura" class="h-5 w-5 text-accent" />
               <h3 class="font-semibold">Estructura</h3>
             </div>
-            <div v-if="cursos && materias" class="stats stats-horizontal w-full shadow-none">
+            <div v-if="cursos && materias" class="stats stats-vertical min-[480px]:stats-horizontal w-full shadow-none">
               <div class="stat px-0">
                 <div class="stat-title text-xs">Cursos</div>
                 <div class="stat-value text-3xl">{{ cursos.length }}</div>
@@ -256,8 +354,12 @@ onMounted(async () => {
                 <div class="stat-value text-3xl">{{ materias.length }}</div>
               </div>
             </div>
+            <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error py-2 text-sm">
+              <span class="flex-1">No se pudo cargar la estructura: {{ erroresBloque.estructura }}</span>
+              <button type="button" class="btn btn-sm min-h-11" @click="cargarEstructura">Reintentar</button>
+            </div>
             <div v-else class="skeleton h-12 w-full"></div>
-            <router-link to="/director/estructura" class="link link-primary text-xs mt-2">Ir a Estructura →</router-link>
+            <router-link to="/director/estructura" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Estructura <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
         </div>
 
@@ -279,17 +381,32 @@ onMounted(async () => {
                 <progress class="progress progress-primary h-1.5 w-full" :value="d.pesoEnPromedio * 100" max="100" />
               </div>
             </div>
+            <div v-else-if="erroresBloque.dimensiones" role="alert" class="alert alert-error py-2 text-sm">
+              <span class="flex-1">No se pudieron cargar las dimensiones: {{ erroresBloque.dimensiones }}</span>
+              <button type="button" class="btn btn-sm min-h-11" @click="cargarDimensiones">Reintentar</button>
+            </div>
             <div v-else class="skeleton h-12 w-full"></div>
-            <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2">Ir a Dimensiones →</router-link>
+            <router-link to="/director/dimensiones" class="link link-primary text-xs mt-2 inline-flex items-center gap-1">Ir a Dimensiones <AppIcon nombre="promocion" class="h-3.5 w-3.5" /></router-link>
           </div>
         </div>
-      </div>
+        </div>
+      </details>
 
       <!-- ── 3. RENDIMIENTO + EXPLORADOR ──────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <RendimientoCursos v-if="detalleAcademico" :detalle="detalleAcademico" />
+        <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudo cargar el rendimiento: {{ erroresBloque.academico }}</span>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarAcademico">Reintentar</button>
+        </div>
         <div v-else class="skeleton h-48 w-full rounded-xl"></div>
         <CursoExplorer v-if="cursos" :cursos="cursos" />
+        <div v-else-if="erroresBloque.estructura" role="alert" class="alert alert-error">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudieron cargar los cursos: {{ erroresBloque.estructura }}</span>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarEstructura">Reintentar</button>
+        </div>
         <div v-else class="skeleton h-32 w-full rounded-xl"></div>
       </div>
 
@@ -299,6 +416,11 @@ onMounted(async () => {
           <MejoresGestion :detalle="detalleAcademico" />
           <EstadoInscripciones :detalle="detalleAcademico" />
         </template>
+        <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error xl:col-span-2">
+          <AppIcon nombre="alerta" class="h-4 w-4 shrink-0" />
+          <span class="flex-1 text-sm">No se pudieron cargar los destacados ni inscripciones: {{ erroresBloque.academico }}</span>
+          <button type="button" class="btn btn-sm min-h-11" @click="cargarAcademico">Reintentar</button>
+        </div>
         <template v-else>
           <div class="skeleton h-48 w-full rounded-xl"></div>
           <div class="skeleton h-48 w-full rounded-xl"></div>
@@ -309,3 +431,14 @@ onMounted(async () => {
 
   </div>
 </template>
+
+<style scoped>
+.font-display { font-family: var(--font-display); }
+.dash-hero ::selection { background: var(--color-dorado); color: var(--color-marino); }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.colapsable > summary:focus-visible {
+  outline: 2px solid var(--color-dorado);
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+}
+</style>

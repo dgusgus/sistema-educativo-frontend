@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useGestionStore } from '@/stores/gestion.store'
@@ -158,13 +158,54 @@ const cambiandoPassword = ref(false)
 const errorPassword = ref<string | null>(null)
 const exitoPassword = ref(false)
 
+const dialogoPassword = ref<HTMLDialogElement | null>(null)
+const inputPasswordActual = ref<HTMLInputElement | null>(null)
+let focoPrevio: HTMLElement | null = null
+
 function abrirModalPassword() {
+  focoPrevio = document.activeElement as HTMLElement | null
   passwordActual.value = ''
   passwordNueva.value = ''
   passwordConfirma.value = ''
   errorPassword.value = null
   exitoPassword.value = false
   modalPassword.value = true
+}
+
+function cerrarModalPassword() {
+  modalPassword.value = false
+  focoPrevio?.focus?.()
+}
+
+// Al abrir: foco al primer campo. Trampa de foco simple + Esc dentro del diálogo.
+watch(modalPassword, async (abierto) => {
+  if (!abierto) return
+  await nextTick()
+  inputPasswordActual.value?.focus()
+})
+
+function atraparTab(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    cerrarModalPassword()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogoPassword.value) return
+  const focos = Array.from(
+    dialogoPassword.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null)
+  if (!focos.length) return
+  const primero = focos[0]
+  const ultimo = focos[focos.length - 1]
+  if (e.shiftKey && document.activeElement === primero) {
+    e.preventDefault()
+    ultimo.focus()
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault()
+    primero.focus()
+  }
 }
 
 async function guardarPassword() {
@@ -204,23 +245,28 @@ async function guardarPassword() {
     <div class="drawer-content flex flex-col">
 
       <!-- Navbar -->
-      <nav class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-10">
+      <nav class="topbar navbar bg-base-100/90 backdrop-blur border-b border-base-300 sticky top-0 z-10 shadow-[0_1px_12px_-6px_rgba(26,60,94,0.25)]" aria-label="Barra superior">
         <div class="flex-none lg:hidden">
-          <label for="drawer-toggle" class="btn btn-square btn-ghost">
+          <label for="drawer-toggle" class="btn btn-square btn-ghost" aria-label="Abrir menú">
             <AppIcon nombre="menu" class="h-5 w-5" />
           </label>
         </div>
 
-        <div class="flex-1 px-2">
-          <span class="text-lg font-semibold text-base-content">
-            {{menuItems.find(i => esActivo(i.to))?.label ?? 'Sistema Educativo'}}
-          </span>
+        <div class="flex-1 min-w-0 px-2">
+          <h1 class="font-display text-[17px] font-bold leading-tight text-base-content truncate">
+            {{ menuItems.find(i => esActivo(i.to))?.label ?? 'Sistema Educativo' }}
+          </h1>
+          <p class="text-[11px] text-base-content/55 truncate">
+            <span v-if="auth.vistaEfectiva">{{ NOMBRE_ROL[auth.vistaEfectiva] }}</span>
+            <span v-if="gestion.anio"> · Gestión {{ gestion.anio }}</span>
+            <span v-if="gestion.trimestreActivo"> · {{ gestion.trimestreActivo.nombre }}</span>
+          </p>
         </div>
 
-        <div class="flex-none gap-2">
-          <!-- ── agregar dentro de <div class="flex-none gap-2">, ANTES del dropdown de usuario ── -->
+        <div class="flex-none items-center gap-1.5 flex">
           <button type="button" class="btn btn-ghost btn-circle"
-            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" @click="alternar">
+            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'"
+            :aria-pressed="tema !== 'colegio'" title="Cambiar tema" @click="alternar">
             <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
               viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -233,30 +279,48 @@ async function guardarPassword() {
             </svg>
           </button>
           <div class="dropdown dropdown-end">
-            <div tabindex="0" role="button" class="btn btn-ghost gap-2">
+            <div tabindex="0" role="button" aria-haspopup="menu" aria-label="Abrir menú de usuario" class="btn btn-ghost gap-2.5 rounded-2xl px-2 py-1.5 h-auto">
               <div class="avatar placeholder">
-                <div class="bg-primary text-primary-content rounded-full w-8">
-                  <span class="text-xs">{{ auth.usuario?.nombre?.charAt(0) ?? '?' }}</span>
+                <div class="bg-primary text-primary-content rounded-full w-9 ring-2 ring-primary/20">
+                  <span class="text-xs font-bold">{{ (auth.usuario?.nombre ?? '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase() }}</span>
                 </div>
               </div>
-              <span class="hidden sm:inline text-sm">{{ auth.usuario?.nombre }}</span>
+              <span class="hidden sm:block text-left leading-tight">
+                <span class="block max-w-[10rem] truncate text-[13px] font-semibold text-base-content">{{ auth.usuario?.nombre ?? 'Usuario' }}</span>
+                <span class="block text-[11px] text-base-content/55">{{ auth.vistaEfectiva ? NOMBRE_ROL[auth.vistaEfectiva] : rolesTexto }}</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="hidden sm:block h-4 w-4 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
-            <ul tabindex="0"
-              class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-300">
-              <li class="menu-title text-xs opacity-60">{{ rolesTexto }}</li>
-              <li>
-                <button @click="abrirModalPassword">
-                  <AppIcon nombre="candado" class="h-4 w-4" />
-                  Cambiar contraseña
-                </button>
-              </li>
-              <li>
-                <button class="text-error" @click="auth.logout()">
-                  <AppIcon nombre="salir" class="h-4 w-4" />
-                  Cerrar sesión
-                </button>
-              </li>
-            </ul>
+            <div tabindex="0" role="menu" aria-label="Opciones de usuario"
+              class="dropdown-content bg-base-100 rounded-2xl z-10 w-64 p-2 shadow-[0_24px_60px_-24px_rgba(26,60,94,0.45)] border border-base-300">
+              <div class="flex items-center gap-3 px-3 pt-2 pb-3 border-b border-base-300">
+                <div class="avatar placeholder">
+                  <div class="bg-primary text-primary-content rounded-full w-10">
+                    <span class="text-sm font-bold">{{ (auth.usuario?.nombre ?? '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase() }}</span>
+                  </div>
+                </div>
+                <div class="min-w-0">
+                  <p class="truncate text-[13px] font-bold text-base-content">{{ auth.usuario?.nombre ?? 'Usuario' }}</p>
+                  <p class="truncate text-[11px] text-base-content/55">{{ rolesTexto }}</p>
+                </div>
+              </div>
+              <ul class="menu gap-0.5 mt-1">
+                <li>
+                  <button role="menuitem" @click="abrirModalPassword">
+                    <AppIcon nombre="candado" class="h-4 w-4" />
+                    Cambiar contraseña
+                  </button>
+                </li>
+                <li>
+                  <button role="menuitem" class="text-error hover:bg-error/10" @click="auth.logout()">
+                    <AppIcon nombre="salir" class="h-4 w-4" />
+                    Cerrar sesión
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </nav>
@@ -282,72 +346,69 @@ async function guardarPassword() {
 
     <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
     <div class="drawer-side z-20">
-      <label for="drawer-toggle" class="drawer-overlay"></label>
+      <label for="drawer-toggle" class="drawer-overlay" aria-label="Cerrar menú"></label>
 
-      <aside class="bg-base-100 border-r border-base-300 w-64 min-h-full flex flex-col">
+      <aside class="side bg-base-100 border-r border-base-300 w-[17rem] min-h-full flex flex-col">
+        <div class="h-[3px] bg-gradient-to-r from-dorado via-dorado-claro to-dorado" aria-hidden="true"></div>
 
-        <div class="p-4 border-b border-base-300">
-          <h1 class="font-bold text-sm leading-tight text-base-content">Unidad Educativa</h1>
-          <p class="text-xs text-primary font-semibold mt-0.5">Los Ángeles de Nazaria Ignacia</p>
+        <div class="flex items-center gap-3 px-4 pt-4 pb-4 border-b border-base-300">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-content shadow-[0_10px_24px_-12px_rgba(26,60,94,0.7)]">
+            <AppIcon nombre="escuela" class="h-5 w-5" />
+          </span>
+          <span class="min-w-0">
+            <span class="block font-display text-[13px] font-bold leading-tight text-base-content truncate">U.E. Los Ángeles de Nazaria Ignacia</span>
+            <span class="mt-0.5 block text-[11px] text-base-content/55">Oruro · Ley 070</span>
+          </span>
         </div>
 
         <!-- Selector de vista — solo aparece si el usuario tiene más de un rol -->
         <div v-if="auth.roles.length > 1" class="px-3 pt-3">
-          <label class="text-[10px] uppercase tracking-wide text-base-content/40 px-1">Viendo como</label>
-          <select class="select select-bordered select-sm w-full mt-1" :value="auth.vistaEfectiva ?? ''"
+          <label for="vista-activa" class="text-[10px] font-semibold uppercase tracking-[0.12em] text-base-content/50 px-1">Viendo como</label>
+          <select id="vista-activa" class="select select-bordered w-full mt-1.5 border-base-300 focus:border-primary" :value="auth.vistaEfectiva ?? ''"
             @change="cambiarVista(($event.target as HTMLSelectElement).value)">
             <option v-for="r in auth.roles" :key="r" :value="r">{{ NOMBRE_ROL[r] }}</option>
           </select>
         </div>
 
         <!-- Ítems del menú, agrupados -->
-        <ul class="menu menu-sm p-3 flex-1 gap-1 overflow-y-auto">
-          <template v-for="grupo in grupos" :key="grupo ?? '_sin_grupo'">
-            <li v-if="grupo"
-              class="menu-title text-[10px] uppercase tracking-wide text-base-content/40 mt-2 first:mt-0">
-              <span>{{ grupo }}</span>
-            </li>
-            <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
-              <RouterLink :to="item.to" :class="esActivo(item.to) ? 'active' : ''">
-                <AppIcon :nombre="item.icon" class="h-4 w-4" />
-                <span class="flex-1">{{ item.label }}</span>
-                <span v-if="badgeDe(item)" class="badge badge-error badge-sm">{{ badgeDe(item) }}</span>
-              </RouterLink>
-            </li>
-          </template>
-        </ul>
+        <nav class="flex-1 overflow-y-auto px-3 py-3" aria-label="Navegación principal">
+          <ul class="menu menu-sm gap-0.5">
+            <template v-for="grupo in grupos" :key="grupo ?? '_sin_grupo'">
+              <li v-if="grupo"
+                class="menu-title px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-base-content/45">
+                <span>{{ grupo }}</span>
+              </li>
+              <li v-for="item in itemsDelGrupo(grupo)" :key="item.to">
+                <RouterLink :to="item.to" class="side-link" :class="esActivo(item.to) ? 'side-active' : ''" :aria-current="esActivo(item.to) ? 'page' : undefined">
+                  <AppIcon :nombre="item.icon" class="h-[18px] w-[18px] shrink-0" />
+                  <span class="flex-1 min-w-0 truncate">{{ item.label }}</span>
+                  <span v-if="badgeDe(item)" class="badge badge-error badge-sm tabular-nums">{{ badgeDe(item) }}</span>
+                </RouterLink>
+              </li>
+            </template>
+          </ul>
+        </nav>
 
-        <div class="p-4 border-t border-base-300 flex items-center justify-between">
-          <span class="text-xs text-base-content/40">Sistema Educativo v1.0</span>
-          <button type="button" class="btn btn-ghost btn-sm btn-circle"
-            :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" @click="alternar">
-            <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </button>
+        <div class="border-t border-base-300 px-4 py-3">
+          <p class="text-[11px] text-base-content/50">Sistema Educativo · v1.0</p>
+          <p v-if="auth.vistaEfectiva" class="mt-0.5 text-[11px] font-medium text-base-content/70">Vista: {{ NOMBRE_ROL[auth.vistaEfectiva] }}</p>
         </div>
       </aside>
     </div>
   </div>
 
   <!-- ── Modal cambiar contraseña ─────────────────────────────────────────── -->
-  <dialog :open="modalPassword" class="modal modal-bottom sm:modal-middle">
+  <dialog ref="dialogoPassword" :open="modalPassword" class="modal modal-bottom sm:modal-middle"
+    role="dialog" aria-modal="true" aria-labelledby="cambiar-pass-titulo" @keydown="atraparTab">
     <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">Cambiar contraseña</h3>
+      <h3 id="cambiar-pass-titulo" class="font-bold text-lg mb-4">Cambiar contraseña</h3>
 
       <div v-if="exitoPassword" class="space-y-4">
         <div role="alert" class="alert alert-success">
           <span>Contraseña actualizada correctamente</span>
         </div>
         <div class="modal-action">
-          <button class="btn btn-primary" @click="modalPassword = false">Cerrar</button>
+          <button class="btn btn-primary" @click="cerrarModalPassword">Cerrar</button>
         </div>
       </div>
 
@@ -357,7 +418,7 @@ async function guardarPassword() {
         </div>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Contraseña actual</legend>
-          <input v-model="passwordActual" type="password" autocomplete="current-password"
+          <input ref="inputPasswordActual" v-model="passwordActual" type="password" autocomplete="current-password"
             class="input input-bordered w-full" :disabled="cambiandoPassword" />
         </fieldset>
         <fieldset class="fieldset">
@@ -372,7 +433,7 @@ async function guardarPassword() {
         </fieldset>
         <div class="modal-action mt-6">
           <button type="button" class="btn btn-ghost" :disabled="cambiandoPassword"
-            @click="modalPassword = false">Cancelar</button>
+            @click="cerrarModalPassword">Cancelar</button>
           <button type="submit" class="btn btn-primary" :disabled="cambiandoPassword">
             <span v-if="cambiandoPassword" class="loading loading-spinner loading-sm"></span>
             Guardar
@@ -380,6 +441,66 @@ async function guardarPassword() {
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="modalPassword = false"><button>cerrar</button></form>
+    <form method="dialog" class="modal-backdrop" @click="cerrarModalPassword"><button>cerrar</button></form>
   </dialog>
 </template>
+
+<style scoped>
+.font-display { font-family: var(--font-display); }
+
+/* Enlace lateral: indicador de activo a la izquierda, sin depender solo de color */
+/* daisy trae .menu con width:fit-content: el ul y sus filas se encogen
+   al texto. Se fuerza ancho completo para que activo/hover pinten la fila. */
+.side ul.menu { width: 100%; }
+.side ul.menu li { width: 100%; }
+.side-link {
+  position: relative;
+  display: flex;
+  width: 100%;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  min-height: 2.75rem;
+  align-items: center;
+}
+/* Dock móvil: área táctil mínima + zona segura del notch */
+.dock a, .dock label { min-height: 2.75rem; }
+.dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+.side-link:hover { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
+.side-link:focus-visible {
+  outline: 2px solid var(--color-dorado);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+}
+.side-link.side-active {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.side-link.side-active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-dorado);
+}
+.topbar :focus-visible {
+  outline: 2px solid var(--color-dorado);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+}
+.topbar ::selection { background: var(--color-dorado); color: var(--color-marino); }
+
+.side nav::-webkit-scrollbar { width: 8px; }
+.side nav::-webkit-scrollbar-thumb {
+  background: var(--color-base-300);
+  border-radius: 999px;
+}
+.side ::selection { background: var(--color-dorado); color: var(--color-marino); }
+
+@media (prefers-reduced-motion: reduce) {
+  .side * { transition: none !important; }
+}
+</style>

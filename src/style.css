@@ -27,6 +27,11 @@
   --color-warning-content: #FFFFFF;
   --color-error: #C0392B;
   --color-error-content: #FFFFFF;
+  /* Marca institucional U.E. — tokens propios, disponibles como bg-/text-/border-dorado */
+  --color-dorado: #C9A227;
+  --color-dorado-claro: #E8C86A;
+  --color-marino: #0C2743;
+  --color-marino-claro: #102E4F;
   --radius-box: 0.75rem;
   --radius-field: 0.5rem;
   --radius-selector: 0.5rem;
@@ -53,6 +58,30 @@ body {
 
 h1, h2, h3, h4, .font-display {
   font-family: var(--font-display);
+}
+
+/* ── Marca institucional compartida ───────────────────────────────────── */
+/* Panel marino fijo (hero, sidebar): mismo en claro y oscuro por identidad */
+.bg-marino {
+  background: linear-gradient(180deg, var(--color-marino-claro) 0%, var(--color-marino) 60%, #081B30 100%);
+}
+
+/* Foco visible de marca: dorado + halo primario para contraste en claro */
+.foco-marca:focus-visible {
+  outline: 2px solid var(--color-dorado);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+}
+@supports (background: color-mix(in srgb, red 10%, transparent)) {
+  .foco-marca:focus-visible {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 25%, transparent);
+  }
+}
+
+/* Fallback sin color-mix: tono base en vez de tinte de primario */
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+  .side-link:hover { background: var(--color-base-300); }
+  .side-link.side-active { background: var(--color-base-300); }
 }
 
 /* Transiciones suaves para cambios de ruta */
@@ -90,6 +119,11 @@ h1, h2, h3, h4, .font-display {
   --color-warning-content: #2a1700;
   --color-error: #f43f5e;
   --color-error-content: #2a000a;
+  /* Marca institucional — en oscuro el dorado claro mantiene contraste */
+  --color-dorado: #C9A227;
+  --color-dorado-claro: #E8C86A;
+  --color-marino: #0C2743;
+  --color-marino-claro: #102E4F;
   --radius-box: 0.75rem;
   --radius-field: 0.5rem;
   --radius-selector: 0.5rem;

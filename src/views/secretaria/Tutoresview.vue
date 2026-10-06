@@ -333,20 +333,29 @@ async function exportar() {
             <td class="font-mono text-sm">{{ t.ci }}</td>
             <td class="text-sm">{{ t.ocupacion ?? '—' }}</td>
 <td>
-  <div class="flex flex-col gap-1 max-w-xs">
-    <div
+  <div v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</div>
+  <ul v-else class="min-w-52 divide-y divide-base-300/60 rounded-2xl border border-base-300/70 bg-base-200/40" :aria-label="`Hijos de ${t.nombre} ${t.apellido}`">
+    <li
       v-for="v in t.estudiantes"
       :key="v.estudiante?.id"
-      class="flex items-center gap-2 bg-base-200 rounded-field px-2 py-1 text-xs"
+      class="flex items-center gap-2.5 py-1.5 pl-2.5 pr-1.5"
     >
-      <span class="flex-1">{{ v.estudiante?.nombre }} {{ v.estudiante?.apellido }}</span>
-      <span class="badge badge-xs badge-ghost shrink-0">{{ v.parentesco }}</span>
-      <button class="text-error shrink-0" @click="desvincular(t, v.estudiante!.id)">
-        <AppIcon nombre="cerrar" class="h-3 w-3" />
+      <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[11px] font-bold text-primary" aria-hidden="true">
+        {{ `${v.estudiante?.nombre?.[0] ?? ''}${v.estudiante?.apellido?.[0] ?? ''}`.toUpperCase() }}
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-xs font-semibold leading-tight">{{ v.estudiante?.nombre }} {{ v.estudiante?.apellido }}</span>
+        <span class="block text-[11px] capitalize leading-tight text-base-content/50">{{ v.parentesco.toLowerCase() }}</span>
+      </span>
+      <button type="button"
+        class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-error transition hover:bg-error/15"
+        :title="`Desvincular a ${v.estudiante?.nombre} ${v.estudiante?.apellido}`"
+        :aria-label="`Desvincular a ${v.estudiante?.nombre} ${v.estudiante?.apellido}`"
+        @click="desvincular(t, v.estudiante!.id)">
+        <AppIcon nombre="cerrar" class="h-3.5 w-3.5" />
       </button>
-    </div>
-    <span v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</span>
-  </div>
+    </li>
+  </ul>
 </td>
             <td>
               <div v-if="t.usuario" class="flex items-center gap-2">
@@ -363,11 +372,11 @@ async function exportar() {
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
             <td>
-              <div class="flex gap-1 flex-wrap">
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(t)">Editar</button>
-                <button class="btn btn-outline btn-xs btn-info" @click="abrirVincularEstudiante(t)">+ Estudiante</button>
-                <button v-if="!t.usuario" class="btn btn-outline btn-xs btn-warning" @click="abrirVincularCuenta(t)">Vincular cuenta</button>
-                <button v-if="t.usuario" class="btn btn-ghost btn-xs" @click="abrirReset(t)">Reset pass</button>
+              <div class="flex gap-1 flex-nowrap whitespace-nowrap">
+                <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(t)">Editar</button>
+                <button class="btn btn-outline btn-sm min-h-11 btn-info" @click="abrirVincularEstudiante(t)">+ Estudiante</button>
+                <button v-if="!t.usuario" class="btn btn-outline btn-sm min-h-11 btn-warning" @click="abrirVincularCuenta(t)">Vincular cuenta</button>
+                <button v-if="t.usuario" class="btn btn-ghost btn-sm min-h-11" @click="abrirReset(t)">Reset pass</button>
               </div>
             </td>
           </tr>
