@@ -413,7 +413,11 @@ onMounted(async () => {
       <!-- ── 4. MEJORES + INSCRIPCIONES ────────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <template v-if="detalleAcademico">
-          <MejoresGestion :detalle="detalleAcademico" />
+          <MejoresGestion
+            :detalle="detalleAcademico"
+            :trimestre-numero="trimestreActivo?.numero ?? null"
+            :trimestre-nombre="trimestreActivo?.nombre ?? ''"
+          />
           <EstadoInscripciones :detalle="detalleAcademico" />
         </template>
         <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error xl:col-span-2">
