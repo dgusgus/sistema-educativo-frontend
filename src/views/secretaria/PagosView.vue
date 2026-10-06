@@ -79,15 +79,26 @@ function abrirModal(conceptoPagoId = 0, monto = 0) {
   modalAbierto.value = true
 }
 
+// Saldo pendiente del concepto elegido en el modal (lo máximo que se puede cobrar)
+const conceptoElegido = computed(() => datos.value?.estadoPorConcepto.find(c => c.concepto.id === form.value.conceptoPagoId))
+const saldoElegido    = computed(() => conceptoElegido.value?.saldo ?? 0)
+
+// Al elegir otro concepto, se sugiere cobrar lo que falta (el cajero puede bajar el monto para un abono)
+function alElegirConcepto() {
+  if (conceptoElegido.value) form.value.montoPagado = conceptoElegido.value.saldo
+}
+
 async function registrar() {
   if (!form.value.conceptoPagoId) { errorModal.value = 'Seleccioná un concepto'; return }
   if (form.value.montoPagado <= 0) { errorModal.value = 'El monto debe ser mayor a 0'; return }
   guardando.value = true
   errorModal.value = null
   try {
-    await pagoApi.registrar(form.value)
+    const pago = await pagoApi.registrar(form.value)
     modalAbierto.value = false
-    toast.success('Pago registrado')
+    toast.success(pago.saldoPendiente > 0
+      ? `Abono registrado. Saldo del concepto: Bs. ${pago.saldoPendiente.toLocaleString('es-BO')}`
+      : 'Pago registrado: concepto saldado')
     await recargar()
   } catch (e) {
     errorModal.value = e instanceof Error ? e.message : 'Error al registrar'
@@ -255,7 +266,7 @@ async function crearConcepto() {
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>
-                <tr><th>Concepto</th><th>Monto</th><th>Estado</th><th>Recibo</th><th></th></tr>
+                <tr><th>Concepto</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Último recibo</th><th></th></tr>
               </thead>
               <tbody>
                 <tr v-for="c in datos.estadoPorConcepto" :key="c.concepto.id" class="hover">
@@ -264,20 +275,27 @@ async function crearConcepto() {
                     <span v-if="c.obligatorio" class="badge badge-xs badge-ghost ml-1">obligatorio</span>
                   </td>
                   <td>Bs. {{ c.concepto.monto }}</td>
+                  <td class="text-base-content/70">
+                    {{ c.montoPagado > 0 ? `Bs. ${c.montoPagado.toLocaleString('es-BO')}` : '—' }}
+                    <span v-if="c.abonos > 1" class="text-xs text-base-content/40">({{ c.abonos }} pagos)</span>
+                  </td>
+                  <td :class="c.saldo > 0 ? 'font-semibold' : 'text-base-content/40'">
+                    {{ c.saldo > 0 ? `Bs. ${c.saldo.toLocaleString('es-BO')}` : '—' }}
+                  </td>
                   <td>
                     <StatusBadge :estado="c.estado" />
                   </td>
                   <td class="font-mono text-xs text-base-content/60">{{ c.numeroRecibo ?? '—' }}</td>
                   <td>
-                    <button v-if="c.estado === 'PENDIENTE'"
+                    <button v-if="c.estado !== 'PAGADO'"
                       class="btn btn-primary btn-xs"
-                      @click="abrirModal(c.concepto.id, c.concepto.monto)">
-                      Pagar
+                      @click="abrirModal(c.concepto.id, c.saldo)">
+                      {{ c.estado === 'PARCIAL' ? 'Abonar' : 'Pagar' }}
                     </button>
                   </td>
                 </tr>
                 <tr v-if="!datos.estadoPorConcepto.length">
-                  <td colspan="5" class="text-center text-base-content/40 py-4">
+                  <td colspan="7" class="text-center text-base-content/40 py-4">
                     No hay conceptos de pago definidos para esta gestión —
                     <button class="link link-primary" @click="abrirConceptos">creá uno</button>
                   </td>
@@ -309,7 +327,7 @@ async function crearConcepto() {
                 <td class="text-sm text-base-content/60">{{ formatoFecha(p.fechaPago) }}</td>
                 <td><StatusBadge :estado="p.estado" /></td>
                 <td>
-                  <button v-if="p.estado === 'PAGADO'"
+                  <button v-if="p.estado === 'PAGADO' || p.estado === 'PARCIAL'"
                     class="btn btn-ghost btn-xs text-error"
                     :disabled="anulando === p.id"
                     @click="anular(p.id)">
@@ -340,17 +358,21 @@ async function crearConcepto() {
       <form class="space-y-3" @submit.prevent="registrar">
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Concepto *</legend>
-          <select v-model="form.conceptoPagoId" class="select select-bordered w-full" :disabled="guardando">
+          <select v-model="form.conceptoPagoId" class="select select-bordered w-full" :disabled="guardando" @change="alElegirConcepto">
             <option :value="0" disabled>Seleccioná un concepto</option>
-            <option v-for="c in datos?.estadoPorConcepto" :key="c.concepto.id" :value="c.concepto.id">
-              {{ c.concepto.nombre }} — Bs. {{ c.concepto.monto }}
+            <option v-for="c in datos?.estadoPorConcepto" :key="c.concepto.id" :value="c.concepto.id" :disabled="c.estado === 'PAGADO'">
+              {{ c.concepto.nombre }} — {{ c.estado === 'PAGADO' ? 'pagado' : `saldo Bs. ${c.saldo}` }}
             </option>
           </select>
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Monto (Bs.) *</legend>
-          <input v-model="form.montoPagado" type="number" min="0.01" step="0.01"
+          <input v-model="form.montoPagado" type="number" min="0.01" step="0.01" :max="saldoElegido || undefined"
             class="input input-bordered w-full" :disabled="guardando" />
+          <p v-if="conceptoElegido" class="text-xs text-base-content/50 mt-1">
+            Saldo pendiente: Bs. {{ saldoElegido.toLocaleString('es-BO') }}.
+            Si cobras menos, queda como pago parcial y podrás registrar abonos después.
+          </p>
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Método de pago</legend>
