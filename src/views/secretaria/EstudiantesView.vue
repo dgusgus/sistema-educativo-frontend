@@ -13,7 +13,7 @@ import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
-import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
+import type { Estudiante, Inscripcion, EstadoInscripcion, Nivel } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
@@ -394,42 +394,9 @@ async function resetearPassword() {
   }
 }
 
-// ─── Registrar resultado final ────────────────────────────────────────────────
-const modalResultado = ref(false)
-const registrandoRes = ref(false)
-const errorResultado = ref<string | null>(null)
-const formResultado  = ref<{ resultado: ResultadoFinal; observaciones: string }>({ resultado: 'PROMOVIDO', observaciones: '' })
+// El resultado final del año (PROMOVIDO/REPROBADO) ya no se registra acá: se calcula
+// con los promedios finales y se confirma en lote en Promoción (Paso 1).
 
-function abrirResultado(insc: Inscripcion) {
-  inscripcionActiva.value = insc
-  formResultado.value = { resultado: 'PROMOVIDO', observaciones: '' }
-  errorResultado.value = null
-  modalResultado.value = true
-}
-
-async function registrarResultado() {
-  if (!inscripcionActiva.value) return
-  const ok = await confirmar({
-    mensaje: `¿Registrar como ${formResultado.value.resultado}? Queda en el historial académico del estudiante.`,
-    peligroso: formResultado.value.resultado === 'REPROBADO',
-  })
-  if (!ok) return
-  registrandoRes.value = true
-  errorResultado.value = null
-  try {
-    await estudianteApi.registrarResultado(inscripcionActiva.value.id, formResultado.value.resultado, formResultado.value.observaciones || undefined)
-    modalResultado.value = false
-    toast.success('Resultado registrado')
-    await cargar()
-  } catch (e) {
-    // El backend devuelve "hay trimestres sin cerrar" cuando corresponde —
-    // más útil que un mensaje genérico
-    errorResultado.value = e instanceof Error ? e.message : 'Error al registrar resultado'
-  } finally {
-    registrandoRes.value = false
-  }
-
-}
 const modalImportar = ref(false)
 
 async function onImportar(archivo: File): Promise<ResultadoImport> {
@@ -557,9 +524,6 @@ async function exportar() {
                   </li>
                   <li v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA'">
                     <button role="menuitem" @click="abrirCambiarEstado(ultimaInscripcion(e)!)"><AppIcon nombre="documento" class="h-4 w-4" />Cambiar estado</button>
-                  </li>
-                  <li v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA' && ultimaInscripcion(e)?.resultado === 'PENDIENTE'">
-                    <button role="menuitem" class="text-info" @click="abrirResultado(ultimaInscripcion(e)!)"><AppIcon nombre="reportes" class="h-4 w-4" />Registrar resultado</button>
                   </li>
                   <li v-if="inscritoEnGestionActiva(e)">
                     <button role="menuitem" class="text-error"
@@ -797,45 +761,6 @@ async function exportar() {
     <form method="dialog" class="modal-backdrop" @click="modalEstado = false"><button>cerrar</button></form>
   </dialog>
 
-  <!-- ── Modal resultado final ────────────────────────────────────────────── -->
-  <dialog :open="modalResultado" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Registrar resultado final</h3>
-      <p class="text-sm text-base-content/60 mb-4">{{ nombreCursoDeInscripcion(inscripcionActiva) }}</p>
-      <div role="alert" class="alert alert-warning py-2 text-sm mb-4">
-        <span>Requiere que los trimestres de la gestión estén cerrados.</span>
-      </div>
-      <div v-if="errorResultado" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorResultado }}</span></div>
-      <form class="space-y-3" @submit.prevent="registrarResultado">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Resultado *</legend>
-          <div class="flex gap-3">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input v-model="formResultado.resultado" type="radio" value="PROMOVIDO" class="radio radio-success" />
-              <span class="font-medium text-success">PROMOVIDO</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input v-model="formResultado.resultado" type="radio" value="REPROBADO" class="radio radio-error" />
-              <span class="font-medium text-error">REPROBADO</span>
-            </label>
-          </div>
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Observaciones</legend>
-          <textarea v-model="formResultado.observaciones" rows="2" class="textarea textarea-bordered w-full" :disabled="registrandoRes"></textarea>
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="registrandoRes" @click="modalResultado = false">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="registrandoRes">
-            <span v-if="registrandoRes" class="loading loading-spinner loading-sm"></span>
-            Registrar resultado
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalResultado = false"><button>cerrar</button></form>
-  </dialog>
-
   <!-- ── Modal resetear contraseña ────────────────────────────────────────── -->
   <dialog :open="modalReset" class="modal modal-bottom sm:modal-middle">
     <div class="modal-box">
@@ -861,6 +786,7 @@ async function exportar() {
     </div>
    <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
   </dialog>
+
 <ImportarExcelModal
   v-model="modalImportar"
   titulo="Importar estudiantes"

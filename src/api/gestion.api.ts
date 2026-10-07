@@ -60,6 +60,52 @@ export interface GestionPayload {
   notaMinimaAprobacion?:  number
 }
 
+// ─── Paso 1 de Promoción: resultado final del año ────────────────────────────
+// Lo calcula el backend desde los promedios finales (reprueba quien tenga
+// alguna materia bajo la nota mínima). El navegador nunca elige el resultado.
+export interface MateriaReprobada {
+  materia:  string
+  promedio: number
+}
+
+export interface CalculoResultado {
+  inscripcionId:       number
+  estudianteId:        number
+  estudiante:          string
+  ci:                  string | null
+  curso:               string
+  resultadoActual:     'PENDIENTE' | 'PROMOVIDO' | 'REPROBADO'
+  estado:              'LISTO' | 'INCOMPLETO'
+  sugerido:            'PROMOVIDO' | 'REPROBADO' | null
+  promedioGeneral:     number | null
+  totalMaterias:       number
+  materiasReprobadas:  MateriaReprobada[]
+  materiasSinPromedio: string[]
+  detalle:             string | null
+}
+
+export interface PropuestaResultados {
+  gestion: { id: number; anio: number; notaMinima: number }
+  resumen: {
+    total:         number
+    promovidos:    number
+    reprobados:    number
+    incompletos:   number
+    yaRegistrados: number
+    porRegistrar:  number
+  }
+  resultados: CalculoResultado[]
+}
+
+export interface ResultadoLote {
+  solicitados:  number
+  actualizados: number
+  promovidos:   number
+  reprobados:   number
+  sinCambios:   number
+  errores:      { inscripcionId: number; estudiante: string; error: string }[]
+}
+
 export const gestionApi = {
   // Cargado una vez al login y compartido vía gestion.store
   getActiva: () =>
@@ -105,4 +151,14 @@ export const gestionApi = {
         cursoSugerido: string | null
       }>
     }>(`/gestiones/${id}/propuesta-inscripciones`).then(r => r.data),
+
+  // Paso 1 de Promoción: calcula (sin escribir) el resultado del año de cada
+  // estudiante. Requiere los trimestres de la gestión cerrados.
+  getPropuestaResultados: (id: number) =>
+    api.get<PropuestaResultados>(`/gestiones/${id}/propuesta-resultados`).then(r => r.data),
+
+  // Registra en lote el resultado del año. Se envían SOLO los ids: el
+  // servidor recalcula y escribe el resultado que corresponde.
+  registrarResultados: (id: number, inscripcionIds: number[]) =>
+    api.post<ResultadoLote>(`/gestiones/${id}/resultados`, { inscripcionIds }).then(r => r.data),
 }

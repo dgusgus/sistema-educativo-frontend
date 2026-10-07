@@ -1,6 +1,16 @@
 <script setup lang="ts">
 /**
- * PromocionView — resuelve el "trabajo de 1000 estudiantes uno por uno".
+ * PromocionView — resuelve el "trabajo de 1000 estudiantes uno por uno" en dos pasos:
+ *
+ * PASO 1 · Resultados finales del año (PROMOVIDO / REPROBADO).
+ *   El backend lo CALCULA con los promedios finales que cargaron los docentes
+ *   (GET /gestiones/:id/propuesta-resultados): reprueba quien tenga alguna
+ *   materia bajo la nota mínima. Acá solo se revisa y se confirma en lote
+ *   (POST /gestiones/:id/resultados, que manda solo ids — el servidor
+ *   vuelve a calcular). Se hace con la gestión todavía ACTIVA: el Director no
+ *   puede cerrarla mientras haya estudiantes sin resultado.
+ *
+ * PASO 2 · Inscripción a la gestión siguiente.
  * El backend YA calcula quién promueve, quién repite y quién egresa
  * (GET /gestiones/:id/propuesta-inscripciones, usando la progresión
  * 1°→2°→...→6° Primaria → 1°→...→6° Secundaria → egresado). Acá se
@@ -10,14 +20,16 @@
  * permanente: solo se crean Inscripcion nuevas.
  */
 import { ref, computed, onMounted } from 'vue'
-import { gestionApi, type GestionResumen } from '@/api/gestion.api'
+import { gestionApi, type GestionResumen, type PropuestaResultados, type ResultadoLote } from '@/api/gestion.api'
 import { cursoApi } from '@/api/estructura.api'
 import { estudianteApi } from '@/api/estudiante.api'
 import { useToastStore } from '@/stores/toast.store'
+import { useConfirm } from '@/composables/useConfirm'
 import type { Curso } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 const toast = useToastStore()
+const { confirmar } = useConfirm()
 
 const gestiones = ref<GestionResumen[]>([])
 const gestionOrigen  = ref<number | ''>('')
@@ -32,10 +44,87 @@ onMounted(async () => {
     const anterior = gestiones.value.find(g => !g.activa)
     if (activa)    gestionDestino.value = activa.id
     if (anterior)  gestionOrigen.value  = anterior.id
+    // Paso 1: los resultados se registran con la gestión todavía activa.
+    gestionResultados.value = (activa ?? gestiones.value[0])?.id ?? ''
   } catch {
     gestiones.value = []
   }
 })
+
+// ─── Paso 1: resultados finales del año ──────────────────────────────────────
+const gestionResultados = ref<number | ''>('')
+const calculo = ref<PropuestaResultados | null>(null)
+const calculando = ref(false)
+const errorResultados = ref<string | null>(null)
+const seleccionResultados = ref<Record<number, boolean>>({})
+const registrando = ref(false)
+const reporteRegistro = ref<ResultadoLote | null>(null)
+const soloPorRegistrar = ref(true)
+
+// Estudiantes con todos sus promedios finales (se puede decidir su resultado)
+const listos = computed(() => (calculo.value?.resultados ?? []).filter(r => r.estado === 'LISTO'))
+const incompletos = computed(() => (calculo.value?.resultados ?? []).filter(r => r.estado === 'INCOMPLETO'))
+const filasVisibles = computed(() =>
+  soloPorRegistrar.value ? listos.value.filter(r => r.resultadoActual !== r.sugerido) : listos.value
+)
+const totalSeleccionadosRes = computed(() =>
+  listos.value.filter(r => seleccionResultados.value[r.inscripcionId]).length
+)
+const todoRegistrado = computed(() =>
+  !!calculo.value && calculo.value.resumen.total > 0
+  && calculo.value.resumen.porRegistrar === 0 && calculo.value.resumen.incompletos === 0
+)
+
+async function calcularResultados(limpiarReporte = true) {
+  if (!gestionResultados.value) { errorResultados.value = 'Elegí la gestión'; return }
+  calculando.value = true
+  errorResultados.value = null
+  calculo.value = null
+  seleccionResultados.value = {}
+  if (limpiarReporte) reporteRegistro.value = null
+  try {
+    calculo.value = await gestionApi.getPropuestaResultados(Number(gestionResultados.value))
+    // Por defecto se marcan los que todavía no tienen el resultado que les corresponde.
+    calculo.value.resultados.forEach(r => {
+      seleccionResultados.value[r.inscripcionId] = r.estado === 'LISTO' && r.resultadoActual !== r.sugerido
+    })
+  } catch (e) {
+    errorResultados.value = e instanceof Error ? e.message : 'Error al calcular los resultados'
+  } finally {
+    calculando.value = false
+  }
+}
+
+function marcarTodosResultados(valor: boolean) {
+  filasVisibles.value.forEach(r => { seleccionResultados.value[r.inscripcionId] = valor })
+}
+
+async function registrarResultados() {
+  const elegidos = listos.value.filter(r => seleccionResultados.value[r.inscripcionId])
+  if (!elegidos.length) { errorResultados.value = 'No hay estudiantes seleccionados'; return }
+  const aReprobar = elegidos.filter(r => r.sugerido === 'REPROBADO').length
+  const aPromover = elegidos.length - aReprobar
+
+  const ok = await confirmar({
+    titulo: 'Registrar resultados del año',
+    mensaje: `Se registrarán ${elegidos.length} resultado(s): ${aPromover} PROMOVIDO y ${aReprobar} REPROBADO, calculados con los promedios finales. Quedan en el historial académico.`,
+    peligroso: aReprobar > 0,
+  })
+  if (!ok) return
+
+  registrando.value = true
+  errorResultados.value = null
+  try {
+    const r = await gestionApi.registrarResultados(Number(gestionResultados.value), elegidos.map(e => e.inscripcionId))
+    reporteRegistro.value = r
+    toast.success(`Resultados registrados: ${r.actualizados}`)
+    await calcularResultados(false)
+  } catch (e) {
+    errorResultados.value = e instanceof Error ? e.message : 'Error al registrar los resultados'
+  } finally {
+    registrando.value = false
+  }
+}
 
 // ─── Propuesta ────────────────────────────────────────────────────────────────
 interface PropuestaItem {
@@ -172,9 +261,157 @@ async function confirmarMatricula() {
     <div>
       <h2 class="font-display text-2xl font-bold tracking-tight">Promoción de Gestión</h2>
       <p class="mt-0.5 text-sm text-base-content/60">
-        Matricula masivamente a la gestión siguiente usando la progresión automática
-        (1°→2°→...→6° Primaria → 1°→...→6° Secundaria → egresado). El Estudiante no se
-        duplica ni se vuelve a crear — solo se genera su inscripción nueva.
+        Primero se registra el resultado final del año de cada estudiante (Paso 1) y después se
+        lo matricula en la gestión siguiente con la progresión automática (Paso 2). El Estudiante
+        no se duplica ni se vuelve a crear — solo se genera su inscripción nueva.
+      </p>
+    </div>
+
+    <!-- ═══ PASO 1 · Resultados finales del año ═══════════════════════════ -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body py-3 space-y-1">
+        <h3 class="font-semibold">Paso 1 · Resultados finales del año</h3>
+        <p class="text-sm text-base-content/60">
+          El resultado se calcula con los promedios finales de cada materia: reprueba el año quien
+          tenga alguna materia con promedio menor a la nota mínima de la gestión. No se elige a mano,
+          así nadie puede promover a quien reprobó. Requiere los trimestres cerrados.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-2">
+          <fieldset class="fieldset md:col-span-2">
+            <legend class="fieldset-legend text-xs">Gestión</legend>
+            <select v-model="gestionResultados" class="select select-bordered w-full">
+              <option value="" disabled>Seleccionar</option>
+              <option v-for="g in gestiones" :key="g.id" :value="g.id">{{ g.anio }} {{ g.activa ? '(activa)' : '' }}</option>
+            </select>
+          </fieldset>
+          <button class="btn btn-primary" :disabled="calculando || !gestionResultados" @click="calcularResultados()">
+            <span v-if="calculando" class="loading loading-spinner loading-sm"></span>
+            Calcular resultados
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="errorResultados" role="alert" class="alert alert-error">
+      <span class="flex-1">{{ errorResultados }}</span>
+    </div>
+
+    <template v-if="calculo">
+      <p class="text-xs text-base-content/50">
+        Gestión {{ calculo.gestion.anio }} · nota mínima de aprobación: {{ calculo.gestion.notaMinima }}
+      </p>
+
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Estudiantes</p><p class="text-xl font-bold">{{ calculo.resumen.total }}</p></div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Promovidos</p><p class="text-xl font-bold text-success">{{ calculo.resumen.promovidos }}</p></div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Reprobados</p><p class="text-xl font-bold text-error">{{ calculo.resumen.reprobados }}</p></div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Incompletos</p><p class="text-xl font-bold text-warning">{{ calculo.resumen.incompletos }}</p></div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Por registrar</p><p class="text-xl font-bold text-info">{{ calculo.resumen.porRegistrar }}</p></div></div>
+      </div>
+
+      <div v-if="todoRegistrado" role="alert" class="alert alert-success text-sm">
+        <span>Todos los estudiantes ya tienen su resultado. El Director puede cerrar la gestión (en Gestiones) y después podés continuar con el Paso 2.</span>
+      </div>
+
+      <!-- Incompletos: no se pueden decidir hasta tener todos los promedios finales -->
+      <div v-if="incompletos.length" class="card bg-base-100 shadow">
+        <div class="card-body py-3">
+          <h3 class="font-semibold mb-1 text-warning">Sin promedios completos ({{ incompletos.length }})</h3>
+          <p class="text-xs text-base-content/60 mb-2">
+            Los promedios finales se generan al cerrar el último trimestre. Completar las notas pendientes y volver a calcular.
+          </p>
+          <div class="overflow-x-auto max-h-48 overflow-y-auto">
+            <table class="table table-xs">
+              <tbody>
+                <tr v-for="r in incompletos" :key="r.inscripcionId">
+                  <td>{{ r.estudiante }}</td>
+                  <td class="text-xs text-base-content/50">{{ r.curso }}</td>
+                  <td class="text-xs text-warning">{{ r.detalle }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultados calculados -->
+      <div v-if="listos.length" class="card bg-base-100 shadow">
+        <div class="card-body py-3">
+          <div class="flex flex-wrap items-center gap-3 mb-2">
+            <h3 class="font-semibold">Resultados calculados ({{ filasVisibles.length }})</h3>
+            <label class="label cursor-pointer gap-2 ml-auto">
+              <input v-model="soloPorRegistrar" type="checkbox" class="checkbox checkbox-sm" />
+              <span class="text-xs">Solo los que faltan registrar</span>
+            </label>
+            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosResultados(true)">Marcar todos</button>
+            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosResultados(false)">Desmarcar todos</button>
+          </div>
+          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="table table-xs">
+              <thead>
+                <tr>
+                  <th class="w-12"></th>
+                  <th>Estudiante</th>
+                  <th>Curso</th>
+                  <th class="text-right">Promedio</th>
+                  <th>Materias reprobadas</th>
+                  <th>Resultado</th>
+                  <th>Actual</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in filasVisibles" :key="r.inscripcionId" class="hover">
+                  <td class="text-center"><input v-model="seleccionResultados[r.inscripcionId]" type="checkbox" class="checkbox checkbox-md" :aria-label="`Seleccionar a ${r.estudiante}`" /></td>
+                  <td>
+                    {{ r.estudiante }}
+                    <span v-if="r.ci" class="block font-mono text-xs text-base-content/50">{{ r.ci }}</span>
+                  </td>
+                  <td class="text-xs text-base-content/50">{{ r.curso }}</td>
+                  <td class="text-right font-mono">{{ r.promedioGeneral ?? '—' }}</td>
+                  <td>
+                    <span v-if="!r.materiasReprobadas.length" class="text-base-content/30">—</span>
+                    <span v-for="m in r.materiasReprobadas" :key="m.materia" class="badge badge-error badge-outline badge-xs mr-1 mb-0.5">{{ m.materia }} ({{ m.promedio }})</span>
+                  </td>
+                  <td><StatusBadge :estado="r.sugerido ?? 'PENDIENTE'" tamano="xs" /></td>
+                  <td><StatusBadge :estado="r.resultadoActual" tamano="xs" /></td>
+                </tr>
+                <tr v-if="!filasVisibles.length">
+                  <td colspan="7" class="text-center text-sm text-base-content/50 py-4">No hay estudiantes pendientes de registrar.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="listos.length" class="card bg-base-100 shadow">
+        <div class="card-body py-3 flex flex-wrap items-center gap-3">
+          <span class="font-semibold">{{ totalSeleccionadosRes }} estudiante(s) seleccionados para registrar</span>
+          <button class="btn btn-primary ml-auto" :disabled="registrando || !totalSeleccionadosRes" @click="registrarResultados">
+            <span v-if="registrando" class="loading loading-spinner loading-sm"></span>
+            {{ registrando ? 'Registrando...' : 'Registrar resultados' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="reporteRegistro" role="alert" class="alert" :class="reporteRegistro.errores.length ? 'alert-warning' : 'alert-success'">
+        <div>
+          <p>
+            <strong>{{ reporteRegistro.actualizados }}</strong> resultado(s) registrados
+            ({{ reporteRegistro.promovidos }} promovidos, {{ reporteRegistro.reprobados }} reprobados)<template v-if="reporteRegistro.sinCambios"> — {{ reporteRegistro.sinCambios }} ya estaban registrados</template><template v-if="reporteRegistro.errores.length"> — <strong>{{ reporteRegistro.errores.length }}</strong> con error</template>.
+          </p>
+          <ul v-if="reporteRegistro.errores.length" class="text-xs mt-2 list-disc list-inside max-h-32 overflow-y-auto">
+            <li v-for="e in reporteRegistro.errores" :key="e.inscripcionId">{{ e.estudiante }}: {{ e.error }}</li>
+          </ul>
+        </div>
+      </div>
+    </template>
+
+    <!-- ═══ PASO 2 · Inscripción a la gestión siguiente ═══════════════════ -->
+    <div class="pt-2">
+      <h3 class="font-semibold">Paso 2 · Inscripción a la gestión siguiente</h3>
+      <p class="text-sm text-base-content/60">
+        Normalmente se hace con la gestión de origen ya cerrada por el Director.
       </p>
     </div>
 
@@ -223,7 +460,7 @@ async function confirmarMatricula() {
       </div>
 
       <div v-if="propuesta.resumen.revisarManualmente > 0" role="alert" class="alert alert-warning text-sm">
-        <span>{{ propuesta.resumen.revisarManualmente }} estudiante(s) sin resultado final registrado — no se incluyen en el lote. Registralos primero en Estudiantes.</span>
+        <span>{{ propuesta.resumen.revisarManualmente }} estudiante(s) sin resultado final registrado — no se incluyen en el lote. Registrar primero su resultado en el Paso 1.</span>
       </div>
 
       <!-- Grupos: elegir curso destino real por cada nivel/grado sugerido -->
