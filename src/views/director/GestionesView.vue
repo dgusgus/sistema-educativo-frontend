@@ -17,57 +17,34 @@
  * permite crear la gestión primero y asignar el director cuando corresponda.
  */
 import { ref, computed, onMounted } from 'vue'
-import { gestionApi, type GestionResumen } from '@/api/gestion.api'
+import { gestionApi, type GestionResumen, type ResultadoCopia } from '@/api/gestion.api'
 import { useGestionStore } from '@/stores/gestion.store'
-import api from '@/api/axios'
+import { useCatalogoStore } from '@/stores/catalogo.store'
+import { directorApi } from '@/api/director.api'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
-import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import GestionCrearModal from '@/components/gestiones/GestionCrearModal.vue'
+import GestionCopiarModal from '@/components/gestiones/GestionCopiarModal.vue'
+import GestionDirectorModal, { type DirectorOpcion } from '@/components/gestiones/GestionDirectorModal.vue'
+import GestionEditarModal from '@/components/gestiones/GestionEditarModal.vue'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
-
 const gestionStore = useGestionStore()
+const catalogo = useCatalogoStore()
 
 // ─── Estado principal ─────────────────────────────────────────────────────────
 const gestiones = ref<GestionResumen[]>([])
 const cargando  = ref(true)
 const error     = ref<string | null>(null)
+// Resumen de la última copia de estructura (al crear o con "Copiar estructura")
+const resultadoCopia = ref<ResultadoCopia | null>(null)
 
-// ─── Lista de directores disponibles ─────────────────────────────────────────
-// ¿Para qué? El modal de "asignar director" necesita mostrar un selector
-// con todos los directores del sistema — no solo el activo.
-// Ej: hay 3 directores registrados históricamente, cualquiera puede
-// ser asignado a cualquier gestión.
-interface DirectorOpcion {
-  id:       number
-  nombre:   string
-  apellido: string
-  activo:   boolean
-}
-const directores   = ref<DirectorOpcion[]>([])
-const cargandoDir  = ref(false)
+// Directores del sistema (no solo el activo): cualquiera puede asignarse a cualquier gestión.
+const directores  = ref<DirectorOpcion[]>([])
+const cargandoDir = ref(false)
 
-// ─── Modal crear gestión ──────────────────────────────────────────────────────
-const modalCrear  = ref(false)
-const guardando   = ref(false)
-const errorModal  = ref<string | null>(null)
-const formCrear   = ref({ anio: new Date().getFullYear() + 1, descripcion: '' })
-
-// ─── Modal asignar director ───────────────────────────────────────────────────
-// ¿Por qué un modal separado para asignar director?
-// Porque es una acción institucional importante — cambiar quién dirige
-// el año académico tiene implicancias en boletines, reportes y firma
-// de documentos. Tenerlo en un modal propio obliga a que sea intencional,
-// no un campo más del formulario de crear gestión.
-const modalDirector     = ref(false)
-const asignando         = ref(false)
-const errorDirector     = ref<string | null>(null)
-const gestionSeleccionada = ref<GestionResumen | null>(null)
-const directorIdSelecto = ref<number | ''>('')
-
-// ─── Carga inicial ────────────────────────────────────────────────────────────
 onMounted(async () => {
   await Promise.all([cargar(), cargarDirectores()])
 })
@@ -76,7 +53,7 @@ async function cargar() {
   cargando.value = true
   error.value    = null
   try {
-    gestiones.value = await gestionApi.getAll()
+    gestiones.value = [...(await catalogo.gestiones(true))]
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar gestiones'
   } finally {
@@ -85,63 +62,63 @@ async function cargar() {
 }
 
 async function cargarDirectores() {
-  // ¿Por qué llamamos directamente a /directores en lugar de usar un store?
-  // Porque la lista de directores solo se necesita en este modal.
-  // No vale la pena un store dedicado para una lista que se usa en un solo lugar.
   cargandoDir.value = true
   try {
-    const { data } = await api.get<DirectorOpcion[]>('/directores')
-    directores.value = data
+    directores.value = await directorApi.getAll() as DirectorOpcion[]
   } catch {
-    // Si falla, el modal mostrará un mensaje — no es un error crítico
-    // porque el Director puede reintentar abriendo el modal de nuevo.
+    // No es crítico: el Director puede reintentar abriendo el modal de nuevo.
     directores.value = []
   } finally {
     cargandoDir.value = false
   }
 }
 
-// ─── Crear gestión ────────────────────────────────────────────────────────────
-function abrirCrear() {
-  // ¿Por qué sugerir el año siguiente?
-  // El Director crea la gestión 2026 durante el año 2025, generalmente
-  // en los últimos meses. Pre-llenar con el año siguiente ahorra
-  // que tenga que escribirlo manualmente cada vez.
-  formCrear.value  = {
-    anio:        new Date().getFullYear() + 1,
-    descripcion: `Gestión Escolar ${new Date().getFullYear() + 1}`,
-  }
-  errorModal.value = null
-  modalCrear.value = true
+// ─── Modales: uno abierto a la vez ────────────────────────────────────────────
+type Modal = 'crear' | 'copiar' | 'director' | 'editar' | null
+const modal = ref<Modal>(null)
+const seleccionadaId = ref<number | null>(null)
+const seleccionada = computed(() => gestiones.value.find(g => g.id === seleccionadaId.value) ?? null)
+
+function abrir(m: Exclude<Modal, null>, g?: GestionResumen) {
+  if (m === 'crear') resultadoCopia.value = null
+  seleccionadaId.value = g?.id ?? null
+  modal.value = m
+}
+const cerrar = () => { modal.value = null }
+
+// ─── Reacciones a lo que hacen los modales ────────────────────────────────────
+async function alCrear(p: { anio: number; copia: ResultadoCopia | null }) {
+  resultadoCopia.value = p.copia
+  await cargar()   // refresca la tabla con los conteos reales (cursos, inscritos)
+  toast.success(`Gestión ${p.anio} creada`)
 }
 
-async function crearGestion() {
-  if (!formCrear.value.anio) {
-    errorModal.value = 'El año es obligatorio'
-    return
-  }
-  guardando.value  = true
-  errorModal.value = null
-  try {
-    const nueva = await gestionApi.create({
-      anio:        formCrear.value.anio,
-      descripcion: formCrear.value.descripcion || undefined,
-    })
-    gestiones.value.unshift(nueva)
-    modalCrear.value = false
-    toast.success(`Gestión ${nueva.anio} creada`)
-  } catch (e) {
-    errorModal.value = e instanceof Error ? e.message : 'Error al crear gestión'
-  } finally {
-    guardando.value = false
-  }
+async function alCopiar(p: { destinoAnio: number; resultado: ResultadoCopia }) {
+  resultadoCopia.value = p.resultado
+  toast.success(`Estructura copiada a la gestión ${p.destinoAnio}`)
+  await cargar()
+}
+
+// Se actualiza la fila en memoria (sabemos exactamente qué cambió) en vez de recargar la lista.
+async function alAsignarDirector(p: { gestionId: number; director: { id: number; nombre: string; apellido: string } }) {
+  const g = gestiones.value.find(x => x.id === p.gestionId)
+  if (!g) return
+  g.director = p.director
+  // Si es la activa, se recarga el store para que el nombre se actualice en el sidebar/dashboard.
+  if (g.activa) await gestionStore.recargar()
+}
+
+async function alEditar(p: { id: number; anio: number; activa: boolean; descripcion: string | null; notaMinimaAprobacion: number }) {
+  const g = gestiones.value.find(x => x.id === p.id)
+  if (g) { g.descripcion = p.descripcion; g.notaMinimaAprobacion = p.notaMinimaAprobacion }
+  if (p.activa) await gestionStore.recargar()
+  toast.success(`Gestión ${p.anio} actualizada`)
 }
 
 // ─── Activar gestión ──────────────────────────────────────────────────────────
-// ¿Qué hace activar? Pone activa=true en esta gestión y activa=false
-// en TODAS las demás. Solo puede haber una gestión activa a la vez.
-// ¿Por qué un confirm()? Porque es una operación que afecta a todo el sistema —
-// todos los módulos empezarán a usar los cursos y trimestres de la nueva gestión.
+// Pone activa=true en esta gestión y false en TODAS las demás (solo una activa a la vez).
+// Pide confirmación porque afecta a todo el sistema: todos los módulos pasan a usar
+// los cursos y trimestres de la nueva gestión.
 const activando = ref<number | null>(null)
 
 async function activar(g: GestionResumen) {
@@ -156,14 +133,10 @@ async function activar(g: GestionResumen) {
   error.value     = null
   try {
     await gestionApi.activar(g.id)
-    // Actualizar la lista localmente — marcar la nueva como activa
-    // y las demás como inactivas, sin recargar todo del backend.
+    catalogo.invalidar('gestiones')
     gestiones.value.forEach(x => { x.activa = x.id === g.id })
-    // Recargar el store global para que todos los módulos vean la nueva gestión
-    // ¿Por qué recargar el store y no solo la lista local?
-    // Porque gestionStore.gestion es lo que usa TODO el sistema
-    // (AsistenciaView, CalificacionesView, EstudiantesView, etc.).
-    // Si no lo recargamos, esos módulos seguirían viendo la gestión anterior.
+    // gestionStore.gestion es lo que usa TODO el sistema (Asistencia, Calificaciones...):
+    // si no se recarga, esos módulos seguirían viendo la gestión anterior.
     await gestionStore.recargar()
     toast.success(`Gestión ${g.anio} activada`)
   } catch (e) {
@@ -173,103 +146,9 @@ async function activar(g: GestionResumen) {
   }
 }
 
-// ─── Asignar director ─────────────────────────────────────────────────────────
-function abrirAsignarDirector(g: GestionResumen) {
-  gestionSeleccionada.value = g
-  // Pre-seleccionar el director actual si ya tiene uno asignado
-  // ¿Para qué? Para que el Director vea quién está asignado ahora
-  // y solo cambie si realmente quiere reemplazarlo.
-  directorIdSelecto.value   = g.director?.id ?? ''
-  errorDirector.value       = null
-  modalDirector.value       = true
-}
-
-async function asignarDirector() {
-  if (!directorIdSelecto.value) {
-    errorDirector.value = 'Seleccioná un director'
-    return
-  }
-  if (!gestionSeleccionada.value) return
-
-  asignando.value     = true
-  errorDirector.value = null
-  try {
-    await gestionApi.asignarDirector(
-      gestionSeleccionada.value.id,
-      Number(directorIdSelecto.value)
-    )
-    // Actualizar localmente el director de la gestión en la lista
-    // ¿Por qué actualizamos localmente en lugar de recargar?
-    // Recargar la lista completa sería una llamada extra innecesaria.
-    // Sabemos exactamente qué cambió: el director de una gestión específica.
-    const directorElegido = directores.value.find(d => d.id === Number(directorIdSelecto.value))
-    const idx = gestiones.value.findIndex(g => g.id === gestionSeleccionada.value!.id)
-    if (idx !== -1 && directorElegido) {
-      gestiones.value[idx].director = {
-        id:       directorElegido.id,
-        nombre:   directorElegido.nombre,
-        apellido: directorElegido.apellido,
-      }
-    }
-    modalDirector.value = false
-    toast.success('Director asignado')
-    // Si la gestión afectada es la activa, recargar el store
-    // para que el nombre del director se actualice en el sidebar/dashboard
-    if (gestionSeleccionada.value.activa) {
-      await gestionStore.recargar()
-    }
-  } catch (e) {
-    errorDirector.value = e instanceof Error ? e.message : 'Error al asignar director'
-  } finally {
-    asignando.value = false
-  }
-}
-
-// ─── Modal editar gestión ─────────────────────────────────────────────────────
-// Solo descripcion y notaMinimaAprobacion (el año no se edita: es la
-// identidad de la gestión y rompería el historial si cambiara).
-const modalEditar   = ref(false)
-const editando      = ref(false)
-const errorEditar   = ref<string | null>(null)
-const gestionEditar = ref<GestionResumen | null>(null)
-const formEditar    = ref({ descripcion: '', notaMinimaAprobacion: 51 })
-
-function abrirEditar(g: GestionResumen) {
-  gestionEditar.value = g
-  // Antes se cargaba 51 fijo: si la gestión usaba otra nota mínima (p. ej. 60) y
-  // solo se corregía la descripción, al guardar se pisaba silenciosamente con 51.
-  formEditar.value    = { descripcion: g.descripcion ?? '', notaMinimaAprobacion: g.notaMinimaAprobacion ?? 51 }
-  errorEditar.value   = null
-  modalEditar.value   = true
-}
-
-async function guardarEdicion() {
-  if (!gestionEditar.value) return
-  editando.value    = true
-  errorEditar.value = null
-  try {
-    await gestionApi.update(gestionEditar.value.id, {
-      descripcion:          formEditar.value.descripcion || undefined,
-      notaMinimaAprobacion: Number(formEditar.value.notaMinimaAprobacion),
-    })
-    const idx = gestiones.value.findIndex(x => x.id === gestionEditar.value!.id)
-    if (idx !== -1) {
-      gestiones.value[idx].descripcion = formEditar.value.descripcion || null
-      gestiones.value[idx].notaMinimaAprobacion = Number(formEditar.value.notaMinimaAprobacion)
-    }
-    if (gestionEditar.value.activa) await gestionStore.recargar()
-    modalEditar.value = false
-    toast.success(`Gestión ${gestionEditar.value.anio} actualizada`)
-  } catch (e) {
-    errorEditar.value = e instanceof Error ? e.message : 'Error al guardar cambios'
-  } finally {
-    editando.value = false
-  }
-}
-
 // ─── Cerrar gestión ───────────────────────────────────────────────────────────
-// Requiere trimestres cerrados y resultados registrados — el backend
-// devuelve el detalle si algo falta, se muestra tal cual.
+// Requiere trimestres cerrados y resultados registrados — el backend devuelve el
+// detalle si algo falta y se muestra tal cual.
 const cerrandoGestion = ref<number | null>(null)
 
 async function cerrarGestion(g: GestionResumen) {
@@ -284,8 +163,8 @@ async function cerrarGestion(g: GestionResumen) {
   error.value = null
   try {
     await gestionApi.cerrar(g.id)
-    const idx = gestiones.value.findIndex(x => x.id === g.id)
-    if (idx !== -1) gestiones.value[idx].activa = false
+    catalogo.invalidar('gestiones')
+    g.activa = false
     await gestionStore.recargar()
     toast.success(`Gestión ${g.anio} cerrada`)
   } catch (e) {
@@ -294,12 +173,6 @@ async function cerrarGestion(g: GestionResumen) {
     cerrandoGestion.value = null
   }
 }
-
-// ─── Helpers de display ───────────────────────────────────────────────────────
-// Directores activos para el selector — ¿por qué filtrar inactivos?
-// No tiene sentido asignar como director a alguien que ya no trabaja
-// en la institución. Igual se muestran en la lista principal por historial.
-const directoresActivos = computed(() => directores.value.filter(d => d.activo))
 </script>
 
 <template>
@@ -311,7 +184,7 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
         <h2 class="text-2xl font-bold">Gestiones escolares</h2>
         <p class="text-sm text-base-content/60">Historial de años académicos de la institución</p>
       </div>
-      <button class="btn btn-primary btn-sm" @click="abrirCrear">
+      <button class="btn btn-primary btn-sm" @click="abrir('crear')">
         + Nueva gestión
       </button>
     </div>
@@ -320,6 +193,25 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
     <div v-if="error" role="alert" class="alert alert-error">
       <span>{{ error }}</span>
       <button class="btn btn-sm btn-ghost" @click="cargar">Reintentar</button>
+    </div>
+
+    <!-- Resumen de la estructura copiada -->
+    <div v-if="resultadoCopia" role="alert" class="alert alert-success items-start">
+      <div class="flex-1 text-sm space-y-1">
+        <p class="font-semibold">Estructura copiada de {{ resultadoCopia.origen.anio }} a {{ resultadoCopia.destino.anio }}</p>
+        <p>
+          Cursos {{ resultadoCopia.cursos.copiados }} ·
+          Asignaciones {{ resultadoCopia.asignaciones.copiados }} ·
+          Trimestres {{ resultadoCopia.trimestres.copiados }} ·
+          Dimensiones {{ resultadoCopia.dimensiones.copiados }} ·
+          Conceptos de pago {{ resultadoCopia.conceptosPago.copiados }}
+          <span class="text-base-content/60">(lo que ya existía se respetó)</span>
+        </p>
+        <ul v-if="resultadoCopia.avisos.length" class="list-disc list-inside text-xs">
+          <li v-for="a in resultadoCopia.avisos" :key="a">{{ a }}</li>
+        </ul>
+      </div>
+      <button class="btn btn-sm btn-ghost" @click="resultadoCopia = null">Cerrar</button>
     </div>
 
     <!-- Info de la gestión activa -->
@@ -388,14 +280,22 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
             <td>
               <div class="flex gap-1 flex-wrap">
                 <!-- Editar datos (descripción, nota mínima) -->
-                <button class="btn btn-ghost btn-xs" @click="abrirEditar(g)">
+                <button class="btn btn-ghost btn-xs" @click="abrir('editar', g)">
                   Editar
+                </button>
+                <!-- Copiar estructura: solo si hay una gestión anterior de la cual copiar -->
+                <button
+                  v-if="gestiones.some(x => x.anio < g.anio)"
+                  class="btn btn-ghost btn-xs"
+                  @click="abrir('copiar', g)"
+                >
+                  Copiar estructura
                 </button>
                 <!-- Asignar director: disponible para cualquier gestión -->
                 <button
                   class="btn btn-ghost btn-xs"
                   :disabled="cargandoDir"
-                  @click="abrirAsignarDirector(g)"
+                  @click="abrir('director', g)"
                 >
                   {{ g.director ? 'Cambiar director' : 'Asignar director' }}
                 </button>
@@ -433,164 +333,8 @@ const directoresActivos = computed(() => directores.value.filter(d => d.activo))
     </p>
   </div>
 
-  <!-- ── Modal crear gestión ─────────────────────────────────────────────────── -->
-  <dialog :open="modalCrear" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">Nueva gestión escolar</h3>
-
-      <div v-if="errorModal" role="alert" class="alert alert-error mb-4 py-2 text-sm">
-        <span>{{ errorModal }}</span>
-      </div>
-
-      <form class="space-y-3" @submit.prevent="crearGestion">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Año *</legend>
-          <input
-            v-model.number="formCrear.anio"
-            type="number"
-            :min="2020"
-            :max="2100"
-            class="input input-bordered w-full"
-            :disabled="guardando"
-          />
-          <p class="text-xs text-base-content/50 mt-1">
-            El año debe ser único — no puede haber dos gestiones para el mismo año.
-          </p>
-        </fieldset>
-
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Descripción</legend>
-          <input
-            v-model="formCrear.descripcion"
-            type="text"
-            placeholder="Ej: Gestión Escolar 2026"
-            class="input input-bordered w-full"
-            :disabled="guardando"
-          />
-        </fieldset>
-
-        <!-- Nota informativa: ¿por qué no asignar director acá?
-             Separamos la creación de la asignación de director para que
-             el Director pueda crear la gestión aunque todavía no sepa
-             quién va a dirigirla. Se puede asignar después con el botón
-             "Asignar director" en la tabla. -->
-        <div role="alert" class="alert py-2 text-sm">
-          <AppIcon nombre="alerta" class="h-4 w-4" />
-          <span>
-            El director se asigna por separado desde la tabla.
-            Después de crear, recordá también crear los cursos y trimestres en <strong>Estructura</strong>.
-          </span>
-        </div>
-
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="modalCrear = false">
-            Cancelar
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="guardando">
-            <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
-            Crear gestión
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalCrear = false">
-      <button>cerrar</button>
-    </form>
-  </dialog>
-
-  <!-- ── Modal asignar director ──────────────────────────────────────────────── -->
-  <dialog :open="modalDirector" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Asignar director</h3>
-      <p class="text-sm text-base-content/60 mb-4">
-        Gestión: <strong>{{ gestionSeleccionada?.anio }}</strong>
-        <span v-if="gestionSeleccionada?.director">
-          · Director actual: {{ gestionSeleccionada.director.nombre }} {{ gestionSeleccionada.director.apellido }}
-        </span>
-      </p>
-
-      <div v-if="errorDirector" role="alert" class="alert alert-error mb-4 py-2 text-sm">
-        <span>{{ errorDirector }}</span>
-      </div>
-
-      <form class="space-y-3" @submit.prevent="asignarDirector">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Director *</legend>
-
-          <!-- ¿Por qué mostramos solo los activos?
-               Un director inactivo ya no trabaja en la institución.
-               Asignarlo como director de una gestión no tendría sentido
-               operativo — no podría iniciar sesión ni firmar documentos. -->
-          <select
-            v-model="directorIdSelecto"
-            class="select select-bordered w-full"
-            :disabled="asignando"
-          >
-            <option value="" disabled>Seleccionar director</option>
-            <option
-              v-for="d in directoresActivos"
-              :key="d.id"
-              :value="d.id"
-            >
-              {{ d.apellido }}, {{ d.nombre }}
-            </option>
-          </select>
-
-          <p v-if="directoresActivos.length === 0" class="text-xs text-warning mt-1">
-            No hay directores activos en el sistema.
-            Creá uno primero desde la pestaña "Directores" en Usuarios.
-          </p>
-        </fieldset>
-
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="asignando" @click="modalDirector = false">
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            class="btn btn-primary"
-            :disabled="asignando || !directorIdSelecto"
-          >
-            <span v-if="asignando" class="loading loading-spinner loading-sm"></span>
-            Asignar
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalDirector = false">
-      <button>cerrar</button>
-    </form>
-  </dialog>
-
-  <!-- ── Modal editar gestión ────────────────────────────────────────────────── -->
-  <dialog :open="modalEditar" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Editar gestión {{ gestionEditar?.anio }}</h3>
-      <p class="text-sm text-base-content/60 mb-4">El año no se puede cambiar — es la identidad de la gestión.</p>
-
-      <div v-if="errorEditar" role="alert" class="alert alert-error mb-4 py-2 text-sm">
-        <span>{{ errorEditar }}</span>
-      </div>
-
-      <form class="space-y-3" @submit.prevent="guardarEdicion">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Descripción</legend>
-          <input v-model="formEditar.descripcion" type="text" class="input input-bordered w-full" :disabled="editando" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Nota mínima de aprobación</legend>
-          <input v-model.number="formEditar.notaMinimaAprobacion" type="number" min="1" max="100"
-            class="input input-bordered w-full" :disabled="editando" />
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="editando" @click="modalEditar = false">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="editando">
-            <span v-if="editando" class="loading loading-spinner loading-sm"></span>
-            Guardar cambios
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalEditar = false"><button>cerrar</button></form>
-  </dialog>
+  <GestionCrearModal :abierto="modal === 'crear'" :gestiones="gestiones" @cerrar="cerrar" @creada="alCrear" />
+  <GestionCopiarModal :abierto="modal === 'copiar'" :destino="seleccionada" :gestiones="gestiones" @cerrar="cerrar" @copiada="alCopiar" />
+  <GestionDirectorModal :abierto="modal === 'director'" :gestion="seleccionada" :directores="directores" @cerrar="cerrar" @asignado="alAsignarDirector" />
+  <GestionEditarModal :abierto="modal === 'editar'" :gestion="seleccionada" @cerrar="cerrar" @editada="alEditar" />
 </template>

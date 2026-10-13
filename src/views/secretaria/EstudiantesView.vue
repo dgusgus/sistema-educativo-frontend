@@ -1,327 +1,87 @@
 <script setup lang="ts">
 /**
- * EstudiantesView — fusiona lo que antes eran EstudiantesView +
- * InscripcionesView. El estudiante es el centro; inscribir, cambiar
- * estado, registrar resultado y gestionar la cuenta son ACCIONES sobre
- * el estudiante, no módulos aparte (mismo criterio que "Asignar" en
- * DocentesView). También reemplaza a la pestaña "Estudiantes" de
- * UsuariosView — acá se crea/vincula/resetea la cuenta directamente.
+ * EstudiantesView — el estudiante es el centro; inscribir, cambiar estado y gestionar
+ * la cuenta son ACCIONES sobre el estudiante, no módulos aparte.
+ *
+ * Lista con paginación y búsqueda EN EL SERVIDOR (useListaPaginada): con ~900 estudiantes
+ * ya no se descarga todo para filtrar en el navegador. Cada modal es un componente en
+ * components/estudiantes/ (antes eran ~450 líneas dentro de esta vista).
  */
-import { ref, computed, onMounted } from 'vue'
-import { estudianteApi, type EstudiantePayload, type CambiarEstadoPayload } from '@/api/estudiante.api'
-import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
-import { useGestionStore } from '@/stores/gestion.store'
-import { useConfirm } from '@/composables/useConfirm'
-import { useToastStore } from '@/stores/toast.store'
-import type { Estudiante, Inscripcion, EstadoInscripcion, Nivel } from '@/types'
+import { ref, onMounted } from 'vue'
+import HistorialAcademicoModal from '@/components/HistorialAcademicoModal.vue'
+import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import AppIcon from '@/components/AppIcon.vue'
-import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import EstudiantePerfilModal from '@/components/estudiantes/EstudiantePerfilModal.vue'
+import EstudianteConCuentaModal from '@/components/estudiantes/EstudianteConCuentaModal.vue'
+import EstudianteVincularModal from '@/components/estudiantes/EstudianteVincularModal.vue'
+import EstudianteInscribirModal from '@/components/estudiantes/EstudianteInscribirModal.vue'
+import EstudianteEstadoModal from '@/components/estudiantes/EstudianteEstadoModal.vue'
+import EstudianteResetModal from '@/components/estudiantes/EstudianteResetModal.vue'
+import { estudianteApi } from '@/api/estudiante.api'
+import { usuarioApi } from '@/api/usuario.api'
+import { descargarBlob } from '@/api/boletin.api'
+import { useGestionStore } from '@/stores/gestion.store'
+import { useConfirm } from '@/composables/useConfirm'
+import { useAccion } from '@/composables/useAccion'
+import { useListaPaginada } from '@/composables/useListaPaginada'
+import { ultimaInscripcion, nombreCursoDeInscripcion } from '@/lib/estudiantes'
+import type { Estudiante, Inscripcion, EstadoInscripcion } from '@/types'
 import type { ResultadoImport } from '@/types/import'
-import { descargarBlob } from '@/api/boletin.api'   // ya existe, reutilizado — es un helper genérico, no específico de boletines
 
 const gestion = useGestionStore()
 const { confirmar } = useConfirm()
-const toast = useToastStore()
 
-// ─── Estado principal ─────────────────────────────────────────────────────────
-const estudiantes = ref<Estudiante[]>([])
-const cargando    = ref(true)
-const error       = ref<string | null>(null)
-const busqueda    = ref('')
+// ─── Lista (paginación + búsqueda en el servidor) ────────────────────────────
 const filtroCurso  = ref<number | ''>('')
 const filtroEstado = ref<EstadoInscripcion | ''>('')
-// ⚠️ Antes se mandaba gestionId SIEMPRE — eso hacía que, al activar una
-// gestión nueva (sin inscripciones todavía), la lista completa de
-// estudiantes desapareciera. El Estudiante es un registro PERMANENTE,
-// separado de la Inscripcion (que sí es por gestión) — por defecto se
-// muestran TODOS los estudiantes existan o no inscripciones este año.
-// Este checkbox es opcional, para cuando sí querés acotar a "quién está
-// inscrito este año en particular".
+// El Estudiante es un registro PERMANENTE (la Inscripción sí es por gestión): por defecto se
+// muestran TODOS, y este filtro es opcional para acotar a "inscritos este año".
 const soloGestionActiva = ref(false)
 
-let cargaSeq = 0   // guard anti-carrera, mismo patrón que DocentesView
+const lista = useListaPaginada<Estudiante>({
+  pedir: ({ pagina, limite, search }) => estudianteApi.getPage({
+    pagina, limite,
+    ...(search && { search }),
+    ...(soloGestionActiva.value && gestion.gestionId ? { gestionId: gestion.gestionId } : {}),
+    ...(filtroEstado.value && { estadoInscripcion: filtroEstado.value }),
+    ...(filtroCurso.value  && { cursoId: Number(filtroCurso.value) }),
+  }),
+})
 
 onMounted(async () => {
   await gestion.cargar()
-  await cargar()
+  await lista.cargar()
 })
-
-async function cargar() {
-  const miTurno = ++cargaSeq
-  cargando.value = true
-  error.value = null
-  try {
-    const lista = await estudianteApi.getAll({
-      ...(soloGestionActiva.value && { gestionId: gestion.gestionId ?? undefined }),
-      ...(filtroEstado.value && { estadoInscripcion: filtroEstado.value }),
-      ...(filtroCurso.value  && { cursoId: Number(filtroCurso.value) }),
-    })
-    if (miTurno !== cargaSeq) return
-    estudiantes.value = lista
-  } catch (e) {
-    if (miTurno !== cargaSeq) return
-    error.value = e instanceof Error ? e.message : 'Error al cargar estudiantes'
-  } finally {
-    if (miTurno === cargaSeq) cargando.value = false
-  }
-}
-
-const estudiantesFiltrados = computed(() => {
-  const q = busqueda.value.toLowerCase().trim()
-  if (!q) return estudiantes.value
-  return estudiantes.value.filter(e =>
-    `${e.nombre} ${e.apellido} ${e.ci}`.toLowerCase().includes(q)
-  )
-})
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function ultimaInscripcion(e: Estudiante): Inscripcion | null {
-  return e.inscripciones?.[0] ?? null
-}
 
 // ¿Ya tiene inscripción EN LA GESTIÓN ACTIVA? Si no, corresponde inscribir;
-// si sí, las acciones son sobre esa inscripción (estado/resultado).
+// si sí, las acciones son sobre esa inscripción (estado/desinscribir).
 function inscritoEnGestionActiva(e: Estudiante): boolean {
   const insc = ultimaInscripcion(e)
   return !!insc && insc.gestionId === gestion.gestionId
 }
 
+// ─── Modales: cada uno guarda y avisa; aquí solo se abre/cierra y se recarga ───
+type Modal = 'perfil' | 'conCuenta' | 'vincular' | 'inscribir' | 'estado' | 'reset' | 'historial' | 'importar' | null
+const modal = ref<Modal>(null)
+const seleccionado = ref<Estudiante | null>(null)
+const inscripcionSel = ref<Inscripcion | null>(null)
 
-// ⚠️ el curso embebido en Estudiante.inscripciones no trae "nombre"
-// calculado — solo nivel/grado/paralelo (sin turno).
-const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
-function nombreCursoDeInscripcion(insc: Inscripcion | null): string {
-  const c = insc?.curso
-  if (!c) return '—'
-  return `${c.grado}° ${NIVEL_TEXTO[c.nivel]} "${c.paralelo}"`
+function abrir(m: Exclude<Modal, null>, e: Estudiante | null = null, insc: Inscripcion | null = null) {
+  seleccionado.value = e
+  inscripcionSel.value = insc
+  modal.value = m
 }
+const cerrar = () => { modal.value = null }
+function guardadoYCerrar() { cerrar(); void lista.cargar() }
 
-// ─── Crear / editar perfil ─────────────────────────────────────────────────────
-const modalPerfil = ref(false)
-const guardando   = ref(false)
-const errorModal  = ref<string | null>(null)
-const modoEdicion = ref(false)
-const idEditando  = ref<number | null>(null)
-
-const formVacio = (): EstudiantePayload => ({ nombre: '', apellido: '', ci: '', fechaNacimiento: '', direccion: '' })
-const form = ref<EstudiantePayload>(formVacio())
-
-function abrirCrear() {
-  modoEdicion.value = false
-  idEditando.value  = null
-  form.value        = formVacio()
-  errorModal.value  = null
-  modalPerfil.value = true
-}
-
-function abrirEditar(e: Estudiante) {
-  modoEdicion.value = true
-  idEditando.value  = e.id
-  form.value = {
-    nombre: e.nombre, apellido: e.apellido, ci: e.ci,
-    fechaNacimiento: e.fechaNacimiento ?? '', direccion: e.direccion ?? '',
-  }
-  errorModal.value  = null
-  modalPerfil.value = true
-}
-
-async function guardar() {
-  if (!form.value.nombre || !form.value.apellido || !form.value.ci) {
-    errorModal.value = 'Nombre, apellido y CI son obligatorios'
-    return
-  }
-  guardando.value  = true
-  errorModal.value = null
-  try {
-    if (modoEdicion.value && idEditando.value) {
-      const actualizado = await estudianteApi.update(idEditando.value, form.value)
-      const idx = estudiantes.value.findIndex(e => e.id === idEditando.value)
-      if (idx !== -1) estudiantes.value[idx] = { ...estudiantes.value[idx], ...actualizado }
-      toast.success('Estudiante actualizado')
-    } else {
-      const nuevo = await estudianteApi.create(form.value)
-      estudiantes.value.unshift(nuevo)
-      toast.success('Estudiante creado')
-    }
-    modalPerfil.value = false
-  } catch (e) {
-    errorModal.value = e instanceof Error ? e.message : 'Error al guardar'
-  } finally {
-    guardando.value = false
-  }
-}
-
-// ─── Crear con cuenta ──────────────────────────────────────────────────────────
-const modalConCuenta = ref(false)
-const creandoCuenta  = ref(false)
-const errorCuenta    = ref<string | null>(null)
-const credenciales   = ref<{ username: string; password: string } | null>(null)
-
-const formCuenta = ref({
-  ci: '', nombre: '', apellido: '', fechaNacimiento: '', direccion: '', rude: '',
-  username: '', password: '',
-})
-
-function abrirConCuenta() {
-  formCuenta.value = { ci: '', nombre: '', apellido: '', fechaNacimiento: '', direccion: '', rude: '', username: '', password: '' }
-  errorCuenta.value = null
-  credenciales.value = null
-  modalConCuenta.value = true
-}
-
-async function crearConCuenta() {
-  const f = formCuenta.value
-  if (!f.ci || !f.nombre || !f.apellido || !f.username || !f.password) {
-    errorCuenta.value = 'CI, nombre, apellido, username y contraseña son obligatorios'
-    return
-  }
-  if (f.password.length < 6) { errorCuenta.value = 'La contraseña debe tener al menos 6 caracteres'; return }
-
-  creandoCuenta.value = true
-  errorCuenta.value   = null
-  try {
-    const payload: ConPerfilPayload = {
-      roles: ['ESTUDIANTE'],
-      username: f.username,
-      password: f.password,
-      persona: {
-        ci: f.ci, nombre: f.nombre, apellido: f.apellido,
-        fechaNacimiento: f.fechaNacimiento || undefined,
-        direccion: f.direccion || undefined,
-      },
-      datosPorRol: { ESTUDIANTE: { rude: f.rude || undefined } },
-    }
-    const resultado = await usuarioApi.createConPerfil(payload)
-    credenciales.value = resultado.credenciales
-
-    // Igual que en DocentesView: se arma el registro con lo que el
-    // backend YA confirmó, sin recargar toda la lista (evita la
-    // condición de carrera que tuvimos con Docentes).
-    const perfil = resultado.perfiles.ESTUDIANTE
-    if (perfil) {
-      estudiantes.value.unshift({
-        id: perfil.id, ci: resultado.persona.ci, nombre: resultado.persona.nombre,
-        apellido: resultado.persona.apellido, fechaNacimiento: resultado.persona.fechaNacimiento ?? null,
-        direccion: resultado.persona.direccion ?? null, rude: (perfil as { rude?: string }).rude ?? null,
-        activo: true, usuario: { id: resultado.usuario.id, username: resultado.usuario.username, activo: true },
-        inscripciones: [], tutores: [],
-      })
-    }
-  } catch (e) {
-    errorCuenta.value = e instanceof Error ? e.message : 'Error al crear estudiante'
-  } finally {
-    creandoCuenta.value = false
-  }
-}
-
-// ─── Vincular cuenta existente ────────────────────────────────────────────────
-const modalVincular    = ref(false)
-const vinculando       = ref(false)
-const errorVincular    = ref<string | null>(null)
-const estudianteAVincular = ref<Estudiante | null>(null)
-const usernameVincular = ref('')
-const passwordVincular = ref('')
-
-function abrirVincular(e: Estudiante) {
-  estudianteAVincular.value = e
-  usernameVincular.value = ''
-  passwordVincular.value = ''
-  errorVincular.value = null
-  modalVincular.value = true
-}
-
-async function vincular() {
-  if (!usernameVincular.value || !passwordVincular.value) {
-    errorVincular.value = 'Username y contraseña son obligatorios'
-    return
-  }
-  if (!estudianteAVincular.value) return
-  vinculando.value = true
-  errorVincular.value = null
-  try {
-    const usuario = await usuarioApi.create({ username: usernameVincular.value, password: passwordVincular.value, roles: ['ESTUDIANTE'] })
-    await usuarioApi.vincularPerfil(usuario.id, { estudianteId: estudianteAVincular.value.id })
-    const idx = estudiantes.value.findIndex(e => e.id === estudianteAVincular.value!.id)
-    if (idx !== -1) estudiantes.value[idx] = { ...estudiantes.value[idx], usuario: { id: usuario.id, username: usuario.username, activo: true } }
-    modalVincular.value = false
-    toast.success('Cuenta vinculada correctamente')
-  } catch (e) {
-    errorVincular.value = e instanceof Error ? e.message : 'Error al vincular cuenta'
-  } finally {
-    vinculando.value = false
-  }
-}
-
-// ─── Inscribir ────────────────────────────────────────────────────────────────
-const modalInscribir  = ref(false)
-const inscribiendo    = ref(false)
-const errorInscripcion = ref<string | null>(null)
-const estudianteAInscribir = ref<Estudiante | null>(null)
-const formInscribir = ref({ cursoId: '' as number | '', procedencia: '' })
-
-function abrirInscribir(e: Estudiante) {
-  estudianteAInscribir.value = e
-  formInscribir.value = { cursoId: '', procedencia: '' }
-  errorInscripcion.value = null
-  modalInscribir.value = true
-}
-
-async function inscribir() {
-  if (!formInscribir.value.cursoId) { errorInscripcion.value = 'Seleccioná un curso'; return }
-  if (!gestion.gestionId) { errorInscripcion.value = 'No hay gestión activa'; return }
-  inscribiendo.value = true
-  errorInscripcion.value = null
-  try {
-    await estudianteApi.inscribir({
-      estudianteId: estudianteAInscribir.value!.id,
-      cursoId: Number(formInscribir.value.cursoId),
-      gestionId: gestion.gestionId,
-    })
-    modalInscribir.value = false
-    toast.success('Estudiante inscrito')
-    await cargar()
-  } catch (e) {
-    errorInscripcion.value = e instanceof Error ? e.message : 'Error al inscribir'
-  } finally {
-    inscribiendo.value = false
-  }
-}
-
-// ─── Cambiar estado de inscripción ────────────────────────────────────────────
-const modalEstado = ref(false)
-const cambiandoEstado = ref(false)
-const errorEstado = ref<string | null>(null)
-const inscripcionActiva = ref<Inscripcion | null>(null)
-const formEstado = ref<CambiarEstadoPayload>({ estadoInscripcion: 'ACTIVA', fechaRetiro: '', observaciones: '' })
-
-function abrirCambiarEstado(insc: Inscripcion) {
-  inscripcionActiva.value = insc
-  formEstado.value = { estadoInscripcion: insc.estadoInscripcion, fechaRetiro: '', observaciones: '' }
-  errorEstado.value = null
-  modalEstado.value = true
-}
-
-async function cambiarEstado() {
-  if (!inscripcionActiva.value) return
-  cambiandoEstado.value = true
-  errorEstado.value = null
-  try {
-    await estudianteApi.cambiarEstado(inscripcionActiva.value.id, formEstado.value)
-    modalEstado.value = false
-    toast.success('Estado actualizado')
-    await cargar()
-  } catch (e) {
-    errorEstado.value = e instanceof Error ? e.message : 'Error al cambiar estado'
-  } finally {
-    cambiandoEstado.value = false
-  }
-}
-
-const requiereFecha = computed(() => ['RETIRADA', 'TRANSFERIDA'].includes(formEstado.value.estadoInscripcion))
-
-// ─── Desinscribir (borrar la inscripción — deshacer un error) ───────────────
+// ─── Desinscribir (borra la inscripción — deshacer un error) ─────────────────
 const desinscribiendo = ref<number | null>(null)
+const desinscribirAccion = useAccion(
+  (insc: Inscripcion) => estudianteApi.eliminarInscripcion(insc.id),
+  { exito: 'Inscripción eliminada', errorEnToast: true },
+)
 
 async function desinscribir(insc: Inscripcion) {
   const ok = await confirmar({
@@ -331,81 +91,33 @@ async function desinscribir(insc: Inscripcion) {
   })
   if (!ok) return
   desinscribiendo.value = insc.id
-  error.value = null
-  try {
-    await estudianteApi.eliminarInscripcion(insc.id)
-    toast.success('Inscripción eliminada')
-    await cargar()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al desinscribir'
-  } finally {
-    desinscribiendo.value = null
-  }
+  if (await desinscribirAccion.ejecutar(insc) !== undefined) await lista.cargar()
+  desinscribiendo.value = null
 }
 
-// ─── Activar / desactivar cuenta ──────────────────────────────────────────────
+// ─── Activar / desactivar cuenta ─────────────────────────────────────────────
 const toggeandoActivo = ref<number | null>(null)
+const toggleAccion = useAccion(
+  async (e: Estudiante) => {
+    const actual = e.usuario!.activo ?? true
+    await usuarioApi.update(e.usuario!.id, { activo: !actual })
+    e.usuario!.activo = !actual
+    return !actual
+  },
+  { errorEnToast: true },
+)
 
 async function toggleActivo(e: Estudiante) {
   if (!e.usuario) return
   toggeandoActivo.value = e.usuario.id
-  try {
-    const estadoActual = e.usuario.activo ?? true
-    await usuarioApi.update(e.usuario.id, { activo: !estadoActual })
-    e.usuario.activo = !estadoActual
-    toast.success(estadoActual ? 'Cuenta desactivada' : 'Cuenta activada')
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error al cambiar estado de la cuenta'
-  } finally {
-    toggeandoActivo.value = null
-  }
+  await toggleAccion.ejecutar(e)
+  toggeandoActivo.value = null
 }
 
-// ─── Resetear contraseña ──────────────────────────────────────────────────────
-const modalReset    = ref(false)
-const reseteando    = ref(false)
-const errorReset    = ref<string | null>(null)
-const nuevaPassword = ref('')
-const estudianteAResetear = ref<Estudiante | null>(null)
-
-function abrirReset(e: Estudiante) {
-  estudianteAResetear.value = e
-  nuevaPassword.value = ''
-  errorReset.value = null
-  modalReset.value = true
-}
-
-async function resetearPassword() {
-  if (nuevaPassword.value.length < 6) {
-    errorReset.value = 'La contraseña debe tener al menos 6 caracteres'
-    return
-  }
-  if (!estudianteAResetear.value?.usuario?.id) return
-  reseteando.value = true
-  errorReset.value = null
-  try {
-    await usuarioApi.resetearPassword(estudianteAResetear.value.usuario.id, nuevaPassword.value)
-    modalReset.value = false
-    toast.success('Contraseña reseteada correctamente')
-  } catch (e) {
-    errorReset.value = e instanceof Error ? e.message : 'Error al resetear'
-  } finally {
-    reseteando.value = false
-  }
-}
-
-// El resultado final del año (PROMOVIDO/REPROBADO) ya no se registra acá: se calcula
-// con los promedios finales y se confirma en lote en Promoción (Paso 1).
-
-const modalImportar = ref(false)
-
+// ─── Importar / exportar ─────────────────────────────────────────────────────
 async function onImportar(archivo: File): Promise<ResultadoImport> {
   if (!gestion.gestionId) throw new Error('No hay gestión activa')
   return estudianteApi.importar(archivo, gestion.gestionId)
-}
-
-function onImportacionCompletada() {
-  cargar()   // recarga la lista — igual que después de cualquier otra escritura
 }
 
 async function exportar() {
@@ -424,10 +136,10 @@ async function exportar() {
         <p class="text-sm text-base-content/60">Gestión {{ gestion.anio ?? '—' }}</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm" @click="abrirCrear">+ Solo perfil</button>
-        <button class="btn btn-primary btn-sm" @click="abrirConCuenta">+ Con cuenta</button>
+        <button class="btn btn-outline btn-sm" @click="abrir('perfil')">+ Solo perfil</button>
+        <button class="btn btn-primary btn-sm" @click="abrir('conCuenta')">+ Con cuenta</button>
         <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
-        <button class="btn btn-outline btn-sm" @click="modalImportar = true">Importar</button>
+        <button class="btn btn-outline btn-sm" @click="abrir('importar')">Importar</button>
       </div>
     </div>
 
@@ -437,13 +149,13 @@ async function exportar() {
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
         </svg>
-        <input v-model="busqueda" type="search" placeholder="Buscar por nombre o CI..." class="grow" />
+        <input v-model="lista.busqueda.value" type="search" placeholder="Buscar por nombre o CI..." class="grow" />
       </label>
-      <select v-model="filtroCurso" class="select select-bordered select-sm" @change="cargar">
+      <select v-model="filtroCurso" class="select select-bordered select-sm" @change="lista.refiltrar()">
         <option value="">Todos los cursos</option>
         <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
       </select>
-      <select v-model="filtroEstado" class="select select-bordered select-sm" @change="cargar">
+      <select v-model="filtroEstado" class="select select-bordered select-sm" @change="lista.refiltrar()">
         <option value="">Todos los estados</option>
         <option value="ACTIVA">Activas</option>
         <option value="RETIRADA">Retiradas</option>
@@ -451,14 +163,14 @@ async function exportar() {
         <option value="CONCLUIDA">Concluidas</option>
       </select>
       <label class="label cursor-pointer gap-2">
-        <input v-model="soloGestionActiva" type="checkbox" class="checkbox checkbox-sm" @change="cargar" />
+        <input v-model="soloGestionActiva" type="checkbox" class="checkbox checkbox-sm" @change="lista.refiltrar()" />
         <span class="text-sm">Solo inscritos en {{ gestion.anio }}</span>
       </label>
     </div>
 
-    <div v-if="error" role="alert" class="alert alert-error">
-      <span>{{ error }}</span>
-      <button class="btn btn-sm btn-ghost" @click="cargar">Reintentar</button>
+    <div v-if="lista.error.value" role="alert" class="alert alert-error">
+      <span>{{ lista.error.value }}</span>
+      <button class="btn btn-sm btn-ghost" @click="lista.cargar()">Reintentar</button>
     </div>
 
     <div class="card bg-base-100 shadow overflow-x-auto">
@@ -469,13 +181,13 @@ async function exportar() {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="cargando" v-for="i in 6" :key="i">
+          <tr v-if="lista.cargando.value && !lista.items.value.length" v-for="i in 6" :key="i">
             <td colspan="7"><div class="skeleton h-4 w-full"></div></td>
           </tr>
-          <tr v-else-if="estudiantesFiltrados.length === 0">
+          <tr v-else-if="lista.items.value.length === 0">
             <td colspan="7" class="text-center text-base-content/40 py-8">No se encontraron estudiantes</td>
           </tr>
-          <tr v-else v-for="e in estudiantesFiltrados" :key="e.id" class="hover">
+          <tr v-else v-for="e in lista.items.value" :key="e.id" class="hover">
             <td class="font-medium">{{ e.apellido }}, {{ e.nombre }}</td>
             <td class="font-mono text-sm">{{ e.ci }}</td>
             <td class="text-sm">
@@ -517,13 +229,16 @@ async function exportar() {
                 <ul tabindex="0" role="menu"
                   class="dropdown-content menu bg-base-100 rounded-2xl z-10 w-64 p-2 shadow-lg border border-base-300 text-left">
                   <li class="menu-title truncate px-3">{{ e.apellido }}, {{ e.nombre }}</li>
-                  <li><button role="menuitem" @click="abrirEditar(e)"><AppIcon nombre="editar" class="h-4 w-4" />Editar perfil</button></li>
+                  <li><button role="menuitem" @click="abrir('perfil', e)"><AppIcon nombre="editar" class="h-4 w-4" />Editar perfil</button></li>
                   <li class="menu-title mt-1">Académico</li>
+                  <li>
+                    <button role="menuitem" @click="abrir('historial', e)"><AppIcon nombre="documento" class="h-4 w-4" />Historial académico</button>
+                  </li>
                   <li v-if="!inscritoEnGestionActiva(e)">
-                    <button role="menuitem" class="text-primary" @click="abrirInscribir(e)"><AppIcon nombre="agregar" class="h-4 w-4" />Inscribir</button>
+                    <button role="menuitem" class="text-primary" @click="abrir('inscribir', e)"><AppIcon nombre="agregar" class="h-4 w-4" />Inscribir</button>
                   </li>
                   <li v-if="ultimaInscripcion(e)?.estadoInscripcion === 'ACTIVA'">
-                    <button role="menuitem" @click="abrirCambiarEstado(ultimaInscripcion(e)!)"><AppIcon nombre="documento" class="h-4 w-4" />Cambiar estado</button>
+                    <button role="menuitem" @click="abrir('estado', e, ultimaInscripcion(e))"><AppIcon nombre="documento" class="h-4 w-4" />Cambiar estado</button>
                   </li>
                   <li v-if="inscritoEnGestionActiva(e)">
                     <button role="menuitem" class="text-error"
@@ -536,10 +251,10 @@ async function exportar() {
                   </li>
                   <li class="menu-title mt-1">Cuenta</li>
                   <li v-if="!e.usuario">
-                    <button role="menuitem" class="text-warning" @click="abrirVincular(e)"><AppIcon nombre="personas" class="h-4 w-4" />Vincular cuenta</button>
+                    <button role="menuitem" class="text-warning" @click="abrir('vincular', e)"><AppIcon nombre="personas" class="h-4 w-4" />Vincular cuenta</button>
                   </li>
                   <li v-if="e.usuario">
-                    <button role="menuitem" @click="abrirReset(e)"><AppIcon nombre="candado" class="h-4 w-4" />Reset pass</button>
+                    <button role="menuitem" @click="abrir('reset', e)"><AppIcon nombre="candado" class="h-4 w-4" />Reset pass</button>
                   </li>
                 </ul>
               </div>
@@ -549,251 +264,30 @@ async function exportar() {
       </table>
     </div>
 
-    <p v-if="!cargando" class="text-xs text-base-content/40">
-      {{ estudiantesFiltrados.length }} estudiante(s) encontrado(s)
-    </p>
+    <PaginadorTabla
+      :pagina="lista.pagina.value" :total-paginas="lista.totalPaginas.value"
+      :desde="lista.desde.value" :hasta="lista.hasta.value" :total="lista.total.value"
+      :limite="lista.limite.value" :cargando="lista.cargando.value"
+      @ir="lista.irAPagina" @limite="lista.cambiarLimite" />
   </div>
 
-  <!-- ── Modal crear/editar perfil ───────────────────────────────────────── -->
-  <dialog :open="modalPerfil" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">{{ modoEdicion ? 'Editar estudiante' : 'Nuevo estudiante (solo perfil)' }}</h3>
-      <div v-if="errorModal" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorModal }}</span></div>
-      <form class="space-y-3" @submit.prevent="guardar">
-        <div class="grid grid-cols-2 gap-3">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Nombre *</legend>
-            <input v-model="form.nombre" type="text" class="input input-bordered w-full" :disabled="guardando" />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Apellido *</legend>
-            <input v-model="form.apellido" type="text" class="input input-bordered w-full" :disabled="guardando" />
-          </fieldset>
-        </div>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="guardando" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Fecha de nacimiento</legend>
-          <input v-model="form.fechaNacimiento" type="date" class="input input-bordered w-full" :disabled="guardando" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Dirección</legend>
-          <input v-model="form.direccion" type="text" class="input input-bordered w-full" :disabled="guardando" />
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="guardando" @click="modalPerfil = false">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="guardando">
-            <span v-if="guardando" class="loading loading-spinner loading-sm"></span>
-            {{ modoEdicion ? 'Guardar cambios' : 'Crear perfil' }}
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalPerfil = false"><button>cerrar</button></form>
-  </dialog>
+  <EstudiantePerfilModal :abierto="modal === 'perfil'" :estudiante="seleccionado" @cerrar="cerrar" @guardado="guardadoYCerrar" />
+  <EstudianteConCuentaModal :abierto="modal === 'conCuenta'" @cerrar="cerrar" @creado="lista.cargar()" />
+  <EstudianteVincularModal :abierto="modal === 'vincular'" :estudiante="seleccionado" @cerrar="cerrar" @vinculado="guardadoYCerrar" />
+  <EstudianteInscribirModal :abierto="modal === 'inscribir'" :estudiante="seleccionado" @cerrar="cerrar" @inscrito="guardadoYCerrar" />
+  <EstudianteEstadoModal :abierto="modal === 'estado'" :inscripcion="inscripcionSel" @cerrar="cerrar" @cambiado="guardadoYCerrar" />
+  <EstudianteResetModal :abierto="modal === 'reset'" :estudiante="seleccionado" @cerrar="cerrar" />
 
-  <!-- ── Modal crear con cuenta ──────────────────────────────────────────── -->
-  <dialog :open="modalConCuenta" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Nuevo estudiante con cuenta</h3>
-      <p class="text-sm text-base-content/60 mb-4">Crea el perfil y la cuenta de acceso en una sola operación.</p>
+  <HistorialAcademicoModal :abierto="modal === 'historial'" :estudiante="seleccionado" @cerrar="cerrar" />
 
-      <div v-if="credenciales" class="space-y-4">
-        <div role="alert" class="alert alert-success"><span>Estudiante creado correctamente</span></div>
-        <div class="bg-base-200 rounded-lg p-4 space-y-2">
-          <p class="text-sm font-semibold">Credenciales de acceso:</p>
-          <p class="font-mono text-sm">Usuario: <strong>{{ credenciales.username }}</strong></p>
-          <p class="font-mono text-sm">Contraseña: <strong>{{ credenciales.password }}</strong></p>
-        </div>
-        <div class="modal-action">
-          <button class="btn btn-primary" @click="modalConCuenta = false; credenciales = null">Cerrar</button>
-        </div>
-      </div>
-
-      <form v-else class="space-y-3" @submit.prevent="crearConCuenta">
-        <div v-if="errorCuenta" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorCuenta }}</span></div>
-        <div class="divider text-xs">Datos personales</div>
-        <div class="grid grid-cols-2 gap-3">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Nombre *</legend>
-            <input v-model="formCuenta.nombre" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Apellido *</legend>
-            <input v-model="formCuenta.apellido" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
-          </fieldset>
-        </div>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="formCuenta.ci" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
-        </fieldset>
-        <div class="grid grid-cols-2 gap-3">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">Fecha de nacimiento</legend>
-            <input v-model="formCuenta.fechaNacimiento" type="date" class="input input-bordered w-full" :disabled="creandoCuenta" />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend text-xs">RUDE</legend>
-            <input v-model="formCuenta.rude" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
-          </fieldset>
-        </div>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Dirección</legend>
-          <input v-model="formCuenta.direccion" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
-        </fieldset>
-        <div class="divider text-xs">Cuenta de acceso</div>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Username *</legend>
-          <input v-model="formCuenta.username" type="text" autocomplete="off" class="input input-bordered w-full" :disabled="creandoCuenta" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Contraseña * (mín. 6 caracteres)</legend>
-          <input v-model="formCuenta.password" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="creandoCuenta" />
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="creandoCuenta" @click="modalConCuenta = false">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="creandoCuenta">
-            <span v-if="creandoCuenta" class="loading loading-spinner loading-sm"></span>
-            Crear estudiante
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalConCuenta = false; credenciales = null"><button>cerrar</button></form>
-  </dialog>
-
-  <!-- ── Modal vincular cuenta ───────────────────────────────────────────── -->
-  <dialog :open="modalVincular" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Crear y vincular cuenta</h3>
-      <p class="text-sm text-base-content/60 mb-4">Para: <strong>{{ estudianteAVincular?.nombre }} {{ estudianteAVincular?.apellido }}</strong></p>
-      <div v-if="errorVincular" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorVincular }}</span></div>
-      <form class="space-y-3" @submit.prevent="vincular">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Username *</legend>
-          <input v-model="usernameVincular" type="text" autocomplete="off" class="input input-bordered w-full" :disabled="vinculando" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Contraseña * (mín. 6 caracteres)</legend>
-          <input v-model="passwordVincular" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="vinculando" />
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="vinculando" @click="modalVincular = false">Cancelar</button>
-          <button type="submit" class="btn btn-warning" :disabled="vinculando">
-            <span v-if="vinculando" class="loading loading-spinner loading-sm"></span>
-            Crear y vincular
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalVincular = false"><button>cerrar</button></form>
-  </dialog>
-
-  <!-- ── Modal inscribir ──────────────────────────────────────────────────── -->
-  <dialog :open="modalInscribir" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Inscribir estudiante</h3>
-      <p class="text-sm text-base-content/60 mb-4">{{ estudianteAInscribir?.nombre }} {{ estudianteAInscribir?.apellido }}</p>
-      <div v-if="errorInscripcion" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorInscripcion }}</span></div>
-      <form class="space-y-3" @submit.prevent="inscribir">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Curso *</legend>
-          <select v-model="formInscribir.cursoId" class="select select-bordered w-full" :disabled="inscribiendo || !gestion.cursos.length">
-            <option value="" disabled>Seleccionar curso</option>
-            <option v-for="c in gestion.cursos" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-          </select>
-          <p v-if="!gestion.cursos.length" class="text-xs text-base-content/40 mt-1">
-            No hay cursos en la gestión activa — creálos primero desde Estructura.
-          </p>
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Procedencia</legend>
-          <input v-model="formInscribir.procedencia" type="text" placeholder="Opcional — de qué colegio viene" class="input input-bordered w-full" :disabled="inscribiendo" />
-        </fieldset>
-        <p class="text-xs text-base-content/50">Gestión: <strong>{{ gestion.anio }}</strong></p>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="inscribiendo" @click="modalInscribir = false">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="inscribiendo">
-            <span v-if="inscribiendo" class="loading loading-spinner loading-sm"></span>
-            Inscribir
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalInscribir = false"><button>cerrar</button></form>
-  </dialog>
-
-  <!-- ── Modal cambiar estado ─────────────────────────────────────────────── -->
-  <dialog :open="modalEstado" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Cambiar estado de inscripción</h3>
-      <p class="text-sm text-base-content/60 mb-4">{{ nombreCursoDeInscripcion(inscripcionActiva) }}</p>
-      <div v-if="errorEstado" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorEstado }}</span></div>
-      <form class="space-y-3" @submit.prevent="cambiarEstado">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Nuevo estado *</legend>
-          <select v-model="formEstado.estadoInscripcion" class="select select-bordered w-full" :disabled="cambiandoEstado">
-            <option value="ACTIVA">ACTIVA</option>
-            <option value="RETIRADA">RETIRADA</option>
-            <option value="TRANSFERIDA">TRANSFERIDA</option>
-            <option value="CONCLUIDA">CONCLUIDA</option>
-          </select>
-        </fieldset>
-        <fieldset v-if="requiereFecha" class="fieldset">
-          <legend class="fieldset-legend text-xs">Fecha de retiro</legend>
-          <input v-model="formEstado.fechaRetiro" type="date" class="input input-bordered w-full" :disabled="cambiandoEstado" />
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Observaciones</legend>
-          <textarea v-model="formEstado.observaciones" rows="2" class="textarea textarea-bordered w-full" :disabled="cambiandoEstado"></textarea>
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="cambiandoEstado" @click="modalEstado = false">Cancelar</button>
-          <button type="submit" class="btn btn-warning" :disabled="cambiandoEstado">
-            <span v-if="cambiandoEstado" class="loading loading-spinner loading-sm"></span>
-            Cambiar estado
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop" @click="modalEstado = false"><button>cerrar</button></form>
-  </dialog>
-
-  <!-- ── Modal resetear contraseña ────────────────────────────────────────── -->
-  <dialog :open="modalReset" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-1">Resetear contraseña</h3>
-      <p class="text-sm text-base-content/60 mb-4">
-        {{ estudianteAResetear?.nombre }} {{ estudianteAResetear?.apellido }}
-        · <span class="font-mono">{{ estudianteAResetear?.usuario?.username }}</span>
-      </p>
-      <div v-if="errorReset" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorReset }}</span></div>
-      <form class="space-y-3" @submit.prevent="resetearPassword">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Nueva contraseña * (mín. 6 caracteres)</legend>
-          <input v-model="nuevaPassword" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="reseteando" />
-        </fieldset>
-        <div class="modal-action mt-6">
-          <button type="button" class="btn btn-ghost" :disabled="reseteando" @click="modalReset = false">Cancelar</button>
-          <button type="submit" class="btn btn-warning" :disabled="reseteando">
-            <span v-if="reseteando" class="loading loading-spinner loading-sm"></span>
-            Resetear
-          </button>
-        </div>
-      </form>
-    </div>
-   <form method="dialog" class="modal-backdrop" @click="modalReset = false"><button>cerrar</button></form>
-  </dialog>
-
-<ImportarExcelModal
-  v-model="modalImportar"
-  titulo="Importar estudiantes"
-  :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']"
-  :plantilla="estudianteApi.plantilla"
-  nombre-plantilla="plantilla_estudiantes.xlsx"
-  :importar="onImportar"
-  @completado="onImportacionCompletada"
-/>
+  <ImportarExcelModal
+    :model-value="modal === 'importar'"
+    titulo="Importar estudiantes"
+    :columnas="['CI', 'Nombre', 'Apellido', 'FechaNacimiento', 'Direccion', 'RUDE', 'Curso']"
+    :plantilla="estudianteApi.plantilla"
+    nombre-plantilla="plantilla_estudiantes.xlsx"
+    :importar="onImportar"
+    @update:model-value="(v: boolean) => { if (!v) cerrar() }"
+    @completado="lista.cargar()"
+  />
 </template>
