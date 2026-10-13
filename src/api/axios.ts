@@ -74,12 +74,21 @@ api.interceptors.response.use(
       mensaje = mensajeDesdeDetalles(detalles)
     } else if (data?.message || data?.error) {
       mensaje = data.message || data.error
+    } else if (status === 429) {
+      // El límite general del servidor responde texto plano, sin { error }.
+      mensaje = 'Demasiadas solicitudes seguidas. Espera un momento e inténtalo de nuevo.'
     } else if (error.code === 'ECONNABORTED') {
       mensaje = 'El servidor tardó demasiado en responder. Intenta de nuevo.'
     } else if (!error.response) {
       mensaje = 'No se pudo conectar con el servidor. Revisa tu conexión.'
     } else {
       mensaje = error.message || 'Error desconocido'
+    }
+
+    // Los errores 500 traen una "referencia": es el id con el que el error quedó en el
+    // log del servidor. Mostrarla permite que soporte lo encuentre al instante.
+    if (status !== undefined && status >= 500 && typeof data?.referencia === 'string') {
+      mensaje = `${mensaje} (código de soporte: ${data.referencia.slice(0, 8)})`
     }
 
     if (status === 401 && !esLogin) {
@@ -106,5 +115,11 @@ api.interceptors.response.use(
 // más que los 10 s generales: con el tiempo global, la pantalla decía "tardó
 // demasiado" mientras el servidor seguía importando, y al reintentar todo salía "Ya existe".
 export const TIMEOUT_IMPORT = 120_000
+
+// Operaciones en lote que el servidor ejecuta en UNA transacción (matricular un curso,
+// copiar la estructura, registrar resultados): pueden pasar los 10 s generales con
+// cientos de estudiantes. Con el timeout corto la pantalla decía "tardó demasiado"
+// aunque el servidor terminaba bien, y la persona reintentaba.
+export const TIMEOUT_LOTE = 60_000
 
 export default api

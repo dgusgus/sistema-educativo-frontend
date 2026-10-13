@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useGestionStore } from '@/stores/gestion.store'
 import { calificacionApi } from '@/api/calificacion.api'
-import api from '@/api/axios'
+import { tutorApi, type EstudianteVinculado } from '@/api/tutor.api'
 import type { Nivel, ResultadoFinal } from '@/types'
 import { horarioApi, type HorarioDetalle } from '@/api/horario.api'
 import HorarioSemanal from '@/components/HorarioSemanal.vue'
@@ -11,15 +11,6 @@ import StatusBadge from '@/components/StatusBadge.vue'
 
 const gestion = useGestionStore()
 const horarioEstudiante = ref<HorarioDetalle[]>([])
-// ─── Tipos locales ────────────────────────────────────────────────────────────
-// No existe un tutor.api.ts dedicado todavía — se consulta directo con
-// tipos locales en vez de "any" para no perder seguridad de tipos.
-interface EstudianteVinculado {
-  id: number
-  nombre: string
-  apellido: string
-  ci: string
-}
 
 // Refleja GET /calificaciones/estudiante (mismo shape que MiPerfilView.vue)
 interface CalificacionItem {
@@ -55,18 +46,14 @@ const error           = ref<string | null>(null)
 onMounted(async () => {
   try {
     await gestion.cargar()
-    // GET /auth/me trae el perfil del tutor (id) — de ahí sacamos sus
-    // estudiantes vinculados con GET /tutores/:id
-    const { data } = await api.get<{ perfil: { id: number } | null }>('/auth/me')
-    const tutorId = data.perfil?.id
-    if (tutorId) {
-      const { data: tutor } = await api.get<{
-        estudiantes: Array<{ estudiante: EstudianteVinculado }>
-      }>(`/tutores/${tutorId}`)
-      estudiantes.value = tutor.estudiantes?.map(te => te.estudiante) ?? []
-      if (estudiantes.value.length === 1) {
-        await cargarDatos(estudiantes.value[0].id)
-      }
+    // El tutor lee SUS vinculados con GET /tutores/mis-vinculados (solo
+    // rol TUTOR, sin id: el backend resuelve el perfil desde el token).
+    // Antes se llamaba a GET /tutores/:id, que exige DIRECTOR/SECRETARIA
+    // y siempre devolvía 403 para tutores.
+    const tutor = await tutorApi.getMisVinculados()
+    estudiantes.value = tutor.estudiantes?.map(te => te.estudiante) ?? []
+    if (estudiantes.value.length === 1) {
+      await cargarDatos(estudiantes.value[0].id)
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar datos'

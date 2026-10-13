@@ -7,6 +7,8 @@ export const useGestionStore = defineStore('gestion', () => {
   const gestion  = ref<GestionActiva | null>(null)
   const cargando = ref(false)
   const error    = ref<string | null>(null)
+  // true cuando ya se consultó al servidor (aunque no haya gestión activa)
+  const cargada  = ref(false)
 
   const gestionId = computed(() => gestion.value?.id ?? null)
   const anio      = computed(() => gestion.value?.anio ?? null)
@@ -30,12 +32,14 @@ export const useGestionStore = defineStore('gestion', () => {
 
   async function cargar() {
     // DashboardLayout llama a cargar() en cada montaje — este guard evita
-    // repetir el GET /gestiones/activa en cada cambio de ruta.
-    if (gestion.value) return
+    // repetir el GET /gestiones/activa en cada cambio de ruta (también cuando
+    // la respuesta fue "no hay gestión activa").
+    if (gestion.value || cargada.value) return
     cargando.value = true
     error.value = null
     try {
       gestion.value = await gestionApi.getActiva()
+      cargada.value = true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Error al cargar gestión'
     } finally {
@@ -47,12 +51,14 @@ export const useGestionStore = defineStore('gestion', () => {
   // activar una gestión o reasignar director.
   async function recargar() {
     gestion.value = null
+    cargada.value = false
     await cargar()
   }
 
   // Se llama en logout para que el próximo usuario no vea datos del anterior
   function limpiar() {
     gestion.value = null
+    cargada.value = false
   }
 
   return {

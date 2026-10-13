@@ -4,6 +4,7 @@ import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores
 import { useGestionStore } from '@/stores/gestion.store'
 import { calificacionApi, type PlanillaResponse } from '@/api/calificacion.api'
 import { evaluacionApi } from '@/api/evaluacion.api'
+import { useCatalogoStore } from '@/stores/catalogo.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import type { DimensionEvaluacion, ActividadEvaluativa, Nivel } from '@/types'
@@ -14,6 +15,7 @@ const toast = useToastStore()
 
 const docenteStore = useDocenteStore()
 const gestion      = useGestionStore()
+const catalogo     = useCatalogoStore()
 
 const asignacion = computed({
   get: () => docenteStore.asignacionActiva,
@@ -71,7 +73,7 @@ async function cargarTodo() {
   try {
     const [pl, dims, acts] = await Promise.all([
       calificacionApi.getPlanilla(asignacion.value.docenteMateriaCursoId, Number(trimestreId.value)),
-      evaluacionApi.getDimensiones(gestion.gestionId),
+      catalogo.dimensiones(gestion.gestionId),
       evaluacionApi.getActividadesEvaluativas(asignacion.value.docenteMateriaCursoId, Number(trimestreId.value)),
     ])
     planilla.value    = pl

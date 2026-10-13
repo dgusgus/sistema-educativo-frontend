@@ -1,6 +1,36 @@
 import api, { TIMEOUT_IMPORT } from '@/api/axios'
-import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal } from '@/types'
+import type { Estudiante, Inscripcion, EstadoInscripcion, ResultadoFinal, Nivel } from '@/types'
 import type { ResultadoImport } from '@/types/import'
+
+// ─── Historial académico ─────────────────────────────────────────────────────
+// A qué curso le corresponde inscribirse (lo calcula el backend desde su
+// historial y es la misma regla que valida al inscribir).
+export type CursoEsperado =
+  | { tipo: 'LIBRE';     motivo: string }
+  | { tipo: 'FIJO';      nivel: Nivel; grado: number; etiqueta: string; corresponde: string; motivo: string }
+  | { tipo: 'EGRESADO';  motivo: string }
+  | { tipo: 'PENDIENTE'; motivo: string }
+
+export interface EntradaHistorial {
+  inscripcionId:    number
+  gestionId:        number
+  anio:             number
+  curso:            string
+  estado:           EstadoInscripcion
+  resultado:        ResultadoFinal
+  fechaInscripcion: string
+  fechaRetiro:      string | null
+  procedencia:      string | null
+  promedioGeneral:  number | null
+  desde:            string
+  hacia:            string
+}
+
+export interface HistorialAcademico {
+  estudiante: { id: number; nombre: string; ci: string | null }
+  proximo:    CursoEsperado
+  historial:  EntradaHistorial[]
+}
 
 export interface EstudiantePayload {
   ci:               string
@@ -26,13 +56,36 @@ export interface CambiarEstadoPayload {
   observaciones?:    string
 }
 
+// Respuesta del backend cuando se pide ?pagina=N (paginación opt-in).
+export interface Paginada<T> {
+  data: T[]
+  meta: { pagina: number; limite: number; total: number; totalPaginas: number }
+}
+
+export interface FiltrosEstudiantes {
+  search?: string
+  cursoId?: number
+  gestionId?: number
+  estadoInscripcion?: EstadoInscripcion
+}
+
 export const estudianteApi = {
+  // Una página de resultados (el servidor filtra y ordena). Usar esto en pantallas con listas largas.
+  getPage: (params: FiltrosEstudiantes & { pagina: number; limite: number }) =>
+    api.get<Paginada<Estudiante>>('/estudiantes', { params }).then(r => r.data),
+
+  // Lista COMPLETA sin paginar. Solo para casos puntuales; con cientos de estudiantes prefiere getPage.
   getAll: (params?: {
     search?: string
     cursoId?: number
     gestionId?: number
     estadoInscripcion?: EstadoInscripcion
   }) => api.get<Estudiante[]>('/estudiantes', { params }).then(r => r.data),
+
+  // Recorrido académico (una fila por gestión) y qué curso le corresponde a
+  // continuación. Con gestionId, "lo que le corresponde" es para esa gestión.
+  getHistorial: (id: number, gestionId?: number) =>
+    api.get<HistorialAcademico>(`/estudiantes/${id}/historial`, { params: gestionId ? { gestionId } : undefined }).then(r => r.data),
 
   // Detalle con historial completo de inscripciones y tutores
   getById: (id: number) =>

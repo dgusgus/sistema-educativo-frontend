@@ -13,13 +13,18 @@ export interface ConceptoPago {
 }
 
 // Refleja GET /pagos/:inscripcionId
+// Un concepto se puede pagar en varios abonos: estos valores son del CONCEPTO completo.
+//   saldo = monto − descuentos − pagado · PAGADO si saldo = 0 · PARCIAL si hay algo pagado · PENDIENTE si nada
 export interface ConceptoEstado {
   concepto:      { id: number; nombre: string; monto: number }
   obligatorio:   boolean
-  estado:        'PAGADO' | 'PENDIENTE'
-  montoPagado:   number
-  fechaPago:     string | null
-  numeroRecibo:  string | null
+  estado:        'PAGADO' | 'PARCIAL' | 'PENDIENTE'
+  montoPagado:   number          // total abonado
+  descuento:     number
+  saldo:         number          // lo que falta por pagar de este concepto
+  abonos:        number          // cantidad de pagos registrados
+  fechaPago:     string | null   // del último abono
+  numeroRecibo:  string | null   // del último abono
   pagosAnulados: number
 }
 
@@ -55,6 +60,9 @@ export interface PagosInscripcionResponse {
   historialPagos:    PagoHistorial[]
 }
 
+// Respuesta de registrar un pago: el pago creado + lo que queda por pagar de ese concepto
+export type PagoRegistrado = PagoHistorial & { saldoPendiente: number }
+
 export interface PagoPayload {
   inscripcionId:  number
   conceptoPagoId: number
@@ -74,10 +82,10 @@ export const pagoApi = {
   getDeInscripcion: (inscripcionId: number) =>
     api.get<PagosInscripcionResponse>(`/pagos/${inscripcionId}`).then(r => r.data),
 
-  // Rechaza (409) si ya hay un pago PAGADO activo para ese concepto —
-  // primero hay que anular el existente.
+  // Permite abonos: si el monto no cubre el saldo queda PARCIAL; si lo cubre, PAGADO.
+  // Rechaza (400) un monto mayor al saldo y (409) un concepto ya pagado por completo.
   registrar: (payload: PagoPayload) =>
-    api.post<PagoHistorial>('/pagos', payload).then(r => r.data),
+    api.post<PagoRegistrado>('/pagos', payload).then(r => r.data),
 
   anular: (id: number, observaciones?: string) =>
     api.put(`/pagos/${id}/anular`, { observaciones }).then(r => r.data),

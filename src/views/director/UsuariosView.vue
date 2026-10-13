@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { docenteApi } from '@/api/docente.api'
 import { estudianteApi } from '@/api/estudiante.api'
+import { useListaPaginada, type PaginaRespuesta } from '@/composables/useListaPaginada'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useToastStore } from '@/stores/toast.store'
 import type { Rol, Nivel } from '@/types'
@@ -51,6 +53,20 @@ const cargando  = ref(false)
 const error     = ref<string | null>(null)
 const busqueda  = ref('')
 
+// Estudiantes: ~900 y crecen cada año → paginados y buscados EN EL SERVIDOR
+// (las demás pestañas son listas cortas y siguen filtrándose en el navegador).
+const estPag = useListaPaginada<PerfilItem>({
+  pedir: p => estudianteApi.getPage(p) as unknown as Promise<PaginaRespuesta<PerfilItem>>,
+})
+const esEstudiantes  = computed(() => tabActivo.value === 'ESTUDIANTE')
+const cargandoVista  = computed(() => esEstudiantes.value ? estPag.cargando.value : cargando.value)
+const errorVista     = computed(() => esEstudiantes.value ? estPag.error.value : error.value)
+const busquedaVista  = computed({
+  get: () => esEstudiantes.value ? estPag.busqueda.value : busqueda.value,
+  set: v => { if (esEstudiantes.value) estPag.busqueda.value = v; else busqueda.value = v },
+})
+const cantidadTab = (rol: TabRol) => rol === 'ESTUDIANTE' ? estPag.total.value : datos.value[rol].length
+
 // ⚠️ Limitación real del backend: GET /estudiantes (lista) NO incluye
 // "usuario" en absoluto (solo GET /estudiantes/:id lo trae) — por eso en
 // el tab Estudiantes el badge de cuenta y "Reset pass" nunca se muestran,
@@ -58,6 +74,11 @@ const busqueda  = ref('')
 // `usuario: { select: {...} }` al include de getEstudiantes en el backend.
 async function cargarTab(rol: TabRol) {
   if (cargados.value[rol]) return
+  if (rol === 'ESTUDIANTE') {
+    await estPag.refiltrar()
+    cargados.value[rol] = !estPag.error.value
+    return
+  }
   cargando.value = true
   error.value    = null
   busqueda.value = ''
@@ -65,8 +86,6 @@ async function cargarTab(rol: TabRol) {
     let items: PerfilItem[] = []
     if (rol === 'DOCENTE') {
       items = await docenteApi.getAll()
-    } else if (rol === 'ESTUDIANTE') {
-      items = await estudianteApi.getAll()
     } else {
       // Directores, Secretarias y Tutores vía el endpoint unificado
       const lista = await usuarioApi.getAll({ rol })
@@ -100,6 +119,7 @@ onMounted(async () => {
 })
 
 const listaFiltrada = computed(() => {
+  if (esEstudiantes.value) return estPag.items.value   // ya viene filtrado y paginado
   const q     = busqueda.value.toLowerCase().trim()
   const items = datos.value[tabActivo.value]
   if (!q) return items
@@ -285,21 +305,21 @@ function labelCampoExtra(): string {
       >
         {{ t.label }}
         <span v-if="cargados[t.rol]" class="ml-1 badge badge-xs badge-ghost">
-          {{ datos[t.rol].length }}
+          {{ cantidadTab(t.rol) }}
         </span>
       </button>
     </div>
 
     <!-- Error -->
-    <div v-if="error" role="alert" class="alert alert-error">
-      <span>{{ error }}</span>
+    <div v-if="errorVista" role="alert" class="alert alert-error">
+      <span>{{ errorVista }}</span>
       <button class="btn btn-sm btn-ghost" @click="cargarTab(tabActivo)">Reintentar</button>
     </div>
 
     <!-- Buscador -->
     <label class="input input-bordered flex items-center gap-2 max-w-sm">
 <AppIcon nombre="buscar" class="h-4 w-4 opacity-50" />
-      <input v-model="busqueda" type="search" :placeholder="`Buscar en ${labelActivo}...`" class="grow" />
+      <input v-model="busquedaVista" type="search" :placeholder="`Buscar en ${labelActivo}...`" class="grow" />
     </label>
 
     <!-- Tabla -->
@@ -316,7 +336,7 @@ function labelCampoExtra(): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="cargando" v-for="i in 5" :key="i">
+          <tr v-if="cargandoVista" v-for="i in 5" :key="i">
             <td colspan="6"><div class="skeleton h-4 w-full"></div></td>
           </tr>
           <tr v-else-if="listaFiltrada.length === 0">
@@ -364,7 +384,13 @@ function labelCampoExtra(): string {
       </table>
     </div>
 
-    <p v-if="!cargando && cargados[tabActivo]" class="text-xs text-base-content/40">
+    <PaginadorTabla
+      v-if="esEstudiantes"
+      :pagina="estPag.pagina.value" :total-paginas="estPag.totalPaginas.value"
+      :desde="estPag.desde.value" :hasta="estPag.hasta.value" :total="estPag.total.value"
+      :limite="estPag.limite.value" :cargando="estPag.cargando.value"
+      @ir="estPag.irAPagina" @limite="estPag.cambiarLimite" />
+    <p v-else-if="!cargando && cargados[tabActivo]" class="text-xs text-base-content/40">
       {{ listaFiltrada.length }} {{ labelActivo.toLowerCase() }} encontrado(s)
     </p>
   </div>

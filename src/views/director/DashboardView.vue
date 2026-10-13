@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { reporteApi, type ReporteAcademicoDetalle } from '@/api/reporte.api'
-import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
-import { evaluacionApi } from '@/api/evaluacion.api'
-import { institucionApi } from '@/api/institucion.api'
+import { cursoApi, trimestreApi, nombreCurso } from '@/api/estructura.api'
+import { useCatalogoStore } from '@/stores/catalogo.store'
 import { docenteApi } from '@/api/docente.api'
 import { useGestionStore } from '@/stores/gestion.store'
 import type { DashboardResponse, DimensionEvaluacion, Materia, Curso, Institucion, Docente } from '@/types'
@@ -19,11 +18,13 @@ import { diasHasta, formatoFecha } from '@/lib/fechas'
 // Dashboard en 3 bloques: hero + alertas (lo que exige acción) → indicadores
 // y estado → rendimiento y explorador por curso. Cada bloque carga
 // independiente: si un endpoint falla, los demás igual se muestran.
+const catalogo = useCatalogoStore()
 const gestionStore = useGestionStore()
 
 const datos    = ref<DashboardResponse | null>(null)
 const cargando = ref(true)
 const error    = ref<string | null>(null)
+const sinGestion = ref(false)
 
 const dimensiones = ref<DimensionEvaluacion[] | null>(null)
 const materias    = ref<Materia[] | null>(null)
@@ -92,7 +93,7 @@ async function cargarDimensiones() {
   if (!id) return
   erroresBloque.value.dimensiones = null
   try {
-    dimensiones.value = await evaluacionApi.getDimensiones(id)
+    dimensiones.value = await catalogo.dimensiones(id)
   } catch (e) {
     erroresBloque.value.dimensiones = mensajeError(e)
   }
@@ -103,7 +104,7 @@ async function cargarEstructura() {
   if (!id) return
   erroresBloque.value.estructura = null
   try {
-    const [ms, cs] = await Promise.all([materiaApi.getAll(), cursoApi.getAll(id)])
+    const [ms, cs] = await Promise.all([catalogo.materias(), cursoApi.getAll(id)])
     materias.value = ms
     cursos.value = cs
   } catch (e) {
@@ -142,6 +143,14 @@ async function cargarPendientes() {
 }
 
 onMounted(async () => {
+  // Sin gestión activa (p. ej. recién cerrada) no hay indicadores que mostrar:
+  // se evita pedir /dashboard, que respondería 404.
+  await gestionStore.cargar().catch(() => {})
+  if (!gestionStore.gestionId) {
+    sinGestion.value = true
+    cargando.value = false
+    return
+  }
   try {
     datos.value = await reporteApi.getDashboard()
   } catch (e) {
@@ -151,7 +160,7 @@ onMounted(async () => {
   }
   cargando.value = false
 
-  institucionApi.get().then(r => { institucion.value = r }).catch(() => {})
+  catalogo.institucion().then(r => { institucion.value = r }).catch(() => {})
   gestionStore.cargar().catch(() => {})
   cargarDimensiones()
   cargarEstructura()
@@ -191,6 +200,11 @@ onMounted(async () => {
         </div>
       </div>
       <progress class="progress h-1.5 w-full rounded-none [&::-webkit-progress-value]:bg-dorado [&::-moz-progress-bar]:bg-dorado" :value="avanceGestion" max="100" :aria-valuenow="avanceGestion" aria-label="Avance del año lectivo" />
+    </div>
+
+    <!-- Sin gestión activa -->
+    <div v-if="sinGestion" role="alert" class="alert alert-info">
+      <span>No hay una gestión activa. Para ver los indicadores, activar una gestión desde Gestiones.</span>
     </div>
 
     <!-- Error -->
@@ -413,7 +427,11 @@ onMounted(async () => {
       <!-- ── 4. MEJORES + INSCRIPCIONES ────────────────────────────────────── -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <template v-if="detalleAcademico">
-          <MejoresGestion :detalle="detalleAcademico" />
+          <MejoresGestion
+            :detalle="detalleAcademico"
+            :trimestre-numero="trimestreActivo?.numero ?? null"
+            :trimestre-nombre="trimestreActivo?.nombre ?? ''"
+          />
           <EstadoInscripciones :detalle="detalleAcademico" />
         </template>
         <div v-else-if="erroresBloque.academico" role="alert" class="alert alert-error xl:col-span-2">

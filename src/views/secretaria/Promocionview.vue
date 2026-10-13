@@ -1,297 +1,146 @@
 <script setup lang="ts">
 /**
- * PromocionView — resuelve el "trabajo de 1000 estudiantes uno por uno".
- * El backend YA calcula quién promueve, quién repite y quién egresa
- * (GET /gestiones/:id/propuesta-inscripciones, usando la progresión
- * 1°→2°→...→6° Primaria → 1°→...→6° Secundaria → egresado). Acá se
- * agrupan los resultados por destino sugerido, se elige a qué CURSO
- * real de la gestión nueva va cada grupo, y se matricula todo de una
- * pasada — sin tocar ni duplicar el registro del Estudiante, que es
- * permanente: solo se crean Inscripcion nuevas.
+ * PromocionView — Promoción y matrícula POR CURSO.
+ *
+ * La unidad de trabajo es un curso de la gestión de origen (p. ej. 3° "A"). Un tablero muestra
+ * todos los cursos con su avance; al abrir uno se hacen sus dos pasos, cada uno en su componente
+ * (components/promocion/): Paso 1 resultados finales, Paso 2 matrícula en la gestión siguiente.
+ * Esta vista solo elige las gestiones, carga el tablero y coordina los pasos.
  */
-import { ref, computed, onMounted } from 'vue'
-import { gestionApi, type GestionResumen } from '@/api/gestion.api'
-import { cursoApi } from '@/api/estructura.api'
-import { estudianteApi } from '@/api/estudiante.api'
-import { useToastStore } from '@/stores/toast.store'
-import type { Curso } from '@/types'
-import StatusBadge from '@/components/StatusBadge.vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { gestionApi, type GestionResumen, type TableroPromocion, type CursoPromocion } from '@/api/gestion.api'
+import { useCatalogoStore } from '@/stores/catalogo.store'
+import PromocionTablero from '@/components/promocion/PromocionTablero.vue'
+import PromocionPaso1 from '@/components/promocion/PromocionPaso1.vue'
+import PromocionPaso2 from '@/components/promocion/PromocionPaso2.vue'
 
-const toast = useToastStore()
+const mensaje = (e: unknown, defecto: string) => (e instanceof Error ? e.message : defecto)
 
+// ─── Gestiones ───────────────────────────────────────────────────────────────
 const gestiones = ref<GestionResumen[]>([])
-const gestionOrigen  = ref<number | ''>('')
-const gestionDestino = ref<number | ''>('')
-const cursosDestino  = ref<Curso[]>([])
+const catalogo = useCatalogoStore()
+const origenId  = ref<number | ''>('')
+const destinoId = ref<number | ''>('')
+
+const destinosPosibles = computed(() => {
+  const origen = gestiones.value.find(g => g.id === origenId.value)
+  return origen ? gestiones.value.filter(g => g.anio > origen.anio) : []
+})
+const destinoAnio = computed(() => gestiones.value.find(g => g.id === destinoId.value)?.anio)
 
 onMounted(async () => {
   try {
-    gestiones.value = await gestionApi.getAll()
-    // Sugerencia razonable: origen = la más reciente NO activa, destino = la activa
-    const activa = gestiones.value.find(g => g.activa)
-    const anterior = gestiones.value.find(g => !g.activa)
-    if (activa)    gestionDestino.value = activa.id
-    if (anterior)  gestionOrigen.value  = anterior.id
+    // forzar: la promoción necesita ver el estado más reciente de las gestiones
+    gestiones.value = [...(await catalogo.gestiones(true))]
+    // Origen: la gestión activa (los resultados se registran antes de cerrarla);
+    // si no hay activa, la más reciente.
+    const masReciente = [...gestiones.value].sort((a, b) => b.anio - a.anio)[0]
+    const origen = gestiones.value.find(g => g.activa) ?? masReciente
+    if (origen) origenId.value = origen.id
   } catch {
     gestiones.value = []
   }
 })
 
-// ─── Propuesta ────────────────────────────────────────────────────────────────
-interface PropuestaItem {
-  estudianteId: number
-  estudiante: string
-  ci: string | null
-  cursoActual: string
-  estado: string
-  resultado: string
-  accion: string
-  cursoSugerido: string | null
-}
-const propuesta = ref<{ resumen: Record<string, number>; propuesta: PropuestaItem[] } | null>(null)
-const cargandoPropuesta = ref(false)
-const error = ref<string | null>(null)
-
-async function cargarPropuesta() {
-  if (!gestionOrigen.value) { error.value = 'Elegí la gestión de origen'; return }
-  cargandoPropuesta.value = true
-  error.value = null
-  propuesta.value = null
-  seleccionados.value = {}
-  try {
-    propuesta.value = await gestionApi.getPropuestaInscripciones(Number(gestionOrigen.value))
-    // Por defecto se seleccionan solo PROMOVER y REPETIR_CURSO — egresados,
-    // los que no continúan y los sin resultado quedan afuera del lote.
-    propuesta.value.propuesta.forEach(p => {
-      seleccionados.value[p.estudianteId] = p.accion === 'PROMOVER' || p.accion === 'REPETIR_CURSO'
-    })
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al calcular la propuesta'
-  } finally {
-    cargandoPropuesta.value = false
-  }
-}
-
-async function cargarCursosDestino() {
-  if (!gestionDestino.value) { cursosDestino.value = []; return }
-  try {
-    cursosDestino.value = await cursoApi.getAll(Number(gestionDestino.value))
-  } catch {
-    cursosDestino.value = []
-  }
-}
-
-// ─── Selección y agrupación por destino sugerido ─────────────────────────────
-const seleccionados = ref<Record<number, boolean>>({})
-
-const itemsProcesables = computed(() =>
-  (propuesta.value?.propuesta ?? []).filter(p => p.accion === 'PROMOVER' || p.accion === 'REPETIR_CURSO')
-)
-const itemsSinAccion = computed(() =>
-  (propuesta.value?.propuesta ?? []).filter(p => p.accion !== 'PROMOVER' && p.accion !== 'REPETIR_CURSO')
-)
-
-// Cada valor único de "cursoSugerido" (ej. "2° Primaria") agrupa a todos
-// los estudiantes que van al mismo nivel+grado — se elige UN curso real
-// de destino por grupo, en vez de uno por estudiante.
-const grupos = computed(() => {
-  const set = new Set<string>()
-  itemsProcesables.value.forEach(p => set.add(p.cursoSugerido ?? '—'))
-  return Array.from(set)
+// Al cambiar el origen: destino por defecto = la gestión inmediatamente posterior.
+watch(origenId, () => {
+  cursoSel.value = null
+  const siguiente = [...destinosPosibles.value].sort((a, b) => a.anio - b.anio)[0]
+  const nuevo = siguiente?.id ?? ''
+  if (destinoId.value === nuevo) void cargarTablero()
+  else destinoId.value = nuevo   // el watch de destinoId recarga el tablero
 })
-const mapeoDestino = ref<Record<string, number | ''>>({})
+watch(destinoId, () => { void cargarTablero() })   // el Paso 2 abierto se recarga solo (vigila destinoId)
 
-function itemsDelGrupo(grupo: string) {
-  return itemsProcesables.value.filter(p => (p.cursoSugerido ?? '—') === grupo)
-}
+// ─── Tablero de cursos ───────────────────────────────────────────────────────
+const tablero = ref<TableroPromocion | null>(null)
+const cargandoTablero = ref(false)
+const errorTablero = ref<string | null>(null)
 
-const totalSeleccionados = computed(() =>
-  itemsProcesables.value.filter(p => seleccionados.value[p.estudianteId]).length
-)
-
-function marcarTodosDelGrupo(grupo: string, valor: boolean) {
-  itemsDelGrupo(grupo).forEach(p => { seleccionados.value[p.estudianteId] = valor })
-}
-
-// ─── Confirmar matrícula masiva ───────────────────────────────────────────────
-const procesando   = ref(false)
-const progreso      = ref({ hechos: 0, total: 0, errores: 0 })
-const resultadoFinal = ref<{ exitos: number; errores: number; detalleErrores: string[] } | null>(null)
-
-async function confirmarMatricula() {
-  if (!gestionDestino.value) { error.value = 'Elegí la gestión de destino'; return }
-  const gruposSinDestino = grupos.value.filter(g => itemsDelGrupo(g).some(p => seleccionados.value[p.estudianteId]) && !mapeoDestino.value[g])
-  if (gruposSinDestino.length) {
-    error.value = `Falta elegir curso destino para: ${gruposSinDestino.join(', ')}`
-    return
-  }
-
-  const aProcesar = itemsProcesables.value.filter(p => seleccionados.value[p.estudianteId])
-  if (!aProcesar.length) { error.value = 'No hay estudiantes seleccionados'; return }
-
-  procesando.value = true
-  error.value = null
-  resultadoFinal.value = null
-  progreso.value = { hechos: 0, total: aProcesar.length, errores: 0 }
-  const errores: string[] = []
-
-  // Se procesa en lotes de 20 en paralelo — con ~1000 estudiantes, uno por
-  // uno sería demasiado lento, y todos a la vez satura al backend.
-  const TAMANO_LOTE = 20
-  for (let i = 0; i < aProcesar.length; i += TAMANO_LOTE) {
-    const lote = aProcesar.slice(i, i + TAMANO_LOTE)
-    const resultados = await Promise.allSettled(
-      lote.map(p => estudianteApi.inscribir({
-        estudianteId: p.estudianteId,
-        cursoId: Number(mapeoDestino.value[p.cursoSugerido ?? '—']),
-        gestionId: Number(gestionDestino.value),
-      }))
+async function cargarTablero() {
+  if (!origenId.value) { tablero.value = null; return }
+  cargandoTablero.value = true
+  errorTablero.value = null
+  try {
+    tablero.value = await gestionApi.getCursosPromocion(
+      Number(origenId.value),
+      destinoId.value ? Number(destinoId.value) : undefined,
     )
-    resultados.forEach((r, idx) => {
-      progreso.value.hechos++
-      if (r.status === 'rejected') {
-        progreso.value.errores++
-        const nombre = lote[idx].estudiante
-        errores.push(`${nombre}: ${r.reason instanceof Error ? r.reason.message : 'Error desconocido'}`)
-      }
-    })
+  } catch (e) {
+    tablero.value = null
+    errorTablero.value = mensaje(e, 'Error al cargar los cursos')
+  } finally {
+    cargandoTablero.value = false
   }
+}
 
-  resultadoFinal.value = {
-    exitos: aProcesar.length - errores.length,
-    errores: errores.length,
-    detalleErrores: errores,
-  }
-  procesando.value = false
-  toast.success(`Matrícula masiva completada: ${aProcesar.length - errores.length} de ${aProcesar.length}`)
+// ─── Curso abierto y coordinación de pasos ───────────────────────────────────
+const cursoSel = ref<CursoPromocion | null>(null)
+const paso2 = ref<InstanceType<typeof PromocionPaso2> | null>(null)
+
+// Al registrar resultados cambia lo que se puede matricular y el avance del tablero.
+function alRegistrar() {
+  void paso2.value?.recargar()
+  void cargarTablero()
 }
 </script>
+
 
 <template>
   <div class="space-y-4">
     <div>
       <h2 class="font-display text-2xl font-bold tracking-tight">Promoción de Gestión</h2>
       <p class="mt-0.5 text-sm text-base-content/60">
-        Matricula masivamente a la gestión siguiente usando la progresión automática
-        (1°→2°→...→6° Primaria → 1°→...→6° Secundaria → egresado). El Estudiante no se
-        duplica ni se vuelve a crear — solo se genera su inscripción nueva.
+        Se trabaja curso por curso: primero se registra el resultado final del año de sus estudiantes (Paso 1)
+        y después se los matricula en la gestión siguiente (Paso 2). El estudiante no se duplica — solo se
+        genera su inscripción nueva, y el sistema controla que cada uno vaya al curso que le corresponde.
       </p>
     </div>
 
-    <!-- Selección de gestiones -->
+    <!-- Gestiones -->
     <div class="card bg-base-100 shadow">
-      <div class="card-body py-3 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Gestión de origen (de dónde vienen)</legend>
-          <select v-model="gestionOrigen" class="select select-bordered w-full">
-            <option value="" disabled>Seleccionar</option>
-            <option v-for="g in gestiones" :key="g.id" :value="g.id">{{ g.anio }} {{ g.activa ? '(activa)' : '' }}</option>
-          </select>
-        </fieldset>
-        <fieldset class="fieldset">
-          <legend class="fieldset-legend text-xs">Gestión de destino (a dónde van)</legend>
-          <select v-model="gestionDestino" class="select select-bordered w-full" @change="cargarCursosDestino">
-            <option value="" disabled>Seleccionar</option>
-            <option v-for="g in gestiones" :key="g.id" :value="g.id" :disabled="g.id === gestionOrigen">
-              {{ g.anio }} {{ g.activa ? '(activa)' : '' }}
-            </option>
-          </select>
-          <p v-if="gestionDestino && !cursosDestino.length" class="text-xs text-warning mt-1">
-            Esta gestión no tiene cursos creados todavía — creálos primero en Estructura.
-          </p>
-        </fieldset>
-        <button class="btn btn-primary" :disabled="cargandoPropuesta || !gestionOrigen" @click="cargarPropuesta">
-          <span v-if="cargandoPropuesta" class="loading loading-spinner loading-sm"></span>
-          Calcular propuesta
-        </button>
-      </div>
-    </div>
-
-    <div v-if="error" role="alert" class="alert alert-error">
-      <span class="flex-1">{{ error }}</span>
-      <button type="button" class="btn btn-sm btn-ghost min-h-11" @click="cargarPropuesta">Reintentar</button>
-    </div>
-
-    <template v-if="propuesta">
-      <!-- Resumen -->
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Promueven</p><p class="text-xl font-bold text-success">{{ propuesta.resumen.promover }}</p></div></div>
-        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Repiten</p><p class="text-xl font-bold text-warning">{{ propuesta.resumen.repetir }}</p></div></div>
-        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Egresan</p><p class="text-xl font-bold text-info">{{ propuesta.resumen.egresados }}</p></div></div>
-        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">No continúan</p><p class="text-xl font-bold text-error">{{ propuesta.resumen.noContinua }}</p></div></div>
-        <div class="card bg-base-100 shadow"><div class="card-body py-3"><p class="text-xs text-base-content/50">Sin resultado</p><p class="text-xl font-bold text-base-content/40">{{ propuesta.resumen.revisarManualmente }}</p></div></div>
-      </div>
-
-      <div v-if="propuesta.resumen.revisarManualmente > 0" role="alert" class="alert alert-warning text-sm">
-        <span>{{ propuesta.resumen.revisarManualmente }} estudiante(s) sin resultado final registrado — no se incluyen en el lote. Registralos primero en Estudiantes.</span>
-      </div>
-
-      <!-- Grupos: elegir curso destino real por cada nivel/grado sugerido -->
-      <div v-for="grupo in grupos" :key="grupo" class="card bg-base-100 shadow">
-        <div class="card-body py-3">
-          <div class="flex flex-wrap items-center gap-3 mb-2">
-            <h3 class="font-semibold">{{ grupo }}</h3>
-            <span class="badge badge-ghost">{{ itemsDelGrupo(grupo).length }} estudiante(s)</span>
-            <select v-model="mapeoDestino[grupo]" class="select select-bordered ml-auto max-w-full" :aria-label="`Curso destino para ${grupo}`">
-              <option value="" disabled>Curso destino real *</option>
-              <option v-for="c in cursosDestino" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+      <div class="card-body py-3 space-y-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Gestión de origen (la que termina)</legend>
+            <select v-model="origenId" class="select select-bordered w-full">
+              <option value="" disabled>Seleccionar</option>
+              <option v-for="g in gestiones" :key="g.id" :value="g.id">{{ g.anio }} {{ g.activa ? '(activa)' : '' }}</option>
             </select>
-            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosDelGrupo(grupo, true)">Marcar todos</button>
-            <button class="btn btn-ghost btn-sm min-h-11" @click="marcarTodosDelGrupo(grupo, false)">Desmarcar todos</button>
-          </div>
-          <div class="overflow-x-auto max-h-64 overflow-y-auto">
-            <table class="table table-xs">
-              <tbody>
-                <tr v-for="p in itemsDelGrupo(grupo)" :key="p.estudianteId" class="hover">
-                  <td class="w-12 text-center"><input v-model="seleccionados[p.estudianteId]" type="checkbox" class="checkbox checkbox-md" :aria-label="`Seleccionar a ${p.estudiante}`" /></td>
-                  <td>{{ p.estudiante }}</td>
-                  <td class="font-mono text-xs text-base-content/50">{{ p.ci }}</td>
-                  <td class="text-xs text-base-content/50">{{ p.cursoActual }}</td>
-                  <td><StatusBadge :estado="p.accion" tamano="xs" /></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Gestión de destino (la siguiente)</legend>
+            <select v-model="destinoId" class="select select-bordered w-full" :disabled="!destinosPosibles.length">
+              <option value="">Sin elegir</option>
+              <option v-for="g in destinosPosibles" :key="g.id" :value="g.id">{{ g.anio }} {{ g.activa ? '(activa)' : '' }}</option>
+            </select>
+          </fieldset>
         </div>
+        <p v-if="origenId && !destinosPosibles.length" class="text-xs text-warning">
+          No hay una gestión posterior. Para matricular, créala en Gestiones copiando la estructura de la actual.
+        </p>
+      </div>
+    </div>
+
+    <div v-if="errorTablero" role="alert" class="alert alert-error"><span>{{ errorTablero }}</span></div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body py-3">
+        <PromocionTablero :tablero="tablero" :cargando="cargandoTablero" :seleccionado-id="cursoSel?.cursoId ?? null"
+                          @abrir="cursoSel = $event" />
+      </div>
+    </div>
+
+    <!-- Curso abierto: la key reinicia los pasos al cambiar de curso -->
+    <template v-if="cursoSel && origenId">
+      <div class="flex items-center gap-3 pt-2">
+        <h3 class="font-display text-xl font-bold">{{ cursoSel.curso }}</h3>
+        <button class="btn btn-ghost btn-sm ml-auto min-h-11" @click="cursoSel = null">Cerrar curso</button>
       </div>
 
-      <!-- Egresados / no continúan / sin resultado — informativo, no procesable -->
-      <div v-if="itemsSinAccion.length" class="card bg-base-100 shadow">
-        <div class="card-body py-3">
-          <h3 class="font-semibold mb-2 text-base-content/60">Sin acción automática ({{ itemsSinAccion.length }})</h3>
-          <div class="overflow-x-auto max-h-48 overflow-y-auto">
-            <table class="table table-xs">
-              <tbody>
-                <tr v-for="p in itemsSinAccion" :key="p.estudianteId">
-                  <td>{{ p.estudiante }}</td>
-                  <td class="text-xs text-base-content/50">{{ p.cursoActual }}</td>
-                  <td><span class="badge badge-xs badge-ghost">{{ p.accion }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Confirmar -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body py-3 flex flex-wrap items-center gap-3">
-          <span class="font-semibold">{{ totalSeleccionados }} estudiante(s) seleccionados para matricular</span>
-          <button class="btn btn-primary ml-auto" :disabled="procesando || !totalSeleccionados" @click="confirmarMatricula">
-            <span v-if="procesando" class="loading loading-spinner loading-sm"></span>
-            {{ procesando ? `Matriculando ${progreso.hechos}/${progreso.total}...` : 'Confirmar matrícula masiva' }}
-          </button>
-        </div>
-      </div>
-
-      <div v-if="resultadoFinal" role="alert" class="alert" :class="resultadoFinal.errores ? 'alert-warning' : 'alert-success'">
-        <div>
-          <p><strong>{{ resultadoFinal.exitos }}</strong> matriculados correctamente<template v-if="resultadoFinal.errores"> — <strong>{{ resultadoFinal.errores }}</strong> con error</template>.</p>
-          <ul v-if="resultadoFinal.detalleErrores.length" class="text-xs mt-2 list-disc list-inside max-h-32 overflow-y-auto">
-            <li v-for="(e, i) in resultadoFinal.detalleErrores" :key="i">{{ e }}</li>
-          </ul>
-        </div>
-      </div>
+      <PromocionPaso1 :key="`p1-${cursoSel.cursoId}`" :origen-id="Number(origenId)" :curso="cursoSel" @registrado="alRegistrar" />
+      <PromocionPaso2 :key="`p2-${cursoSel.cursoId}`" ref="paso2" :origen-id="Number(origenId)" :destino-id="destinoId"
+                      :destino-anio="destinoAnio" :curso="cursoSel" @matriculado="cargarTablero" />
     </template>
   </div>
 </template>

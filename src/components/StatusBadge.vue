@@ -2,7 +2,7 @@
 type Estado = 'APROBADO' | 'PROMOVIDO' | 'AL_DIA' | 'PAGADO' | 'ACTIVA' | 'PROMOVER' | 'ACTIVO' | 'ABIERTO'
             | 'REPROBADO' | 'MOROSO' | 'RETIRADA' | 'CERRADO'
             | 'PENDIENTE' | 'RETRASO' | 'JUSTIFICADO' | 'TRANSFERIDA' | 'REPETIR_CURSO'
-            | 'ANULADO' | 'CONCLUIDA' | 'INACTIVO'
+            | 'ANULADO' | 'CONCLUIDA' | 'INACTIVO' | 'PARCIAL'
 
 const props = withDefaults(defineProps<{
   estado: Estado | string
@@ -17,6 +17,7 @@ const ESTILO: Record<string, string> = {
   REPROBADO: 'badge-error',  MOROSO: 'badge-error', RETIRADA: 'badge-error', CERRADO: 'badge-error',
   PENDIENTE: 'badge-warning', RETRASO: 'badge-warning', JUSTIFICADO: 'badge-warning', TRANSFERIDA: 'badge-warning', REPETIR_CURSO: 'badge-warning',
   ANULADO: 'badge-ghost', CONCLUIDA: 'badge-ghost', INACTIVO: 'badge-ghost',
+  PARCIAL: 'badge-info',   // pago a cuenta: ya se pagó algo pero falta saldo
 }
 
 const claseEstado = ESTILO[props.estado] ?? 'badge-neutral'
