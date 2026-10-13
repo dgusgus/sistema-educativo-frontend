@@ -21,7 +21,19 @@ export interface VincularEstudiantePayload {
   viveConEstudiante?:  boolean
 }
 
+export interface EstudianteVinculado {
+  id: number
+  nombre: string
+  apellido: string
+  ci: string
+}
+
 export const tutorApi = {
+  // El tutor lee SUS vinculados (solo rol TUTOR, sin id: el backend resuelve
+  // el perfil desde el token). GET /tutores/:id exige Director/Secretaría.
+  getMisVinculados: () =>
+    api.get<{ estudiantes: Array<{ estudiante: EstudianteVinculado }> }>('/tutores/mis-vinculados').then(r => r.data),
+
   getAll: (search?: string) =>
     api.get<Tutor[]>('/tutores', { params: search ? { search } : undefined }).then(r => r.data),
 

@@ -30,7 +30,8 @@ export function useBuscadorEstudiante() {
       const miTurno = ++buscaSeq
       buscando.value = true
       try {
-        const lista = await estudianteApi.getAll({ search: texto })
+        // Solo las primeras coincidencias: es un autocompletado, no un listado (antes traía TODAS).
+        const { data: lista } = await estudianteApi.getPage({ search: texto, pagina: 1, limite: 15 })
         if (miTurno !== buscaSeq) return
         resultados.value = lista
       } catch {

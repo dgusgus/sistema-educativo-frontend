@@ -8,8 +8,9 @@
  * de cero para cada gestión nueva.
  */
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { gestionApi, type GestionResumen } from '@/api/gestion.api'
+import { type GestionResumen } from '@/api/gestion.api'
 import { evaluacionApi, type DimensionPayload } from '@/api/evaluacion.api'
+import { useCatalogoStore } from '@/stores/catalogo.store'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
@@ -22,6 +23,7 @@ const toast = useToastStore()
 
 const gestiones           = ref<GestionResumen[]>([])
 const gestionSeleccionada = ref<number | ''>('')
+const catalogo = useCatalogoStore()
 const dimensiones         = ref<DimensionEvaluacion[]>([])
 const cargando            = ref(true)
 const error               = ref<string | null>(null)
@@ -30,7 +32,7 @@ onMounted(async () => {
   await gestionStore.cargar()
   gestionSeleccionada.value = gestionStore.gestionId ?? ''
   try {
-    gestiones.value = await gestionApi.getAll()
+    gestiones.value = await catalogo.gestiones()
   } catch {
     gestiones.value = []
   }
@@ -44,7 +46,7 @@ async function cargarDimensiones() {
   cargando.value = true
   error.value = null
   try {
-    dimensiones.value = await evaluacionApi.getDimensiones(Number(gestionSeleccionada.value))
+    dimensiones.value = [...(await catalogo.dimensiones(Number(gestionSeleccionada.value), true))]
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar dimensiones'
   } finally {
@@ -69,6 +71,7 @@ async function distribuirEquitativamente() {
   error.value = null
   try {
     const pct = 1 / dimensiones.value.length
+    catalogo.invalidar('dimensiones')
     await Promise.all(dimensiones.value.map(d => evaluacionApi.updateDimension(d.id, { pesoEnPromedio: pct })))
     await cargarDimensiones()
     toast.success('Porcentajes distribuidos equitativamente')
@@ -159,6 +162,7 @@ async function guardar() {
   try {
     const pesoEnPromedio = form.value.porcentaje / 100
     if (idEditando.value) {
+      catalogo.invalidar('dimensiones')
       const actualizada = await evaluacionApi.updateDimension(idEditando.value, {
         nombre: form.value.nombre.trim(), puntajeMaximo: form.value.puntajeMaximo,
         pesoEnPromedio, orden: form.value.orden, esAutoevaluada: form.value.esAutoevaluada,
@@ -172,6 +176,7 @@ async function guardar() {
         nombre: form.value.nombre.trim(), puntajeMaximo: form.value.puntajeMaximo,
         pesoEnPromedio, orden: form.value.orden, esAutoevaluada: form.value.esAutoevaluada,
       }
+      catalogo.invalidar('dimensiones')
       const nueva = await evaluacionApi.createDimension(payload)
       dimensiones.value.push(nueva)
       toast.success('Dimensión creada')
@@ -191,6 +196,7 @@ async function eliminar(d: DimensionEvaluacion) {
   eliminando.value = d.id
   try {
     await evaluacionApi.deleteDimension(d.id)
+    catalogo.invalidar('dimensiones')
     dimensiones.value = dimensiones.value.filter(x => x.id !== d.id)
     toast.success('Dimensión eliminada')
   } catch (e) {

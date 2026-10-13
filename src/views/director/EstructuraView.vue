@@ -9,6 +9,7 @@ import { cursoApi, materiaApi, trimestreApi, nombreCurso } from '@/api/estructur
 import AppIcon from '@/components/AppIcon.vue'
 import type { Curso, Materia, Trimestre, Nivel, Turno } from '@/types'
 import { useGestionStore } from '@/stores/gestion.store'
+import { useCatalogoStore } from '@/stores/catalogo.store'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToastStore } from '@/stores/toast.store'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -23,6 +24,7 @@ type Tab = 'cursos' | 'materias' | 'trimestres'
 const tab = ref<Tab>('cursos')
 
 const cursos     = ref<Curso[]>([])
+const catalogo   = useCatalogoStore()
 const materias   = ref<Materia[]>([])
 const trimestres = ref<Trimestre[]>([])
 const cargando   = ref(false)
@@ -61,7 +63,7 @@ async function cargarCursos() {
 
 async function cargarMaterias() {
   try {
-    materias.value = await materiaApi.getAll()
+    materias.value = [...(await catalogo.materias(true))]
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al cargar materias'
   }
@@ -220,10 +222,12 @@ async function guardarMateria() {
   const f = formMateria.value
   if (!f.nombre || !f.codigo) throw new Error('Nombre y código son obligatorios')
   if (modoEdicion.value && idEditando.value) {
+    catalogo.invalidar('materias')
     const updated = await materiaApi.update(idEditando.value, { nombre: f.nombre, horasSemanales: f.horasSemanales })
     const idx = materias.value.findIndex(m => m.id === idEditando.value)
     if (idx !== -1) materias.value[idx] = updated
   } else {
+    catalogo.invalidar('materias')
     const nueva = await materiaApi.create(f)
     materias.value.push(nueva)
   }
@@ -304,6 +308,7 @@ async function eliminarMateria(m: Materia) {
   eliminando.value = m.id
   try {
     await materiaApi.delete(m.id)
+    catalogo.invalidar('materias')
     materias.value = materias.value.filter(x => x.id !== m.id)
     toast.success('Materia eliminada')
   } catch (e) {

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { institucionApi } from '@/api/institucion.api'
+import { useCatalogoStore } from '@/stores/catalogo.store'
 import { useToastStore } from '@/stores/toast.store'
 import type { Institucion } from '@/types'
 
 const toast = useToastStore()
+const catalogo = useCatalogoStore()
 const datos    = ref<Partial<Institucion>>({})
 const cargando = ref(true)
 const guardando = ref(false)
@@ -12,7 +14,7 @@ const error    = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    datos.value = await institucionApi.get()
+    datos.value = { ...(await catalogo.institucion(true)) }
   } catch {
     // 404 = todavía no configurada — el form arranca vacío y el PUT la crea
     datos.value = {}
@@ -30,6 +32,7 @@ async function guardar() {
   error.value = null
   try {
     datos.value = await institucionApi.update(datos.value)
+    catalogo.invalidar('institucion')
     toast.success('Datos guardados correctamente')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al guardar'
