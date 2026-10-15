@@ -74,6 +74,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
     { label: 'Pagos', to: '/secretaria/pagos', grupo: 'Administración', icon: 'pagos' },
     { label: 'Boletines', to: '/secretaria/boletines', grupo: 'Administración', icon: 'documento' },
     { label: 'Asistencia', to: '/secretaria/asistencia', grupo: 'Administración', icon: 'asistencia' },
+    { label: 'Cuaderno Pedagógico', to: '/secretaria/cuaderno', grupo: 'Administración', icon: 'reportes' },
     { label: 'Institución', to: '/director/institucion', grupo: 'Administración', icon: 'institucion' },
 
     { label: 'Reportes', to: '/director/reportes', icon: 'reportes' },
@@ -87,6 +88,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
     { label: 'Pagos', to: '/secretaria/pagos', icon: 'pagos' },
     { label: 'Boletines', to: '/secretaria/boletines', icon: 'documento' },
     { label: 'Asistencia', to: '/secretaria/asistencia', icon: 'asistencia' },
+    { label: 'Cuaderno Pedagógico', to: '/secretaria/cuaderno', icon: 'reportes' },
     { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', icon: 'correccion' },
     { label: 'Promoción de Gestión', to: '/secretaria/promocion', icon: 'promocion' },
   ],
@@ -94,6 +96,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
     { label: 'Asistencia', to: '/docente/asistencia', icon: 'asistencia' },
     { label: 'Calificaciones', to: '/docente/calificaciones', icon: 'correccion' },
     { label: 'Bitácora', to: '/docente/bitacora', icon: 'documento' },
+    { label: 'Cuaderno Pedagógico', to: '/docente/cuaderno', icon: 'reportes' },
     { label: 'Mi Horario', to: '/docente/horario', icon: 'horario' },
   ],
   ESTUDIANTE: [

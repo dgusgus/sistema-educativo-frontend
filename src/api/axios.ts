@@ -58,9 +58,17 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status: number | undefined = error.response?.status
-    const data = error.response?.data
+    let data = error.response?.data
+
+    // En las descargas (responseType: 'blob') el cuerpo del error también llega como
+    // archivo: sin leerlo, el mensaje real del servidor ("Curso no encontrado",
+    // "Sin permisos…") se perdía y el usuario veía "Request failed with status code 404".
+    if (typeof Blob !== 'undefined' && data instanceof Blob && data.type.includes('json')) {
+      try { data = JSON.parse(await data.text()) } catch { data = undefined }
+    }
+
     const esLogin = error.config?.url === '/auth/login'
 
     // Texto que envió el backend (o uno propio si ni siquiera hubo respuesta).
