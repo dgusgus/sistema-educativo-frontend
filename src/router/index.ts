@@ -80,6 +80,7 @@ const router = createRouter({
         { path: 'asistencia',       name: 'secretaria-asistencia',    component: () => import('@/views/secretaria/AsistenciaReporteView.vue') },
         { path: 'correccion-notas', name: 'correccion-notas',         component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
         { path: 'promocion',        name: 'promocion',                component: () => import('@/views/secretaria/Promocionview.vue') },
+        { path: 'cuaderno',         name: 'secretaria-cuaderno',      component: () => import('@/views/secretaria/CuadernoView.vue') },
       ],
     },
 
@@ -93,6 +94,8 @@ const router = createRouter({
         { path: 'calificaciones', name: 'docente-calificaciones', component: () => import('@/views/docente/CalificacionesView.vue') },
         { path: 'bitacora',       name: 'docente-bitacora',       component: () => import('@/views/docente/BitacoraView.vue') },
         { path: 'horario',        name: 'docente-horario',        component: () => import('@/views/docente/HorarioView.vue') },
+        // Misma pantalla que la de Secretaría: con vista de docente solo lista sus cursos
+        { path: 'cuaderno',       name: 'docente-cuaderno',       component: () => import('@/views/secretaria/CuadernoView.vue') },
       ],
     },
 
