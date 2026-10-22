@@ -4,6 +4,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth.store'
+import { useInstitucionStore } from './stores/institucion.store'
 import './style.css'
 
 const app = createApp(App)
@@ -25,5 +26,8 @@ const auth = useAuthStore()
 if (auth.estaAutenticado) {
   auth.refreshMe().catch(() => { /* sin red: se reintenta en la próxima acción */ })
 }
+
+// 4. Nombre del colegio (público): login, menú y título de la pestaña
+void useInstitucionStore().cargar()
 
 app.mount('#app')

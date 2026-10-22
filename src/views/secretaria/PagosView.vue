@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { pagoApi, type PagosInscripcionResponse, type PagoPayload, type ConceptoPago } from '@/api/pago.api'
+import { cobranzaApi } from '@/api/cobranza.api'
+import CobranzaPanel from '@/components/pagos/CobranzaPanel.vue'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useConfirm } from '@/composables/useConfirm'
@@ -19,7 +21,12 @@ onMounted(() => gestion.cargar())
 // La inscripción activa es la más reciente del estudiante elegido — el
 // buscador ya trae take:1 ordenado por gestión desc, así que alcanza con
 // el primero. Si el estudiante no tiene inscripción, no hay nada que cobrar.
-const inscripcionId = computed(() => buscador.seleccionado.value?.inscripciones?.[0]?.id ?? null)
+// También se puede llegar desde el panel de cobranza (botón "Cobrar" de un deudor): ahí ya se conoce la inscripción.
+const inscripcionDirecta = ref<number | null>(null)
+const inscripcionId = computed(() => inscripcionDirecta.value ?? buscador.seleccionado.value?.inscripciones?.[0]?.id ?? null)
+
+function cobrar(id: number) { inscripcionDirecta.value = id; window.scrollTo({ top: 0, behavior: 'smooth' }) }
+function volverAlPanel() { inscripcionDirecta.value = null; buscador.limpiar() }
 
 const NIVEL_TEXTO: Record<Nivel, string> = { PRIMARIA: 'Primaria', SECUNDARIA: 'Secundaria' }
 const cursoDelSeleccionado = computed(() => {
@@ -149,6 +156,44 @@ async function abrirConceptos() {
   }
 }
 
+// ── Generador de cuotas (pensión mensual / por trimestre) ────────────────────
+const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const formGenerar = ref({ tipo: 'MENSUAL' as 'MENSUAL' | 'TRIMESTRAL', nombreBase: 'Pensión', monto: 0, mesDesde: 2, mesHasta: 11, diaVencimiento: 10, diasPlazo: 15 })
+const generando = ref(false)
+
+async function generarCuotas() {
+  const f = formGenerar.value
+  if (!gestion.gestionId) return
+  if (!f.nombreBase.trim() || f.monto <= 0) { errorConcepto.value = 'Escribe el nombre y un monto mayor a 0'; return }
+  generando.value = true
+  errorConcepto.value = null
+  try {
+    const r = await cobranzaApi.generarConceptos({
+      gestionId: gestion.gestionId, tipo: f.tipo, nombreBase: f.nombreBase.trim(), monto: f.monto,
+      ...(f.tipo === 'MENSUAL' ? { mesDesde: f.mesDesde, mesHasta: f.mesHasta, diaVencimiento: f.diaVencimiento } : { diasPlazo: f.diasPlazo }),
+    })
+    conceptos.value = await pagoApi.getConceptos(gestion.gestionId)
+    toast.success(r.yaExistian ? `${r.creados} cuota(s) creada(s); ${r.yaExistian} ya existían` : `${r.creados} cuota(s) creada(s)`)
+    await recargar()
+  } catch (e) {
+    errorConcepto.value = e instanceof Error ? e.message : 'No se pudieron generar las cuotas'
+  } finally {
+    generando.value = false
+  }
+}
+
+// Desactivar = dejar de cobrarlo sin borrar los pagos ya hechos
+async function alternarActivo(c: ConceptoPago) {
+  const nuevo = !(c.activo ?? true)
+  try {
+    await cobranzaApi.actualizarConcepto(c.id, { activo: nuevo })
+    c.activo = nuevo
+    await recargar()
+  } catch (e) {
+    errorConcepto.value = e instanceof Error ? e.message : 'No se pudo actualizar el concepto'
+  }
+}
+
 async function crearConcepto() {
   if (!formConcepto.value.nombre || formConcepto.value.monto <= 0) {
     errorConcepto.value = 'Nombre y monto (mayor a 0) son obligatorios'
@@ -227,8 +272,22 @@ async function crearConcepto() {
             <p class="text-xs text-base-content/50">Curso</p>
             <p class="font-semibold">{{ cursoDelSeleccionado ?? 'Sin inscripción activa' }}</p>
           </div>
-          <button class="btn btn-ghost btn-xs ml-auto" @click="buscador.limpiar">Cambiar estudiante</button>
+          <button class="btn btn-ghost btn-xs ml-auto" @click="volverAlPanel">← Volver al panel</button>
         </div>
+      </div>
+    </div>
+
+    <div v-if="inscripcionDirecta && datos" class="card bg-base-100 shadow">
+      <div class="card-body py-3 flex-row flex-wrap items-center gap-6">
+        <div>
+          <p class="text-xs text-base-content/50">Estudiante</p>
+          <p class="font-semibold">{{ datos.inscripcion.estudiante.nombre }} {{ datos.inscripcion.estudiante.apellido }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-base-content/50">Curso</p>
+          <p class="font-semibold">{{ datos.inscripcion.curso.grado }}° {{ NIVEL_TEXTO[datos.inscripcion.curso.nivel as Nivel] }} "{{ datos.inscripcion.curso.paralelo }}"</p>
+        </div>
+        <button class="btn btn-ghost btn-xs ml-auto" @click="volverAlPanel">← Volver al panel</button>
       </div>
     </div>
 
@@ -343,9 +402,8 @@ async function crearConcepto() {
 
     </template>
 
-    <div v-else-if="!cargando && !buscador.seleccionado.value" class="text-center text-base-content/40 py-12">
-      Buscá un estudiante para ver su estado de pagos
-    </div>
+    <!-- Sin estudiante elegido: se muestra el estado de la cobranza (quién debe, hasta cuándo, quién pagó) -->
+    <CobranzaPanel v-else-if="!cargando && !buscador.seleccionado.value && !inscripcionDirecta" @cobrar="cobrar" />
   </div>
 
   <!-- Modal registrar pago -->
@@ -411,16 +469,67 @@ async function crearConcepto() {
 
       <div v-if="cargandoConceptos" class="skeleton h-20 rounded-lg mb-4"></div>
       <table v-else class="table table-sm mb-4">
-        <thead><tr><th>Nombre</th><th>Monto</th><th>Tipo</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Monto</th><th>Vence</th><th>Tipo</th><th>Activo</th></tr></thead>
         <tbody>
-          <tr v-for="c in conceptos" :key="c.id">
+          <tr v-for="c in conceptos" :key="c.id" :class="c.activo === false ? 'opacity-50' : ''">
             <td>{{ c.nombre }}</td>
             <td>Bs. {{ c.monto }}</td>
+            <td class="text-xs">{{ c.fechaVencimiento ? formatoFecha(c.fechaVencimiento) : '—' }}</td>
             <td><span class="badge badge-xs" :class="c.obligatorio ? 'badge-primary' : 'badge-ghost'">{{ c.obligatorio ? 'Obligatorio' : 'Opcional' }}</span></td>
+            <td><input type="checkbox" class="toggle toggle-xs toggle-success" :checked="c.activo !== false" @change="alternarActivo(c)" /></td>
           </tr>
-          <tr v-if="!conceptos.length"><td colspan="3" class="text-center text-base-content/40 py-4">Sin conceptos aún</td></tr>
+          <tr v-if="!conceptos.length"><td colspan="5" class="text-center text-base-content/40 py-4">Sin conceptos aún</td></tr>
         </tbody>
       </table>
+
+      <div class="divider text-xs">Generar cuotas del año</div>
+      <form class="grid grid-cols-2 gap-3 items-end" @submit.prevent="generarCuotas">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Se cobra</legend>
+          <select v-model="formGenerar.tipo" class="select select-bordered w-full" :disabled="generando">
+            <option value="MENSUAL">Cada mes</option>
+            <option value="TRIMESTRAL">Cada trimestre</option>
+          </select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-xs">Monto de cada cuota (Bs.) *</legend>
+          <input v-model.number="formGenerar.monto" type="number" min="1" class="input input-bordered w-full" :disabled="generando" />
+        </fieldset>
+        <fieldset class="fieldset col-span-2">
+          <legend class="fieldset-legend text-xs">Nombre base *</legend>
+          <input v-model="formGenerar.nombreBase" type="text" placeholder="Pensión" class="input input-bordered w-full" :disabled="generando" />
+          <p class="text-xs text-base-content/40 mt-1">
+            Se crea «{{ formGenerar.nombreBase || 'Pensión' }} {{ formGenerar.tipo === 'MENSUAL' ? MESES[formGenerar.mesDesde] : 'Primer trimestre' }}», etc.
+          </p>
+        </fieldset>
+        <template v-if="formGenerar.tipo === 'MENSUAL'">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Desde</legend>
+            <select v-model.number="formGenerar.mesDesde" class="select select-bordered w-full" :disabled="generando">
+              <option v-for="m in 12" :key="m" :value="m">{{ MESES[m] }}</option>
+            </select>
+          </fieldset>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend text-xs">Hasta</legend>
+            <select v-model.number="formGenerar.mesHasta" class="select select-bordered w-full" :disabled="generando">
+              <option v-for="m in 12" :key="m" :value="m">{{ MESES[m] }}</option>
+            </select>
+          </fieldset>
+          <fieldset class="fieldset col-span-2">
+            <legend class="fieldset-legend text-xs">Vence el día</legend>
+            <input v-model.number="formGenerar.diaVencimiento" type="number" min="1" max="31" class="input input-bordered w-full" :disabled="generando" />
+          </fieldset>
+        </template>
+        <fieldset v-else class="fieldset col-span-2">
+          <legend class="fieldset-legend text-xs">Plazo: días después de empezar el trimestre</legend>
+          <input v-model.number="formGenerar.diasPlazo" type="number" min="0" max="120" class="input input-bordered w-full" :disabled="generando" />
+        </fieldset>
+        <button type="submit" class="btn btn-secondary btn-sm col-span-2" :disabled="generando">
+          <span v-if="generando" class="loading loading-spinner loading-xs"></span>
+          Generar cuotas
+        </button>
+        <p class="col-span-2 text-xs text-base-content/40">Si algunas ya existen no se duplican: puedes volver a generar sin problema.</p>
+      </form>
 
       <div class="divider text-xs">Nuevo concepto</div>
       <form class="grid grid-cols-2 gap-3 items-end" @submit.prevent="crearConcepto">

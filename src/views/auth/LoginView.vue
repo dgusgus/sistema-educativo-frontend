@@ -3,11 +3,13 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useTheme } from '@/composables/useTheme'
+import { useInstitucionStore } from '@/stores/institucion.store'
 const { tema, alternar } = useTheme()
 
 const router = useRouter()
 const route  = useRoute()
 const auth   = useAuthStore()
+const colegio = useInstitucionStore()
 
 const username  = ref('')
 const password  = ref('')
@@ -93,7 +95,7 @@ function usarCredencial(c: { u: string; p: string }) {
       <div class="andean-pattern absolute inset-0 opacity-[0.12]"></div>
       <div class="absolute -right-24 -bottom-24 h-[26rem] w-[26rem] rounded-full border-[28px] border-white/[0.04]"></div>
       <div class="absolute -right-10 -bottom-10 h-[18rem] w-[18rem] rounded-full border border-[#C9A227]/20"></div>
-      <p class="absolute -bottom-6 left-6 font-display font-extrabold text-[6rem] leading-none tracking-tighter text-white/[0.06] select-none">NAZARIA</p>
+      <p class="absolute -bottom-6 left-6 font-display font-extrabold text-[6rem] leading-none tracking-tighter text-white/[0.06] select-none">{{ colegio.palabraClave }}</p>
     </div>
     <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#C9A227] via-[#E8C86A] to-[#C9A227]" aria-hidden="true"></div>
 
@@ -107,8 +109,8 @@ function usarCredencial(c: { u: string; p: string }) {
         </div>
         <div>
           <p class="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E8C86A]">Plataforma Académica</p>
-          <h1 class="font-display text-xl font-bold leading-tight text-white">U.E. “Los Ángeles<br class="hidden xl:block" /> de Nazaria Ignacia”</h1>
-          <p class="mt-1 text-xs text-white/70">Oruro · Bolivia — Ley N.º 070</p>
+          <h1 class="font-display text-xl font-bold leading-tight text-white">{{ colegio.nombre || 'Sistema de gestión académica' }}</h1>
+          <p class="mt-1 text-xs text-white/70">{{ colegio.ubicacion || 'Bolivia' }}</p>
         </div>
       </div>
     </div>
@@ -116,9 +118,9 @@ function usarCredencial(c: { u: string; p: string }) {
     <!-- Mensaje central -->
     <div class="relative max-w-xl mt-10">
       <h2 class="font-display text-4xl xl:text-[2.9rem] font-extrabold leading-[1.08] tracking-tight text-white text-balance">
-        Formamos con<br />
-        <span class="text-[#E8C86A]">disciplina, fe</span> y<br />
-        excelencia académica.
+        Tu colegio,<br />
+        <span class="text-[#E8C86A]">ordenado</span> y<br />
+        en un solo lugar.
       </h2>
       <p class="mt-4 max-w-md text-[15px] leading-relaxed text-white/75">
         Acceso seguro para Dirección, Secretaría, Docentes, Estudiantes y Tutores.
@@ -142,20 +144,16 @@ function usarCredencial(c: { u: string; p: string }) {
 
     <!-- Pie del panel -->
     <div class="relative mt-10 flex items-end justify-between gap-6">
-      <div class="flex gap-8">
-        <div><p class="font-display text-2xl font-extrabold tracking-tight text-white">1.2k<span class="text-[#E8C86A]">+</span></p><p class="text-[11px] uppercase tracking-wider text-white/60">Estudiantes</p></div>
-        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold tracking-tight text-white">48</p><p class="text-[11px] uppercase tracking-wider text-white/60">Docentes</p></div>
-        <div class="border-l border-white/10 pl-8"><p class="font-display text-2xl font-extrabold tracking-tight text-white">100<span class="text-[#E8C86A]">%</span></p><p class="text-[11px] uppercase tracking-wider text-white/60">Ley 070</p></div>
-      </div>
+      <div></div>
       <div class="hidden xl:block text-right">
         <p class="inline-flex items-center gap-2 text-[11px] text-white/70">
           <span class="relative flex h-2 w-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
             <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
           </span>
-          Portal unificado · Gestión 2026
+          Portal unificado
         </p>
-        <p class="mt-1 text-[11px] leading-relaxed text-white/60">Urb. Bustillos, Zona Los Ángeles<br />RUE 81230370 · Oruro</p>
+        <p v-if="colegio.direccion || colegio.rue" class="mt-1 text-[11px] leading-relaxed text-white/60">{{ colegio.direccion }}<template v-if="colegio.direccion && colegio.rue"><br /></template><template v-if="colegio.rue">RUE {{ colegio.rue }}</template></p>
       </div>
     </div>
   </aside>
@@ -187,8 +185,8 @@ function usarCredencial(c: { u: string; p: string }) {
           </svg>
         </div>
         <div>
-          <p class="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">U.E. Los Ángeles de Nazaria Ignacia</p>
-          <p class="text-xs text-base-content/60">Oruro · Bolivia</p>
+          <p class="font-display text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">{{ colegio.nombre || 'Plataforma Académica' }}</p>
+          <p class="text-xs text-base-content/60">{{ colegio.ubicacion || 'Bolivia' }}</p>
         </div>
       </div>
 

@@ -9,6 +9,9 @@ export interface ConceptoPago {
   obligatorio:       boolean
   gestionId:         number
   fechaVencimiento:  string | null
+  activo?:           boolean
+  periodicidad?:     'UNICO' | 'MENSUAL' | 'TRIMESTRAL'
+  trimestreId?:      number | null
   gestion?:          { id: number; anio: number }
 }
 

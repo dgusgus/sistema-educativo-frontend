@@ -392,13 +392,28 @@ export interface Pago {
 export interface Institucion {
   id:            number
   nombre:        string
-  direccion:     string
+  direccion?:    string | null
   telefono?:     string | null
   email?:        string | null
-  rue:           string
+  rue?:          string | null
   logoUrl?:      string | null
-  municipio:     string
-  departamento:  string
+  municipio?:    string | null
+  distrito?:     string | null
+  departamento?: string | null
+  dependencia?:  'FISCAL' | 'CONVENIO' | 'PRIVADO' | null
+  /** Director(a) de la gestión activa (solo lectura, viene del backend) */
+  directorNombre?: string | null
+}
+
+/** Lo que el backend entrega SIN iniciar sesión (pantalla de login). */
+export interface InstitucionPublica {
+  configurada:   boolean
+  nombre?:       string
+  direccion?:    string | null
+  rue?:          string | null
+  municipio?:    string | null
+  departamento?: string | null
+  logoUrl?:      string | null
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────

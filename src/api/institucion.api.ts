@@ -1,11 +1,15 @@
 import api from '@/api/axios'
-import type { Institucion } from '@/types'
+import type { Institucion, InstitucionPublica } from '@/types'
 
 // ARCHIVO NUEVO — cubre institucion.controller.ts, que no existía en el
 // frontend v5. Útil para encabezados de boletines/reportes y una futura
 // pantalla de "Datos del colegio" en el panel de Director.
 
 export const institucionApi = {
+  // Sin sesión: nombre y ubicación del colegio para el login
+  getPublica: () =>
+    api.get<InstitucionPublica>('/institucion/publica').then(r => r.data),
+
   // Cualquier usuario autenticado puede verlo
   get: () =>
     api.get<Institucion>('/institucion').then(r => r.data),

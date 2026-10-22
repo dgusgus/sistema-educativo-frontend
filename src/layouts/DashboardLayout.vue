@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useGestionStore } from '@/stores/gestion.store'
 import { useDocenteStore } from '@/stores/docente.store'
+import { useInstitucionStore } from '@/stores/institucion.store'
 import { reporteApi } from '@/api/reporte.api'
 import type { Rol } from '@/types'
 import { useTheme } from '@/composables/useTheme'
@@ -32,6 +33,8 @@ async function cargarIndicadores() {
     pagosPendientes.value = null
   }
 }
+
+const colegio = useInstitucionStore()
 
 onMounted(() => {
   gestion.cargar()
@@ -129,7 +132,7 @@ function esActivo(path: string): boolean {
   return route.path.startsWith(path)
 }
 
-// Badge numérico junto al ítem del menú — hoy solo "Pagos" tiene una
+// Badge numérico junto al ítem del menú — hoy solo "Pagos" (estudiantes morosos) tiene una
 // fuente de datos barata (el dashboard, que ya se carga si es Director).
 // Ampliar acá cuando haya más endpoints de conteo disponibles.
 function badgeDe(item: MenuItem): number | null {
@@ -339,6 +342,11 @@ async function guardarPassword() {
         </nav>
 
         <main class="flex-1 p-4 pb-20 lg:pb-4 bg-base-200">
+          <!-- Primer uso: el sistema no trae ningún colegio escrito, el Director lo configura -->
+          <div v-if="colegio.cargada && !colegio.configurada && auth.esDirector" role="alert" class="alert alert-warning mb-4">
+            <span>Falta configurar los datos de la unidad educativa (nombre, RUE, dirección). Aparecen en los boletines, reportes y el cuaderno pedagógico.</span>
+            <RouterLink to="/director/institucion" class="btn btn-sm">Configurar ahora</RouterLink>
+          </div>
           <RouterView />
         </main>
 
@@ -369,8 +377,8 @@ async function guardarPassword() {
               <AppIcon nombre="escuela" class="h-5 w-5" />
             </span>
             <span class="min-w-0">
-              <span class="block font-display text-[13px] font-bold leading-tight text-base-content truncate">U.E. Los Ángeles de Nazaria Ignacia</span>
-              <span class="mt-0.5 block text-[11px] text-base-content/55">Oruro · Ley 070</span>
+              <span class="block font-display text-[13px] font-bold leading-tight text-base-content truncate">{{ colegio.nombre || 'Unidad Educativa' }}</span>
+              <span class="mt-0.5 block text-[11px] text-base-content/55">{{ colegio.ubicacion || 'Sin configurar' }}</span>
             </span>
           </div>
 

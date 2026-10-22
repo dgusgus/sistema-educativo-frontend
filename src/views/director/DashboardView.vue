@@ -267,7 +267,7 @@ onMounted(async () => {
           { label: 'Estudiantes', valor: String(datos.indicadores.totalEstudiantes), icono: 'estudiantes', fondo: 'bg-primary/10 text-primary', nota: `${cursos?.length ?? 0} cursos` },
           { label: 'Docentes', valor: String(datos.indicadores.totalDocentes), icono: 'personas', fondo: 'bg-secondary/10 text-secondary', nota: 'planta activa' },
           { label: 'Promedio general', valor: datos.indicadores.promedioGeneral.toFixed(1), icono: 'reportes', fondo: 'bg-info/10 text-info', nota: 'escala 1–100' },
-          { label: 'Recaudado', valor: `Bs. ${datos.indicadores.totalRecaudado.toLocaleString('es-BO')}`, icono: 'pagos', fondo: 'bg-success/10 text-success', nota: `${datos.indicadores.pagosPendientes} pago(s) pendiente(s)` },
+          { label: 'Recaudado', valor: `Bs. ${datos.indicadores.totalRecaudado.toLocaleString('es-BO')}`, icono: 'pagos', fondo: 'bg-success/10 text-success', nota: `${datos.indicadores.pagosPendientes} estudiante(s) con deuda vencida` },
         ]" :key="card.label" class="card bg-base-100 border border-base-300/60 shadow-[0_16px_36px_-24px_rgba(26,60,94,0.5)] hover:shadow-[0_20px_44px_-24px_rgba(26,60,94,0.55)] transition-shadow">
           <div class="card-body p-4 flex-row items-center gap-3">
             <span class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" :class="card.fondo">
