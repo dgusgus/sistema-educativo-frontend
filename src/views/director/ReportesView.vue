@@ -8,6 +8,7 @@ import { descargarBlob } from '@/api/boletin.api'
 import type { Nivel, Turno } from '@/types'
 
 import AppIcon from '@/components/AppIcon.vue'
+import ComparativoGestiones from '@/components/historial/ComparativoGestiones.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 const gestion    = useGestionStore()
@@ -101,6 +102,9 @@ async function cargarReporteAsistencia() {
 <template>
   <div class="space-y-6">
     <h2 class="text-2xl font-bold">Reportes Académicos</h2>
+
+    <!-- Evolución entre gestiones -->
+    <ComparativoGestiones />
 
     <!-- Filtros -->
     <div class="card bg-base-100 shadow">

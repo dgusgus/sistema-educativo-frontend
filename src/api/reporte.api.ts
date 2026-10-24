@@ -30,7 +30,28 @@ export interface ReporteAcademicoResponse {
   detalle: ReporteAcademicoDetalle[]
 }
 
+// Refleja GET /reportes/comparativo (reporte.controller.ts)
+export interface ComparativoGestion {
+  gestionId: number; anio: number
+  inscritos: number; retirados: number; promovidos: number; reprobados: number; pendientes: number
+  tasaAprobacion: number | null
+  promedioGeneral: number | null
+  promedioPorTrimestre: Record<number, number | null>
+  asistencia: number | null
+}
+export interface ComparativoGrado { anio: number; nivel: string; grado: number; estudiantes: number; promovidos: number; reprobados: number; promedio: number | null }
+export interface ComparativoMateria { anio: number; materia: string; promedio: number | null; reprobados: number; total: number }
+export interface ComparativoResponse {
+  gestiones:  ComparativoGestion[]
+  porGrado:   ComparativoGrado[]
+  porMateria: ComparativoMateria[]
+}
+
 export const reporteApi = {
+  // Rendimiento comparado entre gestiones (Director/Secretaría)
+  getComparativo: (params?: { desde?: number; hasta?: number }) =>
+    api.get<ComparativoResponse>('/reportes/comparativo', { params }).then(r => r.data),
+
   // Solo Director — indicadores generales de la gestión activa
   getDashboard: () =>
     api.get<DashboardResponse>('/dashboard').then(r => r.data),
