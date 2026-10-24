@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { pagoApi, type PagosInscripcionResponse, type PagoPayload, type ConceptoPago } from '@/api/pago.api'
 import { cobranzaApi } from '@/api/cobranza.api'
+import { descargarBlob } from '@/api/boletin.api'
 import CobranzaPanel from '@/components/pagos/CobranzaPanel.vue'
 import { useBuscadorEstudiante } from '@/composables/useBuscadorEstudiante'
 import { useGestionStore } from '@/stores/gestion.store'
@@ -95,19 +96,43 @@ function alElegirConcepto() {
   if (conceptoElegido.value) form.value.montoPagado = conceptoElegido.value.saldo
 }
 
+// ── Recibo (PDF) ──────────────────────────────────────────────────────────────
+// La pestaña se abre ANTES de la petición (mientras dura el clic del usuario) para que el
+// navegador no la bloquee como ventana emergente; después se le pone el PDF.
+const imprimiendo = ref<number | null>(null)
+
+async function mostrarRecibo(id: number, numero: string | null, ventana?: Window | null) {
+  imprimiendo.value = id
+  const w = ventana ?? window.open('', '_blank')
+  try {
+    const blob = await pagoApi.recibo(id)
+    const url = URL.createObjectURL(blob)
+    if (w) { w.location.href = url; setTimeout(() => URL.revokeObjectURL(url), 60_000) }
+    else { descargarBlob(blob, `${numero ?? 'recibo'}.pdf`); URL.revokeObjectURL(url) }
+  } catch (e) {
+    w?.close()
+    toast.error(e instanceof Error ? e.message : 'No se pudo generar el recibo')
+  } finally {
+    imprimiendo.value = null
+  }
+}
+
 async function registrar() {
   if (!form.value.conceptoPagoId) { errorModal.value = 'Seleccioná un concepto'; return }
   if (form.value.montoPagado <= 0) { errorModal.value = 'El monto debe ser mayor a 0'; return }
   guardando.value = true
   errorModal.value = null
+  const ventanaRecibo = window.open('', '_blank')   // se abre ya (con el clic) y se llena al cobrar
   try {
     const pago = await pagoApi.registrar(form.value)
     modalAbierto.value = false
+    void mostrarRecibo(pago.id, pago.numeroRecibo, ventanaRecibo)   // el comprobante se abre solo al cobrar
     toast.success(pago.saldoPendiente > 0
       ? `Abono registrado. Saldo del concepto: Bs. ${pago.saldoPendiente.toLocaleString('es-BO')}`
       : 'Pago registrado: concepto saldado')
     await recargar()
   } catch (e) {
+    ventanaRecibo?.close()
     errorModal.value = e instanceof Error ? e.message : 'Error al registrar'
   } finally {
     guardando.value = false
@@ -385,7 +410,13 @@ async function crearConcepto() {
                 <td class="text-sm">{{ p.metodoPago }}</td>
                 <td class="text-sm text-base-content/60">{{ formatoFecha(p.fechaPago) }}</td>
                 <td><StatusBadge :estado="p.estado" /></td>
-                <td>
+                <td class="whitespace-nowrap">
+                  <button v-if="p.numeroRecibo" class="btn btn-ghost btn-xs"
+                    :disabled="imprimiendo === p.id" title="Ver o imprimir el recibo (PDF)"
+                    @click="mostrarRecibo(p.id, p.numeroRecibo)">
+                    <span v-if="imprimiendo === p.id" class="loading loading-xs loading-spinner"></span>
+                    <span v-else>🧾 Recibo</span>
+                  </button>
                   <button v-if="p.estado === 'PAGADO' || p.estado === 'PARCIAL'"
                     class="btn btn-ghost btn-xs text-error"
                     :disabled="anulando === p.id"

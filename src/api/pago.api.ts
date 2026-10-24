@@ -90,6 +90,10 @@ export const pagoApi = {
   registrar: (payload: PagoPayload) =>
     api.post<PagoRegistrado>('/pagos', payload).then(r => r.data),
 
+  // GET /pagos/:id/recibo → PDF (original + copia en una hoja A4). Se puede reimprimir las veces que haga falta.
+  recibo: (id: number) =>
+    api.get<Blob>(`/pagos/${id}/recibo`, { responseType: 'blob' }).then(r => r.data),
+
   anular: (id: number, observaciones?: string) =>
     api.put(`/pagos/${id}/anular`, { observaciones }).then(r => r.data),
 }
