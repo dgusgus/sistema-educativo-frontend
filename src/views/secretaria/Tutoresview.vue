@@ -187,6 +187,14 @@ const vinculandoEst    = ref(false)
 const errorVincularEst = ref<string | null>(null)
 const tutorParaVincularEst = ref<Tutor | null>(null)
 const buscador = useBuscadorEstudiante()
+// Mismos valores que el enum Parentesco del backend (el texto libre provocaba un 500)
+const PARENTESCOS = [
+  { valor: 'MADRE', etiqueta: 'Madre' }, { valor: 'PADRE', etiqueta: 'Padre' },
+  { valor: 'ABUELA', etiqueta: 'Abuela' }, { valor: 'ABUELO', etiqueta: 'Abuelo' },
+  { valor: 'TIA', etiqueta: 'Tía' }, { valor: 'TIO', etiqueta: 'Tío' },
+  { valor: 'HERMANA', etiqueta: 'Hermana' }, { valor: 'HERMANO', etiqueta: 'Hermano' },
+  { valor: 'TUTOR_LEGAL', etiqueta: 'Tutor legal' }, { valor: 'OTRO', etiqueta: 'Otro' },
+]
 const formVinculo = ref({ parentesco: '', esTutorPrincipal: false, esApoderado: false, viveConEstudiante: true })
 
 function abrirVincularEstudiante(t: Tutor) {
@@ -518,7 +526,10 @@ async function exportar() {
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Parentesco *</legend>
-          <input v-model="formVinculo.parentesco" type="text" placeholder="Ej: Madre, Padre, Tío/a, Abuelo/a" class="input input-bordered w-full" :disabled="vinculandoEst" />
+          <select v-model="formVinculo.parentesco" class="select select-bordered w-full" :disabled="vinculandoEst">
+            <option value="" disabled>Selecciona el parentesco</option>
+            <option v-for="p in PARENTESCOS" :key="p.valor" :value="p.valor">{{ p.etiqueta }}</option>
+          </select>
         </fieldset>
         <div class="flex flex-col gap-1">
           <label class="label cursor-pointer justify-start gap-2">
