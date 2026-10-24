@@ -56,6 +56,7 @@ const router = createRouter({
         { path: 'secretarias',  name: 'director-secretarias',  component: () => import('@/views/director/Secretariasview.vue') },
         { path: 'usuarios',     name: 'director-usuarios',     component: () => import('@/views/director/UsuariosView.vue') },
         { path: 'reportes',     name: 'director-reportes',     component: () => import('@/views/director/ReportesView.vue') },
+        { path: 'historial',    name: 'director-historial',    component: () => import('@/views/secretaria/HistorialView.vue') },
         { path: 'estructura',   name: 'director-estructura',   component: () => import('@/views/director/EstructuraView.vue') },
         { path: 'dimensiones',  name: 'director-dimensiones',  component: () => import('@/views/director/Dimensionesview.vue') },
         { path: 'gestiones',    name: 'director-gestiones',    component: () => import('@/views/director/GestionesView.vue') },
@@ -77,6 +78,7 @@ const router = createRouter({
         { path: 'tutores',          name: 'secretaria-tutores',       component: () => import('@/views/secretaria/Tutoresview.vue') },
         { path: 'pagos',            name: 'secretaria-pagos',         component: () => import('@/views/secretaria/PagosView.vue') },
         { path: 'boletines',        name: 'secretaria-boletines',     component: () => import('@/views/secretaria/BoletinesView.vue') },
+        { path: 'historial',        name: 'secretaria-historial',     component: () => import('@/views/secretaria/HistorialView.vue') },
         { path: 'asistencia',       name: 'secretaria-asistencia',    component: () => import('@/views/secretaria/AsistenciaReporteView.vue') },
         { path: 'correccion-notas', name: 'correccion-notas',         component: () => import('@/views/secretaria/CorreccionNotasView.vue') },
         { path: 'promocion',        name: 'promocion',                component: () => import('@/views/secretaria/Promocionview.vue') },
@@ -106,6 +108,7 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['ESTUDIANTE'] },
       children: [
         { path: 'perfil', name: 'estudiante-perfil', component: () => import('@/views/estudiante/MiPerfilView.vue') },
+        { path: 'historial', name: 'estudiante-historial', component: () => import('@/views/estudiante/MiHistorialView.vue') },
       ],
     },
 
@@ -116,6 +119,7 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['TUTOR'] },
       children: [
         { path: 'seguimiento', name: 'tutor-seguimiento', component: () => import('@/views/tutor/SeguimientoView.vue') },
+        { path: 'historial', name: 'tutor-historial', component: () => import('@/views/tutor/HistorialTutorView.vue') },
       ],
     },
 

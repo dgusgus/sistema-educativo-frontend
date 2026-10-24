@@ -81,6 +81,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
     { label: 'Institución', to: '/director/institucion', grupo: 'Administración', icon: 'institucion' },
 
     { label: 'Reportes', to: '/director/reportes', icon: 'reportes' },
+    { label: 'Historial académico', to: '/director/historial', icon: 'documento' },
     { label: 'Gestiones', to: '/director/gestiones', icon: 'gestiones' },
     { label: 'Horarios', to: '/director/horarios', icon: 'horario' },
     
@@ -90,6 +91,7 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
     { label: 'Tutores', to: '/secretaria/tutores', icon: 'personas' },
     { label: 'Pagos', to: '/secretaria/pagos', icon: 'pagos' },
     { label: 'Boletines', to: '/secretaria/boletines', icon: 'documento' },
+    { label: 'Historial académico', to: '/secretaria/historial', icon: 'reportes' },
     { label: 'Asistencia', to: '/secretaria/asistencia', icon: 'asistencia' },
     { label: 'Cuaderno Pedagógico', to: '/secretaria/cuaderno', icon: 'reportes' },
     { label: 'Corrección de Notas', to: '/secretaria/correccion-notas', icon: 'correccion' },
@@ -104,9 +106,11 @@ const menusPorRol: Record<Rol, MenuItem[]> = {
   ],
   ESTUDIANTE: [
     { label: 'Mi Perfil', to: '/estudiante/perfil', icon: 'perfil' },
+    { label: 'Mi Historial', to: '/estudiante/historial', icon: 'reportes' },
   ],
   TUTOR: [
     { label: 'Seguimiento', to: '/tutor/seguimiento', icon: 'seguimiento' },
+    { label: 'Historial', to: '/tutor/historial', icon: 'reportes' },
   ],
 }
 
