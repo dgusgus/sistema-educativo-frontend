@@ -32,6 +32,7 @@
   --color-dorado-claro: #E8C86A;
   --color-marino: #0C2743;
   --color-marino-claro: #102E4F;
+  --color-marino-oscuro: #081B30;
   --radius-box: 0.75rem;
   --radius-field: 0.5rem;
   --radius-selector: 0.5rem;
@@ -63,14 +64,14 @@ h1, h2, h3, h4, .font-display {
 /* ── Marca institucional compartida ───────────────────────────────────── */
 /* Panel marino fijo (hero, sidebar): mismo en claro y oscuro por identidad */
 .bg-marino {
-  background: linear-gradient(180deg, var(--color-marino-claro) 0%, var(--color-marino) 60%, #081B30 100%);
+  background: linear-gradient(180deg, var(--color-marino-claro) 0%, var(--color-marino) 60%, var(--color-marino-oscuro) 100%);
 }
 
 /* Foco visible de marca: dorado + halo primario para contraste en claro */
 .foco-marca:focus-visible {
   outline: 2px solid var(--color-dorado);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+  box-shadow: 0 0 0 4px rgba(120, 120, 120, 0.28);
 }
 @supports (background: color-mix(in srgb, red 10%, transparent)) {
   .foco-marca:focus-visible {
@@ -124,6 +125,122 @@ h1, h2, h3, h4, .font-display {
   --color-dorado-claro: #E8C86A;
   --color-marino: #0C2743;
   --color-marino-claro: #102E4F;
+  --color-marino-oscuro: #081B30;
+  --radius-box: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Tema claro verde/granate — mismos tokens que "colegio" */
+@plugin "daisyui/theme" {
+  name: "esmeralda";
+  default: false;
+  color-scheme: light;
+  --color-primary: #1B5E3F;
+  --color-primary-content: #FFFFFF;
+  --color-secondary: #2F8F5B;
+  --color-secondary-content: #FFFFFF;
+  --color-accent: #2F8F5B;
+  --color-accent-content: #FFFFFF;
+  --color-neutral: #2B3330;
+  --color-neutral-content: #FFFFFF;
+  --color-base-100: #FFFFFF;
+  --color-base-200: #EAF5EE;
+  --color-base-300: #D9ECE1;
+  --color-base-content: #2B3330;
+  --color-info: #2E6DA4;
+  --color-info-content: #FFFFFF;
+  --color-success: #2E7D32;
+  --color-success-content: #FFFFFF;
+  --color-warning: #C77700;
+  --color-warning-content: #FFFFFF;
+  --color-error: #C0392B;
+  --color-error-content: #FFFFFF;
+  --color-dorado: #C9A227;
+  --color-dorado-claro: #E8C86A;
+  --color-marino: #0B2E22;
+  --color-marino-claro: #0F3A2B;
+  --color-marino-oscuro: #06201A;
+  --radius-box: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Tema claro verde/granate — mismos tokens que "colegio" */
+@plugin "daisyui/theme" {
+  name: "vino";
+  default: false;
+  color-scheme: light;
+  --color-primary: #7A1F3D;
+  --color-primary-content: #FFFFFF;
+  --color-secondary: #A63D5E;
+  --color-secondary-content: #FFFFFF;
+  --color-accent: #A63D5E;
+  --color-accent-content: #FFFFFF;
+  --color-neutral: #33292C;
+  --color-neutral-content: #FFFFFF;
+  --color-base-100: #FFFFFF;
+  --color-base-200: #FAEFF2;
+  --color-base-300: #F1DDE3;
+  --color-base-content: #33292C;
+  --color-info: #2E6DA4;
+  --color-info-content: #FFFFFF;
+  --color-success: #2E7D32;
+  --color-success-content: #FFFFFF;
+  --color-warning: #C77700;
+  --color-warning-content: #FFFFFF;
+  --color-error: #C0392B;
+  --color-error-content: #FFFFFF;
+  --color-dorado: #C9A227;
+  --color-dorado-claro: #E8C86A;
+  --color-marino: #3A0F1F;
+  --color-marino-claro: #4A1528;
+  --color-marino-oscuro: #26091A;
+  --radius-box: 0.75rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Tema oscuro "Carnaval" — berenjena con magenta y ámbar (guiño al Carnaval de Oruro) */
+@plugin "daisyui/theme" {
+  name: "carnaval";
+  default: false;
+  prefersdark: false;
+  color-scheme: dark;
+  --color-primary: #E0457B;
+  --color-primary-content: #1A0614;
+  --color-secondary: #9B7BF0;
+  --color-secondary-content: #140A2A;
+  --color-accent: #F5B83D;
+  --color-accent-content: #2A1A00;
+  --color-neutral: #2E1B4A;
+  --color-neutral-content: #EADFF7;
+  --color-base-100: #1F1236;
+  --color-base-200: #160C29;
+  --color-base-300: #2A1A47;
+  --color-base-content: #EADFF7;
+  --color-info: #7DB2FF;
+  --color-info-content: #06142B;
+  --color-success: #3DD6A0;
+  --color-success-content: #00210f;
+  --color-warning: #F5B83D;
+  --color-warning-content: #2A1700;
+  --color-error: #FF6B81;
+  --color-error-content: #2a000a;
+  --color-dorado: #C9A227;
+  --color-dorado-claro: #E8C86A;
+  --color-marino: #1A0B2E;
+  --color-marino-claro: #25123F;
+  --color-marino-oscuro: #10071D;
   --radius-box: 0.75rem;
   --radius-field: 0.5rem;
   --radius-selector: 0.5rem;

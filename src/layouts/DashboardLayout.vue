@@ -7,13 +7,12 @@ import { useDocenteStore } from '@/stores/docente.store'
 import { useInstitucionStore } from '@/stores/institucion.store'
 import { reporteApi } from '@/api/reporte.api'
 import type { Rol } from '@/types'
-import { useTheme } from '@/composables/useTheme'
+import ThemeSelector from '@/components/ThemeSelector.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import type { NombreIcono } from '@/lib/icons'
 
 
 const auth = useAuthStore()
-const { tema, alternar } = useTheme()
 const route = useRoute()
 const router = useRouter()
 const gestion = useGestionStore()
@@ -284,20 +283,7 @@ async function guardarPassword() {
           </div>
 
           <div class="flex-none items-center gap-1.5 flex">
-            <button type="button" class="btn btn-ghost btn-circle"
-              :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'"
-              :aria-pressed="tema !== 'colegio'" title="Cambiar tema" @click="alternar">
-              <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
+            <ThemeSelector />
             <div class="dropdown dropdown-end">
               <div tabindex="0" role="button" aria-haspopup="menu" aria-label="Abrir menú de usuario" class="btn btn-ghost gap-2.5 rounded-2xl px-2 py-1.5 h-auto">
                 <div class="avatar placeholder">
@@ -495,7 +481,7 @@ async function guardarPassword() {
 .side-link:focus-visible {
   outline: 2px solid var(--color-dorado);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 28%, transparent);
 }
 .side-link.side-active {
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
@@ -515,7 +501,7 @@ async function guardarPassword() {
 .topbar :focus-visible {
   outline: 2px solid var(--color-dorado);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.28);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 28%, transparent);
 }
 .topbar ::selection { background: var(--color-dorado); color: var(--color-marino); }
 

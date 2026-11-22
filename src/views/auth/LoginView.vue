@@ -2,9 +2,8 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
-import { useTheme } from '@/composables/useTheme'
+import ThemeSelector from '@/components/ThemeSelector.vue'
 import { useInstitucionStore } from '@/stores/institucion.store'
-const { tema, alternar } = useTheme()
 
 const router = useRouter()
 const route  = useRoute()
@@ -91,7 +90,7 @@ function usarCredencial(c: { u: string; p: string }) {
   <aside class="panel-enter relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#0C2743] text-white p-10 xl:p-14">
     <!-- Capas decorativas -->
     <div class="absolute inset-0" aria-hidden="true">
-      <div class="absolute inset-0" style="background: radial-gradient(1100px 500px at 15% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(800px 600px at 110% 100%, #C9A22722 0%, transparent 55%), linear-gradient(180deg, #102E4F 0%, #0C2743 55%, #081B30 100%);"></div>
+      <div class="absolute inset-0" style="background: radial-gradient(1100px 500px at 15% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(800px 600px at 110% 100%, #C9A22722 0%, transparent 55%), linear-gradient(180deg, var(--color-marino-claro) 0%, var(--color-marino) 55%, var(--color-marino-oscuro) 100%);"></div>
       <div class="andean-pattern absolute inset-0 opacity-[0.12]"></div>
       <div class="absolute -right-24 -bottom-24 h-[26rem] w-[26rem] rounded-full border-[28px] border-white/[0.04]"></div>
       <div class="absolute -right-10 -bottom-10 h-[18rem] w-[18rem] rounded-full border border-[#C9A227]/20"></div>
@@ -160,21 +159,7 @@ function usarCredencial(c: { u: string; p: string }) {
 
   <!-- ═════════ COLUMNA FORMULARIO ═════════ -->
   <main class="relative flex items-center justify-center px-4 py-10 sm:px-8">
-    <button
-      type="button"
-      class="btn btn-ghost btn-circle absolute top-4 right-4 border border-base-300 bg-base-100/80"
-      :aria-label="tema === 'colegio' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'"
-      :aria-pressed="tema !== 'colegio'"
-      @click="alternar"
-      title="Cambiar tema"
-    >
-      <svg v-if="tema === 'colegio'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-      </svg>
-      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    </button>
+    <ThemeSelector class="absolute top-4 right-4" />
 
     <div class="form-enter w-full max-w-[26rem]">
       <!-- Marca móvil -->

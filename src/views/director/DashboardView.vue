@@ -174,9 +174,9 @@ onMounted(async () => {
 
     <!-- ── HERO institucional ─────────────────────────────────────────────── -->
     <div v-if="cargando" class="skeleton h-36 w-full rounded-box"></div>
-    <div v-else-if="datos" class="dash-hero bg-marino relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(12,39,67,0.65)]">
+    <div v-else-if="datos" class="dash-hero bg-marino relative overflow-hidden rounded-3xl text-white shadow-[0_24px_60px_-28px_rgba(0,0,0,0.45)]">
       <div class="absolute inset-0" aria-hidden="true">
-        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, #2E6DA455 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%); background: radial-gradient(700px 260px at 12% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, color-mix(in srgb, var(--color-dorado) 13%, transparent) 0%, transparent 55%);"></div>
+        <div class="absolute inset-0" style="background: radial-gradient(700px 260px at 12% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, #C9A22722 0%, transparent 55%); background: radial-gradient(700px 260px at 12% 0%, color-mix(in srgb, var(--color-secondary) 33%, transparent) 0%, transparent 60%), radial-gradient(500px 300px at 105% 100%, color-mix(in srgb, var(--color-dorado) 13%, transparent) 0%, transparent 55%);"></div>
         <div class="absolute -right-16 -bottom-20 h-64 w-64 rounded-full border-[22px] border-white/[0.05]"></div>
       </div>
       <div class="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-dorado via-dorado-claro to-dorado" aria-hidden="true"></div>

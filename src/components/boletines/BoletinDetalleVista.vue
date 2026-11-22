@@ -57,7 +57,7 @@ const promedioGeneralAnual = computed(() => {
 <template>
   <div class="rounded-box border border-base-300 overflow-hidden">
     <!-- Encabezado institucional -->
-    <div class="px-4 sm:px-6 py-4 sm:py-5 text-white" style="background: linear-gradient(135deg, #1A3C5E 0%, #2E6DA4 100%)">
+    <div class="px-4 sm:px-6 py-4 sm:py-5 text-white" style="background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)">
       <div class="flex items-center gap-3 sm:gap-4">
         <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/15 flex items-center justify-center text-lg sm:text-xl font-semibold shrink-0">
           {{ iniciales }}
