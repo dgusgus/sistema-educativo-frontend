@@ -28,6 +28,7 @@ const tabs: Array<{ rol: TabRol; label: string }> = [
 // Cada tab cachea su propio estado — cambiar de tab no recarga si ya se vio.
 interface PerfilItem {
   id: number
+  personaId?: number
   nombre: string
   apellido: string
   ci: string
@@ -37,7 +38,7 @@ interface PerfilItem {
   gradoInstruccion?: string | null   // TUTOR
   telefono?: string | null
   email?: string | null
-  usuario?: { id: number; username: string; activo?: boolean } | null
+  usuario?: { id: number; username: string; activo?: boolean; roles?: Rol[] } | null
   // ⚠️ Curso embebido sin "nombre" calculado — ver estudiante.controller.ts
   // (select solo trae nivel/grado/paralelo, no turno ni conNombre())
   inscripciones?: Array<{ curso?: { nivel: Nivel; grado: number; paralelo: string }; estadoInscripcion: string }>
@@ -95,7 +96,7 @@ async function cargarTab(rol: TabRol) {
         apellido: u.perfil?.apellido ?? '—',
         ci:       u.perfil?.ci      ?? '—',
         activo:   u.activo,
-        usuario:  { id: u.id, username: u.username, activo: u.activo },
+        usuario:  { id: u.id, username: u.username, activo: u.activo, roles: u.roles },
       }))
     }
     datos.value[rol]    = items
@@ -250,6 +251,89 @@ async function toggleActivo(p: PerfilItem) {
   }
 }
 
+
+// ─── Habilitar / quitar rol (la misma persona con varios roles) ──────────────
+type RolPersonal = 'DIRECTOR' | 'SECRETARIA' | 'DOCENTE'
+const ETIQUETA_ROL: Record<RolPersonal, string> = { DIRECTOR: 'Director', SECRETARIA: 'Secretaria', DOCENTE: 'Docente' }
+
+// Roles que se le pueden sumar a una fila según la pestaña donde está
+const rolesSumables = computed<RolPersonal[]>(() => {
+  switch (tabActivo.value) {
+    case 'DIRECTOR':   return ['DOCENTE']
+    case 'SECRETARIA': return ['DOCENTE']
+    case 'DOCENTE':    return ['DIRECTOR', 'SECRETARIA']
+    default:           return []
+  }
+})
+const esRolPersonal = (r: string): r is RolPersonal => r in ETIQUETA_ROL
+const otrosRoles = (p: PerfilItem) =>
+  (p.usuario?.roles ?? []).filter(r => r !== tabActivo.value && esRolPersonal(r)) as RolPersonal[]
+const puedeQuitarRol = (p: PerfilItem) =>
+  esRolPersonal(tabActivo.value) && (p.usuario?.roles?.length ?? 0) > 1 && (p.usuario?.roles ?? []).includes(tabActivo.value)
+
+const modalRol      = ref(false)
+const guardandoRol  = ref(false)
+const errorRol      = ref<string | null>(null)
+const filaRol       = ref<PerfilItem | null>(null)
+const rolAHabilitar = ref<RolPersonal>('DOCENTE')
+const formRol       = ref({ especialidad: '', username: '', password: '' })
+const credencialesRol = ref<{ username: string; password: string } | null>(null)
+
+function abrirHabilitar(p: PerfilItem, rol: RolPersonal) {
+  filaRol.value       = p
+  rolAHabilitar.value = rol
+  formRol.value       = { especialidad: '', username: '', password: '' }
+  errorRol.value      = null
+  credencialesRol.value = null
+  modalRol.value      = true
+}
+
+// Hay que pedir usuario/contraseña solo si la persona todavía no tiene cuenta
+const necesitaCuenta = computed(() => !filaRol.value?.usuario)
+
+async function habilitarRol() {
+  const p = filaRol.value
+  if (!p) return
+  if (necesitaCuenta.value && (!formRol.value.username || formRol.value.password.length < 6)) {
+    errorRol.value = 'Esta persona no tiene cuenta: indica usuario y contraseña (mín. 6 caracteres)'
+    return
+  }
+  guardandoRol.value = true
+  errorRol.value     = null
+  try {
+    const r = await usuarioApi.habilitarRol({
+      ...(p.usuario ? { usuarioId: p.usuario.id } : { personaId: p.personaId }),
+      rol:          rolAHabilitar.value,
+      especialidad: rolAHabilitar.value === 'DOCENTE' ? (formRol.value.especialidad || undefined) : undefined,
+      username:     necesitaCuenta.value ? formRol.value.username : undefined,
+      password:     necesitaCuenta.value ? formRol.value.password : undefined,
+    })
+    toast.success(r.mensaje)
+    credencialesRol.value = r.credenciales
+    // Recargar todas las pestañas: la persona ahora aparece también en otra
+    cargados.value = { DIRECTOR: false, SECRETARIA: false, DOCENTE: false, ESTUDIANTE: cargados.value.ESTUDIANTE, TUTOR: false }
+    await cargarTab(tabActivo.value)
+    if (!r.credenciales) modalRol.value = false
+  } catch (e) {
+    errorRol.value = e instanceof Error ? e.message : 'No se pudo habilitar el rol'
+  } finally {
+    guardandoRol.value = false
+  }
+}
+
+async function quitarRol(p: PerfilItem) {
+  if (!p.usuario || !esRolPersonal(tabActivo.value)) return
+  const rol = tabActivo.value
+  if (!confirm(`¿Quitar el rol de ${ETIQUETA_ROL[rol]} a ${p.nombre} ${p.apellido}? Conservará su cuenta y sus otros roles, y sus datos históricos.`)) return
+  try {
+    await usuarioApi.quitarRol(p.usuario.id, rol)
+    cargados.value[rol] = false
+    await cargarTab(rol)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'No se pudo quitar el rol'
+  }
+}
+
 // ─── Helpers de display ───────────────────────────────────────────────────────
 const labelActivo = computed(() =>
   tabs.find(t => t.rol === tabActivo.value)?.label ?? ''
@@ -345,7 +429,10 @@ function labelCampoExtra(): string {
             </td>
           </tr>
           <tr v-else v-for="p in listaFiltrada" :key="p.id" class="hover">
-            <td class="font-medium">{{ p.apellido }}, {{ p.nombre }}</td>
+            <td class="font-medium">
+              {{ p.apellido }}, {{ p.nombre }}
+              <span v-for="r in otrosRoles(p)" :key="r" class="badge badge-xs badge-info ml-1">también {{ ETIQUETA_ROL[r].toLowerCase() }}</span>
+            </td>
             <td class="font-mono text-sm">{{ p.ci }}</td>
             <td class="text-sm text-base-content/70">{{ campoExtra(p) }}</td>
             <td>
@@ -374,6 +461,20 @@ function labelCampoExtra(): string {
                 >
                   Reset pass
                 </button>
+                <template v-if="!esEstudiantes">
+                  <button
+                    v-for="r in rolesSumables.filter(x => !otrosRoles(p).includes(x))"
+                    :key="r"
+                    class="btn btn-ghost btn-xs text-info"
+                    :title="`Habilitar a esta misma persona como ${ETIQUETA_ROL[r].toLowerCase()} (sin volver a crear sus datos)`"
+                    @click="abrirHabilitar(p, r)"
+                  >
+                    + {{ ETIQUETA_ROL[r] }}
+                  </button>
+                  <button v-if="puedeQuitarRol(p)" class="btn btn-ghost btn-xs text-error" @click="quitarRol(p)">
+                    Quitar rol
+                  </button>
+                </template>
                 <span v-if="tabActivo === 'ESTUDIANTE' && !p.usuario" class="text-xs text-base-content/30">
                   Gestionado por Secretaría
                 </span>
@@ -551,5 +652,56 @@ function labelCampoExtra(): string {
     <form method="dialog" class="modal-backdrop" @click="modalReset = false">
       <button>cerrar</button>
     </form>
+  </dialog>
+  <!-- ── Modal habilitar rol ───────────────────────────────────────────────── -->
+  <dialog :open="modalRol" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-1">Habilitar como {{ ETIQUETA_ROL[rolAHabilitar].toLowerCase() }}</h3>
+      <p class="text-sm text-base-content/60 mb-4">
+        {{ filaRol?.nombre }} {{ filaRol?.apellido }} · CI {{ filaRol?.ci }}.
+        Se reutilizan sus mismos datos; no hace falta volver a registrarla/o.
+      </p>
+
+      <div v-if="credencialesRol" role="status" class="alert alert-success mb-4 text-sm">
+        <div>
+          <p class="font-semibold">Cuenta creada. Comparte estas credenciales:</p>
+          <p class="font-mono">{{ credencialesRol.username }} / {{ credencialesRol.password }}</p>
+        </div>
+      </div>
+      <template v-if="!credencialesRol">
+        <div v-if="errorRol" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorRol }}</span></div>
+        <form class="space-y-3" @submit.prevent="habilitarRol">
+          <fieldset v-if="rolAHabilitar === 'DOCENTE'" class="fieldset">
+            <legend class="fieldset-legend text-xs">Especialidad (opcional)</legend>
+            <input v-model="formRol.especialidad" class="input input-bordered w-full" :disabled="guardandoRol" />
+          </fieldset>
+          <template v-if="necesitaCuenta">
+            <p class="text-xs text-base-content/60">Esta persona aún no tiene cuenta de acceso; se creará una.</p>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Usuario *</legend>
+              <input v-model="formRol.username" class="input input-bordered w-full" autocomplete="off" :disabled="guardandoRol" />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-xs">Contraseña * (mín. 6)</legend>
+              <input v-model="formRol.password" type="password" autocomplete="new-password" class="input input-bordered w-full" :disabled="guardandoRol" />
+            </fieldset>
+          </template>
+          <p v-else class="text-xs text-base-content/60">
+            Usará su misma cuenta ({{ filaRol?.usuario?.username }}); al volver a iniciar sesión podrá cambiar entre sus roles.
+          </p>
+          <div class="modal-action mt-6">
+            <button type="button" class="btn btn-ghost" :disabled="guardandoRol" @click="modalRol = false">Cancelar</button>
+            <button type="submit" class="btn btn-primary" :disabled="guardandoRol">
+              <span v-if="guardandoRol" class="loading loading-spinner loading-sm"></span>
+              Habilitar rol
+            </button>
+          </div>
+        </form>
+      </template>
+      <div v-else class="modal-action">
+        <button class="btn btn-primary" @click="modalRol = false">Cerrar</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="modalRol = false"><button>cerrar</button></form>
   </dialog>
 </template>

@@ -119,4 +119,26 @@ export const usuarioApi = {
     estudianteId?: number
     tutorId?:      number
   }) => api.put(`/usuarios/${id}/vincular`, data).then(r => r.data),
+
+  // Suma un rol de personal (Director/Secretaria/Docente) a una persona que
+  // ya existe: reutiliza sus datos y su cuenta. Si no tiene cuenta, enviar
+  // username + password. Solo Director.
+  habilitarRol: (data: {
+    usuarioId?:    number
+    personaId?:    number
+    rol:           'DIRECTOR' | 'SECRETARIA' | 'DOCENTE'
+    especialidad?: string
+    gestionId?:    number
+    username?:     string
+    password?:     string
+  }) =>
+    api.post<{
+      usuario:      { id: number; username: string; roles: Rol[] }
+      credenciales: { username: string; password: string } | null
+      mensaje:      string
+    }>('/usuarios/habilitar-rol', data).then(r => r.data),
+
+  // Quita un rol de personal y desactiva ese perfil (conserva el historial)
+  quitarRol: (id: number, rol: 'DIRECTOR' | 'SECRETARIA' | 'DOCENTE') =>
+    api.post<{ message: string }>(`/usuarios/${id}/quitar-rol`, { rol }).then(r => r.data),
 }
