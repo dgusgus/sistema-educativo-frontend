@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 // Crear (estudiante = null) o editar el perfil de un estudiante, sin cuenta.
 import { ref, watch } from 'vue'
 import ModalBase from '@/components/ModalBase.vue'
@@ -54,7 +55,7 @@ async function enviar() {
       </div>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">CI *</legend>
-        <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="guardar.ejecutando.value" />
+        <CiInput v-model="form.ci" :disabled="guardar.ejecutando.value" />
       </fieldset>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">Fecha de nacimiento</legend>

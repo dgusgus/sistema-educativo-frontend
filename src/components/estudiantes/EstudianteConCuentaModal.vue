@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 // Crea el perfil de estudiante y su cuenta de acceso en una sola operación.
 // Al terminar muestra las credenciales (única vez que se ven en claro).
 import { ref, watch } from 'vue'
@@ -84,7 +85,7 @@ async function enviar() {
       </div>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">CI *</legend>
-        <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="crear.ejecutando.value" />
+        <CiInput v-model="form.ci" :disabled="crear.ejecutando.value" />
       </fieldset>
       <div class="grid grid-cols-2 gap-3">
         <fieldset class="fieldset">

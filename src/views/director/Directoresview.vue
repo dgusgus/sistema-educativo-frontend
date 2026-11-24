@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 import { ref, computed, onMounted } from 'vue'
 import { directorApi, type DirectorConCuentaPayload } from '@/api/director.api'
 import { useToastStore } from '@/stores/toast.store'
@@ -161,7 +162,7 @@ async function guardarEdicion() {
             <input v-model="formCrear.apellido" type="text" class="input input-bordered w-full" :disabled="creando" /></fieldset>
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="formCrear.ci" type="text" class="input input-bordered w-full" :disabled="creando" /></fieldset>
+          <CiInput v-model="formCrear.ci" :disabled="creando" /></fieldset>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="formCrear.telefono" type="tel" class="input input-bordered w-full" :disabled="creando" /></fieldset>
@@ -201,7 +202,7 @@ async function guardarEdicion() {
             <input v-model="formEditar.apellido" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI</legend>
-          <input v-model="formEditar.ci" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
+          <CiInput v-model="formEditar.ci" :disabled="guardando" /></fieldset>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="formEditar.telefono" type="tel" class="input input-bordered w-full" :disabled="guardando" /></fieldset>

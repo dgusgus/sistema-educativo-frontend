@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 // Crea el docente (perfil + cuenta) en una sola operación y muestra las credenciales.
 import { ref, watch } from 'vue'
 import ModalBase from '@/components/ModalBase.vue'
@@ -100,7 +101,7 @@ async function enviar() {
       </div>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">CI *</legend>
-        <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="crear.ejecutando.value" />
+        <CiInput v-model="form.ci" :disabled="crear.ejecutando.value" />
       </fieldset>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">Especialidad</legend>

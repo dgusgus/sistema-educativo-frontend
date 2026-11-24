@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 // Crear (docente = null) o editar el perfil de un docente, sin cuenta de acceso.
 import { ref, watch } from 'vue'
 import ModalBase from '@/components/ModalBase.vue'
@@ -64,7 +65,7 @@ async function enviar() {
       </div>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">CI *</legend>
-        <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="accion().ejecutando.value" />
+        <CiInput v-model="form.ci" :disabled="accion().ejecutando.value" />
       </fieldset>
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-xs">Especialidad</legend>

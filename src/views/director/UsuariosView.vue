@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 import { ref, computed, onMounted } from 'vue'
 import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
 import { docenteApi } from '@/api/docente.api'
@@ -541,7 +542,7 @@ function labelCampoExtra(): string {
 
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="formCuenta.ci" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" />
+          <CiInput v-model="formCuenta.ci" :disabled="creandoCuenta" />
         </fieldset>
 
         <div class="grid grid-cols-2 gap-3">

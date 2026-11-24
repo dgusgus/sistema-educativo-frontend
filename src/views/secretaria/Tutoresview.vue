@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CiInput from '@/components/CiInput.vue'
 import { ref, computed, onMounted } from 'vue'
 import { tutorApi, type TutorPayload } from '@/api/tutor.api'
 import { usuarioApi, type ConPerfilPayload } from '@/api/usuario.api'
@@ -408,7 +409,7 @@ async function exportar() {
             <input v-model="form.apellido" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
+          <CiInput v-model="form.ci" :disabled="guardando" /></fieldset>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Ocupación</legend>
             <input v-model="form.ocupacion" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
@@ -455,7 +456,7 @@ async function exportar() {
             <input v-model="formCuenta.apellido" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
-          <input v-model="formCuenta.ci" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
+          <CiInput v-model="formCuenta.ci" :disabled="creandoCuenta" /></fieldset>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Ocupación</legend>
             <input v-model="formCuenta.ocupacion" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
