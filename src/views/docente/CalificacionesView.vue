@@ -209,6 +209,15 @@ const statsFinales = computed(() => {
   const aprobados = promedios.filter(n => n >= gestion.notaMinima).length
   return { promedio: promedio.toFixed(1), aprobados, reprobados: promedios.length - aprobados }
 })
+// Enter en una nota salta a la siguiente (como en Excel); en la última cierra el teclado.
+// En el celular el teclado numérico muestra "Siguiente" gracias a enterkeyhint="next".
+function siguienteNota(e: KeyboardEvent) {
+  const actual = e.target as HTMLInputElement
+  const todas = Array.from(document.querySelectorAll<HTMLInputElement>('input[data-nota]'))
+  const sig = todas[todas.indexOf(actual) + 1]
+  if (sig) sig.focus()
+  else actual.blur()
+}
 </script>
 
 <template>
@@ -273,8 +282,8 @@ const statsFinales = computed(() => {
         </div>
 
         <!-- Tabs de dimensiones (Ser/Saber/Hacer...) -->
-        <div role="tablist" class="tabs tabs-boxed w-fit">
-          <a v-for="d in dimensiones" :key="d.id" role="tab" class="tab"
+        <div role="tablist" class="tabs tabs-boxed w-full flex-nowrap overflow-x-auto sm:w-fit">
+          <a v-for="d in dimensiones" :key="d.id" role="tab" class="tab whitespace-nowrap"
             :class="dimensionActiva?.id === d.id ? 'tab-active' : ''"
             @click="dimensionActiva = d"
           >
@@ -357,8 +366,11 @@ const statsFinales = computed(() => {
                     <td>
                       <input
                         v-model="notasLocales[item.inscripcionId]"
-                        type="number" min="0" :max="actividadParaNotas.puntajeMaximo" step="0.5"
+                        type="number" inputmode="decimal" enterkeyhint="next" data-nota
+                        min="0" :max="actividadParaNotas.puntajeMaximo" step="0.5"
                         class="input input-bordered input-sm w-24"
+                        @keydown.enter.prevent="siguienteNota"
+                        @focus="($event.target as HTMLInputElement).select()"
                         :class="erroresNota[item.inscripcionId] ? 'input-error' : ''"
                         placeholder="—"
                       />
@@ -383,7 +395,7 @@ const statsFinales = computed(() => {
             <table class="table table-sm">
               <thead>
                 <tr>
-                  <th>#</th><th>Estudiante</th>
+                  <th>#</th><th class="col-fija">Estudiante</th>
                   <th v-for="d in dimensiones" :key="d.id">{{ d.nombre }}</th>
                   <th>Promedio</th><th>Estado</th>
                 </tr>
@@ -391,7 +403,7 @@ const statsFinales = computed(() => {
               <tbody>
                 <tr v-for="(item, idx) in planilla.planilla" :key="item.inscripcionId" class="hover">
                   <td class="text-base-content/40 text-sm">{{ idx + 1 }}</td>
-                  <td class="font-medium">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
+                  <td class="col-fija max-w-[9rem] truncate font-medium sm:max-w-none">{{ item.estudiante.apellido }}, {{ item.estudiante.nombre }}</td>
                   <td v-for="d in dimensiones" :key="d.id" class="text-center">
                     {{ item.dimensiones.find(x => x.nombre === d.nombre)?.promedio?.toFixed(1) ?? '—' }}
                   </td>
