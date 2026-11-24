@@ -248,3 +248,86 @@ h1, h2, h3, h4, .font-display {
   --depth: 1;
   --noise: 0;
 }
+
+/* ── Móvil / pantallas táctiles ───────────────────────────────────────── */
+/* iOS hace zoom al enfocar un campo con letra < 16px: se fuerza 16px en móvil. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Con dedo (puntero "coarse") los controles pequeños de daisyUI quedan por debajo de
+   los ~40 px recomendados: se agrandan solo en táctiles, el escritorio no cambia. */
+@media (pointer: coarse) {
+  .btn-sm { --size: 2.5rem; }
+  .btn-xs { --size: 2.25rem; }
+  .input-sm, .select-sm { --size: 2.5rem; }
+  .tab { min-height: 2.5rem; }
+}
+
+/* Tablas anchas: la primera columna (nombre) queda fija al hacer scroll horizontal. */
+.col-fija { position: sticky; left: 0; z-index: 1; background: var(--color-base-100); }
+
+/* Pista visual de scroll horizontal en móvil: sombra en el borde donde hay más contenido.
+   Solo background-image (no el shorthand) para no pisar el color de fondo de la tarjeta. */
+@media (max-width: 639px) {
+  .overflow-x-auto {
+    background-image:
+      linear-gradient(to right, var(--color-base-100) 30%, transparent),
+      linear-gradient(to left, var(--color-base-100) 30%, transparent),
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.16), transparent),
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.16), transparent);
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-repeat: no-repeat;
+    background-size: 36px 100%, 36px 100%, 12px 100%, 12px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+}
+
+/* ── Tabla apilada (móvil) ─────────────────────────────────────────────────
+   En <640 px una tabla de 6-7 columnas no cabe: cada fila pasa a ser una tarjeta con
+   "ETIQUETA  valor" por línea. Uso: class="tabla-cards" en <table> y data-label="…" en cada
+   <td> de la fila de datos. data-label="" = sin etiqueta (la primera celda es el título y la
+   última, las acciones). Las filas de "cargando"/"sin datos" (td con colspan) quedan centradas. */
+@media (max-width: 639px) {
+  .tabla-cards, .tabla-cards tbody { display: block; width: 100%; }
+  .tabla-cards thead { display: none; }
+  .tabla-cards tr {
+    display: block;
+    margin: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+  }
+  .tabla-cards td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    border: 0;
+    text-align: right;
+  }
+  .tabla-cards td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  }
+  .tabla-cards td[data-label=""]:first-child {
+    justify-content: flex-start;
+    padding-top: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: left;
+  }
+  .tabla-cards td[data-label=""]:last-child { justify-content: flex-end; flex-wrap: wrap; padding-bottom: 0; }
+  .tabla-cards td[colspan] { display: block; text-align: center; }
+}
