@@ -61,14 +61,28 @@ const PERFILES = [
 // import.meta.env.DEV por false y el arreglo (con las contraseñas) desaparece del
 // bundle. Antes quedaba en texto plano en dist/assets/LoginView-*.js aunque el
 // panel estuviera oculto con v-if.
-const CREDENCIALES_PRUEBA: { u: string; p: string; r: string }[] = import.meta.env.DEV ? [
-  { u: 'director',   p: 'admin1234', r: 'Director' },
-  { u: 'secretaria', p: 'sec1234',   r: 'Secretaria' },
-  { u: 'doc_mamani', p: 'doc1234',   r: 'Docente' },
-  { u: 'est_ana',    p: 'est1234',   r: 'Estudiante' },
-  { u: 'tut_rosa',   p: 'tut1234',   r: 'Tutor' },
-] : []
+type Credencial = { u: string; p: string; r: string }
+// Dos juegos de datos de prueba, según el seed que se haya cargado:
+//  · demo  → `pnpm db:seed:perfil demo` (500 estudiantes; hay doc01..doc37, est_v001..060, tut_v001..030)
+//  · basico → `pnpm db:seed` (seed por defecto, pocos usuarios con nombre propio)
+const CREDENCIALES_PRUEBA: Record<'demo' | 'basico', Credencial[]> = import.meta.env.DEV ? {
+  demo: [
+    { u: 'director',   p: 'admin1234', r: 'Director' },
+    { u: 'secretaria', p: 'sec1234',   r: 'Secretaria' },
+    { u: 'doc01',      p: 'doc1234',   r: 'Docente' },
+    { u: 'est_v001',   p: 'est1234',   r: 'Estudiante' },
+    { u: 'tut_v001',   p: 'tut1234',   r: 'Tutor' },
+  ],
+  basico: [
+    { u: 'director',   p: 'admin1234', r: 'Director' },
+    { u: 'secretaria', p: 'sec1234',   r: 'Secretaria' },
+    { u: 'doc_mamani', p: 'doc1234',   r: 'Docente' },
+    { u: 'est_ana',    p: 'est1234',   r: 'Estudiante' },
+    { u: 'tut_rosa',   p: 'tut1234',   r: 'Tutor' },
+  ],
+} : { demo: [], basico: [] }
 const esDesarrollo = import.meta.env.DEV
+const juegoPrueba = ref<'demo' | 'basico'>('demo')
 
 function usarCredencial(c: { u: string; p: string }) {
   username.value = c.u
@@ -284,13 +298,17 @@ function usarCredencial(c: { u: string; p: string }) {
           <details v-if="esDesarrollo" class="mt-4 rounded-2xl border border-dashed border-base-300 bg-base-200/60 text-xs">
             <summary class="cursor-pointer select-none px-4 py-2.5 font-semibold text-base-content/70 hover:text-base-content">Credenciales de prueba (solo desarrollo)</summary>
             <div class="px-4 pb-3">
+              <div role="tablist" class="tabs tabs-box tabs-xs mb-2">
+                <button type="button" role="tab" class="tab" :class="{ 'tab-active': juegoPrueba === 'demo' }" @click="juegoPrueba = 'demo'">Demo (500 estudiantes)</button>
+                <button type="button" role="tab" class="tab" :class="{ 'tab-active': juegoPrueba === 'basico' }" @click="juegoPrueba = 'basico'">Seed básico</button>
+              </div>
               <div class="overflow-hidden rounded-xl border border-base-300 bg-base-100">
                 <table class="table table-xs">
                   <thead>
                     <tr><th>Usuario</th><th>Contraseña</th><th>Rol</th></tr>
                   </thead>
                   <tbody>
-                    <tr v-for="c in CREDENCIALES_PRUEBA" :key="c.u" class="hover">
+                    <tr v-for="c in CREDENCIALES_PRUEBA[juegoPrueba]" :key="c.u" class="hover">
                       <td><button type="button" class="link link-primary font-medium" @click="usarCredencial(c)">{{ c.u }}</button></td>
                       <td class="font-mono">{{ c.p }}</td>
                       <td>{{ c.r }}</td>
@@ -298,7 +316,7 @@ function usarCredencial(c: { u: string; p: string }) {
                   </tbody>
                 </table>
               </div>
-              <p class="mt-1.5 text-[11px] text-base-content/55">Clic en un usuario para autocompletar.</p>
+              <p class="mt-1.5 text-[11px] text-base-content/55">Clic en un usuario para autocompletar. En el demo existen también doc01…doc37, est_v001…est_v060 y tut_v001…tut_v030.</p>
             </div>
           </details>
         </div>
