@@ -27,7 +27,31 @@ const horarioPorDia = computed(() => {
 </script>
 
 <template>
-  <div class="overflow-x-auto">
+  <!-- Móvil: lista agrupada por día (la tabla de 5 columnas no cabe en 390 px y se corta). -->
+  <div class="sm:hidden">
+    <div v-if="cargando" class="skeleton h-16 w-full"></div>
+    <p v-else-if="horarios.length === 0" class="py-6 text-center text-base-content/40">Sin horario cargado todavía.</p>
+    <template v-else>
+      <section v-for="dia in DIAS_SEMANA.filter(d => horarioPorDia.get(d)?.length)" :key="dia" class="mb-3 last:mb-0">
+        <h4 class="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{{ DIA_TEXTO[dia] }}</h4>
+        <ul class="divide-y divide-base-200 rounded-box border border-base-300">
+          <li v-for="h in horarioPorDia.get(dia)" :key="h.id" class="flex items-start gap-3 px-3 py-2">
+            <span class="w-[5.2rem] shrink-0 pt-0.5 font-mono text-xs text-base-content/60">{{ h.horaInicio }}–{{ h.horaFin }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium leading-snug">{{ h.materia.nombre }}</span>
+              <span class="block text-xs text-base-content/60">
+                <template v-if="columnaExtra === 'docente'">{{ h.docente.nombre }} {{ h.docente.apellido }}</template>
+                <template v-else>{{ h.curso.grado }}° {{ NIVEL_TEXTO[h.curso.nivel] }} "{{ h.curso.paralelo }}"</template>
+                <template v-if="h.aula"> · {{ h.aula }}</template>
+              </span>
+            </span>
+          </li>
+        </ul>
+      </section>
+    </template>
+  </div>
+
+  <div class="hidden overflow-x-auto sm:block">
     <table class="table table-sm">
       <thead>
         <tr>
