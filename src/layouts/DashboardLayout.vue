@@ -17,7 +17,8 @@ const route = useRoute()
 const router = useRouter()
 const gestion = useGestionStore()
 const docenteStore = useDocenteStore()
-const itemsPrincipales = computed(() => menuItems.value.slice(0, 4))
+// Barra inferior móvil: con más de 4 opciones se muestran 3 + «Más» (4 botones caben con etiqueta legible a 360 px)
+const itemsPrincipales = computed(() => menuItems.value.length > 4 ? menuItems.value.slice(0, 3) : menuItems.value)
 const hayMasItems = computed(() => menuItems.value.length > 4)
 
 // Badge de "Pagos pendientes" en el sidebar — GET /dashboard es Director-only,
@@ -286,7 +287,7 @@ async function guardarPassword() {
             <ThemeSelector />
             <div class="dropdown dropdown-end">
               <div tabindex="0" role="button" aria-haspopup="menu" aria-label="Abrir menú de usuario" class="btn btn-ghost gap-2.5 rounded-2xl px-2 py-1.5 h-auto">
-                <div class="avatar placeholder">
+                <div class="avatar avatar-placeholder">
                   <div class="bg-primary text-primary-content rounded-full w-9 ring-2 ring-primary/20">
                     <span class="text-xs font-bold">{{ (auth.usuario?.nombre ?? '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase() }}</span>
                   </div>
@@ -302,7 +303,7 @@ async function guardarPassword() {
               <div tabindex="0" role="menu" aria-label="Opciones de usuario"
                 class="dropdown-content bg-base-100 rounded-2xl z-10 w-64 p-2 shadow-[0_24px_60px_-24px_rgba(26,60,94,0.45)] border border-base-300">
                 <div class="flex items-center gap-3 px-3 pt-2 pb-3 border-b border-base-300">
-                  <div class="avatar placeholder">
+                  <div class="avatar avatar-placeholder">
                     <div class="bg-primary text-primary-content rounded-full w-10">
                       <span class="text-sm font-bold">{{ (auth.usuario?.nombre ?? '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase() }}</span>
                     </div>
@@ -345,7 +346,7 @@ async function guardarPassword() {
           <RouterLink v-for="item in itemsPrincipales" :key="item.to" :to="item.to"
             :class="esActivo(item.to) ? 'dock-active' : ''">
             <AppIcon :nombre="item.icon" class="h-5 w-5" />
-            <span class="dock-label">{{ item.label }}</span>
+            <span class="dock-label max-w-full truncate">{{ item.label }}</span>
           </RouterLink>
 
           <label v-if="hayMasItems" for="drawer-toggle">
