@@ -86,7 +86,7 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
     <!-- Encabezado del perfil -->
     <div class="card bg-base-100 shadow">
       <div class="card-body flex flex-row items-center gap-4">
-        <div class="avatar placeholder">
+        <div class="avatar avatar-placeholder">
           <div class="bg-primary text-primary-content rounded-full w-14">
             <span class="text-xl">{{ auth.usuario?.nombre?.charAt(0) ?? '?' }}</span>
           </div>
@@ -97,7 +97,6 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
         </div>
       </div>
     </div>
-    <!-- agregar en el template, después del <div class="card ..."> del encabezado (línea 90 del archivo original) y antes de "Notas por inscripción" -->
 <div class="card bg-base-100 shadow">
   <div class="card-body">
     <h3 class="font-semibold mb-2">Mi horario</h3>

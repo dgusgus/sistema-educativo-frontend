@@ -85,7 +85,7 @@ async function guardar() {
           </fieldset>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset">
             <legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="datos.telefono" type="tel" class="input input-bordered w-full" :disabled="guardando" />
@@ -96,7 +96,7 @@ async function guardar() {
           </fieldset>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset">
             <legend class="fieldset-legend text-xs">Código SIE / RUE</legend>
             <input v-model="datos.rue" type="text" class="input input-bordered w-full" :disabled="guardando" />

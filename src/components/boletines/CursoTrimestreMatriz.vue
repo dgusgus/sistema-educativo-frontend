@@ -89,7 +89,7 @@ function inicial(nombre: string): string {
       <div v-for="est in estudiantes" :key="est.inscripcionId"
         class="rounded-box border border-base-300 bg-base-100 shadow-sm p-3">
         <div class="flex items-center gap-3">
-          <span class="avatar placeholder">
+          <span class="avatar avatar-placeholder">
             <span class="bg-primary/10 text-primary rounded-full w-9 h-9 flex items-center justify-center font-bold">
               {{ inicial(est.nombreCompleto) }}
             </span>

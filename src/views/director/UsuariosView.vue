@@ -408,7 +408,7 @@ function labelCampoExtra(): string {
 
     <!-- Tabla -->
     <div class="card bg-base-100 shadow overflow-x-auto">
-      <table class="table table-sm">
+      <table class="table table-sm tabla-cards">
         <thead>
           <tr>
             <th>Nombre</th>
@@ -429,19 +429,19 @@ function labelCampoExtra(): string {
             </td>
           </tr>
           <tr v-else v-for="p in listaFiltrada" :key="p.id" class="hover">
-            <td class="font-medium">
+            <td data-label="" class="font-medium">
               {{ p.apellido }}, {{ p.nombre }}
               <span v-for="r in otrosRoles(p)" :key="r" class="badge badge-xs badge-info ml-1">también {{ ETIQUETA_ROL[r].toLowerCase() }}</span>
             </td>
-            <td class="font-mono text-sm">{{ p.ci }}</td>
-            <td class="text-sm text-base-content/70">{{ campoExtra(p) }}</td>
-            <td>
+            <td data-label="CI" class="font-mono text-sm">{{ p.ci }}</td>
+            <td :data-label="labelCampoExtra()" class="text-sm text-base-content/70">{{ campoExtra(p) }}</td>
+            <td data-label="Cuenta">
               <span v-if="p.usuario" class="badge badge-sm badge-success font-mono">
                 {{ p.usuario.username }}
               </span>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
-            <td>
+            <td data-label="Estado cuenta">
               <input
                 v-if="p.usuario"
                 type="checkbox"
@@ -452,7 +452,7 @@ function labelCampoExtra(): string {
               />
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
-            <td>
+            <td data-label="">
               <div class="flex gap-1">
                 <button
                   v-if="p.usuario"

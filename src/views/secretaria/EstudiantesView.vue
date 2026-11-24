@@ -135,7 +135,7 @@ async function exportar() {
         <h2 class="text-2xl font-bold">Estudiantes</h2>
         <p class="text-sm text-base-content/60">Gestión {{ gestion.anio ?? '—' }}</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button class="btn btn-outline btn-sm" @click="abrir('perfil')">+ Solo perfil</button>
         <button class="btn btn-primary btn-sm" @click="abrir('conCuenta')">+ Con cuenta</button>
         <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
@@ -174,7 +174,7 @@ async function exportar() {
     </div>
 
     <div class="card bg-base-100 shadow overflow-x-auto">
-      <table class="table table-sm">
+      <table class="table table-sm tabla-cards">
         <thead>
           <tr>
             <th>Nombre</th><th>CI</th><th>Curso</th><th>Estado</th><th>Resultado</th><th>Cuenta</th><th>Acciones</th>
@@ -188,21 +188,21 @@ async function exportar() {
             <td colspan="7" class="text-center text-base-content/40 py-8">No se encontraron estudiantes</td>
           </tr>
           <tr v-else v-for="e in lista.items.value" :key="e.id" class="hover">
-            <td class="font-medium">{{ e.apellido }}, {{ e.nombre }}</td>
-            <td class="font-mono text-sm">{{ e.ci }}</td>
-            <td class="text-sm">
+            <td data-label="" class="font-medium">{{ e.apellido }}, {{ e.nombre }}</td>
+            <td data-label="CI" class="font-mono text-sm">{{ e.ci }}</td>
+            <td data-label="Curso" class="text-sm">
               <span v-if="ultimaInscripcion(e)">{{ nombreCursoDeInscripcion(ultimaInscripcion(e)) }}</span>
              <span v-else class="text-base-content/30">Sin inscripción</span>
             </td>
-            <td>
+            <td data-label="Estado">
               <StatusBadge v-if="ultimaInscripcion(e)" :estado="ultimaInscripcion(e)!.estadoInscripcion" />
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
-            <td>
+            <td data-label="Resultado">
               <StatusBadge v-if="ultimaInscripcion(e)" :estado="ultimaInscripcion(e)!.resultado" />
               <span v-else class="text-base-content/30 text-xs">—</span>
             </td>
-            <td>
+            <td data-label="Cuenta">
               <div v-if="e.usuario" class="flex items-center gap-2">
                 <span class="badge badge-sm badge-success font-mono">{{ e.usuario.username }}</span>
                 <input
@@ -216,7 +216,7 @@ async function exportar() {
               </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
-            <td class="text-right">
+            <td data-label="" class="text-right">
               <div class="dropdown dropdown-end">
                 <button tabindex="0" role="button"
                   class="btn btn-ghost btn-circle min-h-11 min-w-11"

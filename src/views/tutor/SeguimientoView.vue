@@ -136,7 +136,6 @@ function nombreCursoCorto(c: { nivel: Nivel; grado: number; paralelo: string }):
         <div v-if="cargandoDatos" class="space-y-3">
           <div class="skeleton h-40 rounded-xl"></div>
         </div>
-<!-- agregar dentro de <template v-if="seleccionado"> ..., antes de v-else-if="datosEstudiante" o después de cerrar ese bloque, al mismo nivel -->
 <div v-if="!cargandoDatos" class="card bg-base-100 shadow">
   <div class="card-body">
     <h3 class="font-semibold mb-2">Horario</h3>

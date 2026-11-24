@@ -348,29 +348,29 @@ async function crearConcepto() {
         <div class="card-body">
           <h3 class="font-semibold mb-3">Estado por concepto</h3>
           <div class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table table-sm tabla-cards">
               <thead>
                 <tr><th>Concepto</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Último recibo</th><th></th></tr>
               </thead>
               <tbody>
                 <tr v-for="c in datos.estadoPorConcepto" :key="c.concepto.id" class="hover">
-                  <td>
+                  <td data-label="">
                     {{ c.concepto.nombre }}
                     <span v-if="c.obligatorio" class="badge badge-xs badge-ghost ml-1">obligatorio</span>
                   </td>
-                  <td>Bs. {{ c.concepto.monto }}</td>
-                  <td class="text-base-content/70">
+                  <td data-label="Monto">Bs. {{ c.concepto.monto }}</td>
+                  <td data-label="Pagado" class="text-base-content/70">
                     {{ c.montoPagado > 0 ? `Bs. ${c.montoPagado.toLocaleString('es-BO')}` : '—' }}
                     <span v-if="c.abonos > 1" class="text-xs text-base-content/40">({{ c.abonos }} pagos)</span>
                   </td>
-                  <td :class="c.saldo > 0 ? 'font-semibold' : 'text-base-content/40'">
+                  <td data-label="Saldo" :class="c.saldo > 0 ? 'font-semibold' : 'text-base-content/40'">
                     {{ c.saldo > 0 ? `Bs. ${c.saldo.toLocaleString('es-BO')}` : '—' }}
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     <StatusBadge :estado="c.estado" />
                   </td>
-                  <td class="font-mono text-xs text-base-content/60">{{ c.numeroRecibo ?? '—' }}</td>
-                  <td>
+                  <td data-label="Recibo" class="font-mono text-xs text-base-content/60">{{ c.numeroRecibo ?? '—' }}</td>
+                  <td data-label="">
                     <button v-if="c.estado !== 'PAGADO'"
                       class="btn btn-primary btn-xs"
                       @click="abrirModal(c.concepto.id, c.saldo)">
@@ -394,7 +394,7 @@ async function crearConcepto() {
       <div class="card bg-base-100 shadow overflow-x-auto">
         <div class="card-body">
           <h3 class="font-semibold mb-3">Historial de pagos</h3>
-          <table class="table table-sm">
+          <table class="table table-sm tabla-cards">
             <thead>
               <tr><th>Recibo</th><th>Concepto</th><th>Monto</th><th>Método</th><th>Fecha</th><th>Estado</th><th></th></tr>
             </thead>
@@ -404,13 +404,13 @@ async function crearConcepto() {
               </tr>
               <tr v-else v-for="p in datos.historialPagos" :key="p.id" class="hover"
                 :class="p.estado === 'ANULADO' ? 'opacity-50' : ''">
-                <td class="font-mono text-xs">{{ p.numeroRecibo ?? '—' }}</td>
-                <td>{{ p.conceptoPago.nombre }}</td>
-                <td class="font-semibold">Bs. {{ p.montoPagado.toLocaleString('es-BO') }}</td>
-                <td class="text-sm">{{ p.metodoPago }}</td>
-                <td class="text-sm text-base-content/60">{{ formatoFecha(p.fechaPago) }}</td>
-                <td><StatusBadge :estado="p.estado" /></td>
-                <td class="whitespace-nowrap">
+                <td data-label="Recibo" class="font-mono text-xs">{{ p.numeroRecibo ?? '—' }}</td>
+                <td data-label="Concepto">{{ p.conceptoPago.nombre }}</td>
+                <td data-label="Monto" class="font-semibold">Bs. {{ p.montoPagado.toLocaleString('es-BO') }}</td>
+                <td data-label="Método" class="text-sm">{{ p.metodoPago }}</td>
+                <td data-label="Fecha" class="text-sm text-base-content/60">{{ formatoFecha(p.fechaPago) }}</td>
+                <td data-label="Estado"><StatusBadge :estado="p.estado" /></td>
+                <td data-label="" class="whitespace-nowrap">
                   <button v-if="p.numeroRecibo" class="btn btn-ghost btn-xs"
                     :disabled="imprimiendo === p.id" title="Ver o imprimir el recibo (PDF)"
                     @click="mostrarRecibo(p.id, p.numeroRecibo)">
@@ -503,18 +503,18 @@ async function crearConcepto() {
         <thead><tr><th>Nombre</th><th>Monto</th><th>Vence</th><th>Tipo</th><th>Activo</th></tr></thead>
         <tbody>
           <tr v-for="c in conceptos" :key="c.id" :class="c.activo === false ? 'opacity-50' : ''">
-            <td>{{ c.nombre }}</td>
-            <td>Bs. {{ c.monto }}</td>
-            <td class="text-xs">{{ c.fechaVencimiento ? formatoFecha(c.fechaVencimiento) : '—' }}</td>
-            <td><span class="badge badge-xs" :class="c.obligatorio ? 'badge-primary' : 'badge-ghost'">{{ c.obligatorio ? 'Obligatorio' : 'Opcional' }}</span></td>
-            <td><input type="checkbox" class="toggle toggle-xs toggle-success" :checked="c.activo !== false" @change="alternarActivo(c)" /></td>
+            <td data-label="">{{ c.nombre }}</td>
+            <td data-label="Monto">Bs. {{ c.monto }}</td>
+            <td data-label="Vence" class="text-xs">{{ c.fechaVencimiento ? formatoFecha(c.fechaVencimiento) : '—' }}</td>
+            <td data-label="Tipo"><span class="badge badge-xs" :class="c.obligatorio ? 'badge-primary' : 'badge-ghost'">{{ c.obligatorio ? 'Obligatorio' : 'Opcional' }}</span></td>
+            <td data-label="Activo"><input type="checkbox" class="toggle toggle-xs toggle-success" :checked="c.activo !== false" @change="alternarActivo(c)" /></td>
           </tr>
           <tr v-if="!conceptos.length"><td colspan="5" class="text-center text-base-content/40 py-4">Sin conceptos aún</td></tr>
         </tbody>
       </table>
 
       <div class="divider text-xs">Generar cuotas del año</div>
-      <form class="grid grid-cols-2 gap-3 items-end" @submit.prevent="generarCuotas">
+      <form class="grid grid-cols-1 gap-3 items-end sm:grid-cols-2" @submit.prevent="generarCuotas">
         <fieldset class="fieldset">
           <legend class="fieldset-legend text-xs">Se cobra</legend>
           <select v-model="formGenerar.tipo" class="select select-bordered w-full" :disabled="generando">
@@ -526,7 +526,7 @@ async function crearConcepto() {
           <legend class="fieldset-legend text-xs">Monto de cada cuota (Bs.) *</legend>
           <input v-model.number="formGenerar.monto" type="number" min="1" class="input input-bordered w-full" :disabled="generando" />
         </fieldset>
-        <fieldset class="fieldset col-span-2">
+        <fieldset class="fieldset sm:col-span-2">
           <legend class="fieldset-legend text-xs">Nombre base *</legend>
           <input v-model="formGenerar.nombreBase" type="text" placeholder="Pensión" class="input input-bordered w-full" :disabled="generando" />
           <p class="text-xs text-base-content/40 mt-1">
@@ -546,25 +546,25 @@ async function crearConcepto() {
               <option v-for="m in 12" :key="m" :value="m">{{ MESES[m] }}</option>
             </select>
           </fieldset>
-          <fieldset class="fieldset col-span-2">
+          <fieldset class="fieldset sm:col-span-2">
             <legend class="fieldset-legend text-xs">Vence el día</legend>
             <input v-model.number="formGenerar.diaVencimiento" type="number" min="1" max="31" class="input input-bordered w-full" :disabled="generando" />
           </fieldset>
         </template>
-        <fieldset v-else class="fieldset col-span-2">
+        <fieldset v-else class="fieldset sm:col-span-2">
           <legend class="fieldset-legend text-xs">Plazo: días después de empezar el trimestre</legend>
           <input v-model.number="formGenerar.diasPlazo" type="number" min="0" max="120" class="input input-bordered w-full" :disabled="generando" />
         </fieldset>
-        <button type="submit" class="btn btn-secondary btn-sm col-span-2" :disabled="generando">
+        <button type="submit" class="btn btn-secondary btn-sm sm:col-span-2" :disabled="generando">
           <span v-if="generando" class="loading loading-spinner loading-xs"></span>
           Generar cuotas
         </button>
-        <p class="col-span-2 text-xs text-base-content/40">Si algunas ya existen no se duplican: puedes volver a generar sin problema.</p>
+        <p class="sm:col-span-2 text-xs text-base-content/40">Si algunas ya existen no se duplican: puedes volver a generar sin problema.</p>
       </form>
 
       <div class="divider text-xs">Nuevo concepto</div>
-      <form class="grid grid-cols-2 gap-3 items-end" @submit.prevent="crearConcepto">
-        <fieldset class="fieldset col-span-2">
+      <form class="grid grid-cols-1 gap-3 items-end sm:grid-cols-2" @submit.prevent="crearConcepto">
+        <fieldset class="fieldset sm:col-span-2">
           <legend class="fieldset-legend text-xs">Nombre *</legend>
           <input v-model="formConcepto.nombre" type="text" placeholder="Ej: Matrícula" class="input input-bordered w-full" :disabled="guardandoConcepto" />
         </fieldset>
@@ -576,11 +576,11 @@ async function crearConcepto() {
           <legend class="fieldset-legend text-xs">Vencimiento</legend>
           <input v-model="formConcepto.fechaVencimiento" type="date" class="input input-bordered w-full" :disabled="guardandoConcepto" />
         </fieldset>
-        <label class="label cursor-pointer justify-start gap-2 col-span-2">
+        <label class="label cursor-pointer justify-start gap-2 sm:col-span-2">
           <input v-model="formConcepto.obligatorio" type="checkbox" class="checkbox checkbox-sm" />
           <span class="text-xs">Obligatorio</span>
         </label>
-        <button type="submit" class="btn btn-primary btn-sm col-span-2" :disabled="guardandoConcepto">
+        <button type="submit" class="btn btn-primary btn-sm sm:col-span-2" :disabled="guardandoConcepto">
           <span v-if="guardandoConcepto" class="loading loading-spinner loading-xs"></span>
           Crear concepto
         </button>

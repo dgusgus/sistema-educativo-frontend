@@ -259,7 +259,7 @@ async function eliminar(h: HorarioDetalle) {
           </select>
         </fieldset>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset">
             <legend class="fieldset-legend text-xs">Hora inicio *</legend>
             <input v-model="form.horaInicio" type="time" class="input input-bordered w-full" :disabled="guardando" />

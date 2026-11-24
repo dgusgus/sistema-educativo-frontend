@@ -50,7 +50,7 @@ function toggle(inscripcionId: number) {
         class="rounded-box border shadow-sm overflow-hidden h-fit"
         :class="est.alertaCritica ? 'border-error/40 bg-error/5' : 'border-base-300 bg-base-100'">
         <button class="w-full flex items-center gap-3 p-3 text-left" @click="toggle(est.inscripcionId)">
-          <span class="avatar placeholder">
+          <span class="avatar avatar-placeholder">
             <span class="rounded-full w-9 h-9 flex items-center justify-center font-bold"
               :class="est.alertaCritica ? 'bg-error/15 text-error' : 'bg-primary/10 text-primary'">
               {{ inicial(est.estudiante.apellido) }}

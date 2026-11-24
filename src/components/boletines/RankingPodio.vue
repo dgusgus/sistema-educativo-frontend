@@ -37,7 +37,7 @@ function estiloPuesto(puesto: number): string {
         <!-- 2° puesto -->
         <div v-if="podio()[1]" class="order-2 sm:order-1 flex-1 rounded-box bg-base-200/60 border border-base-300 p-3 text-center">
           <span class="badge badge-lg font-bold" :class="estiloPuesto(2)">2</span>
-          <p class="avatar placeholder mt-2">
+          <p class="avatar avatar-placeholder mt-2">
             <span class="bg-base-300 rounded-full w-10 h-10 flex items-center justify-center font-bold">
               {{ inicial(podio()[1].nombreCompleto) }}
             </span>
@@ -49,7 +49,7 @@ function estiloPuesto(puesto: number): string {
         <div class="order-1 sm:order-2 flex-1 rounded-box border border-amber-400/50 p-3 sm:p-4 text-center shadow"
           style="background: linear-gradient(180deg, rgba(251,191,36,.15) 0%, rgba(251,191,36,.03) 100%)">
           <span class="badge badge-lg font-bold" :class="estiloPuesto(1)">1</span>
-          <p class="avatar placeholder mt-2">
+          <p class="avatar avatar-placeholder mt-2">
             <span class="bg-amber-400/30 text-amber-800 rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold">
               {{ inicial(podio()[0].nombreCompleto) }}
             </span>
@@ -60,7 +60,7 @@ function estiloPuesto(puesto: number): string {
         <!-- 3° puesto -->
         <div v-if="podio()[2]" class="order-3 flex-1 rounded-box bg-base-200/60 border border-base-300 p-3 text-center">
           <span class="badge badge-lg font-bold" :class="estiloPuesto(3)">3</span>
-          <p class="avatar placeholder mt-2">
+          <p class="avatar avatar-placeholder mt-2">
             <span class="bg-base-300 rounded-full w-10 h-10 flex items-center justify-center font-bold">
               {{ inicial(podio()[2].nombreCompleto) }}
             </span>
@@ -82,7 +82,7 @@ function estiloPuesto(puesto: number): string {
             <span class="badge badge-sm font-bold shrink-0" :class="estiloPuesto(item.puesto)">
               {{ item.puesto }}°
             </span>
-            <span class="avatar placeholder shrink-0">
+            <span class="avatar avatar-placeholder shrink-0">
               <span class="bg-base-300 rounded-full w-6 h-6 flex items-center justify-center text-[11px] font-bold">
                 {{ inicial(item.nombreCompleto) }}
               </span>

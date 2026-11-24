@@ -153,7 +153,7 @@ async function exportar() {
     <!-- Encabezado -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <h2 class="text-2xl font-bold flex-1">Docentes</h2>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button class="btn btn-outline btn-sm" @click="abrir('perfil')">
           + Solo perfil
         </button>
@@ -180,7 +180,7 @@ async function exportar() {
 
     <!-- Tabla -->
     <div class="card bg-base-100 shadow overflow-x-auto">
-      <table class="table table-sm">
+      <table class="table table-sm tabla-cards">
         <thead>
           <tr>
             <th>Nombre</th>
@@ -204,10 +204,10 @@ async function exportar() {
             </td>
           </tr>
           <tr v-else v-for="d in docentesFiltrados" :key="d.id" class="hover">
-            <td class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
-            <td class="font-mono text-sm">{{ d.ci }}</td>
-            <td class="text-sm">{{ d.especialidad ?? '—' }}</td>
-<td>
+            <td data-label="" class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
+            <td data-label="CI" class="font-mono text-sm">{{ d.ci }}</td>
+            <td data-label="Especialidad" class="text-sm">{{ d.especialidad ?? '—' }}</td>
+<td data-label="Cursos">
   <div v-if="!cursosDe(d).length" class="text-xs text-base-content/30">Sin asignaciones</div>
   <details v-else class="collapse-arrow collapse min-w-52 rounded-2xl border border-base-300/70 bg-base-200/40">
     <summary class="collapse-title flex min-h-11 items-center gap-2 py-2 pl-3 pr-9 text-xs font-semibold">
@@ -233,7 +233,7 @@ async function exportar() {
     </ul>
   </details>
 </td>
-            <td>
+            <td data-label="Cuenta">
               <div v-if="tieneCuenta(d)" class="flex items-center gap-2">
                 <span class="badge badge-sm badge-success font-mono">{{ d.usuario?.username }}</span>
                 <input type="checkbox" class="toggle toggle-xs toggle-success" :checked="d.usuario?.activo ?? true"
@@ -242,11 +242,11 @@ async function exportar() {
               </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
-            <td>
+            <td data-label="Estado">
               <StatusBadge :estado="d.activo ? 'ACTIVO' : 'INACTIVO'" :texto="d.activo ? 'Activo' : 'Inactivo'" />
             </td>
-            <td>
-              <div class="flex gap-1 flex-nowrap whitespace-nowrap">
+            <td data-label="">
+              <div class="flex flex-wrap gap-1 sm:flex-nowrap sm:whitespace-nowrap">
                 <button class="btn btn-ghost btn-sm min-h-11" @click="abrir('perfil', d)">
                   Editar
                 </button>

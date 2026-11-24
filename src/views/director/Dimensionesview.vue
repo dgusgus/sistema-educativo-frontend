@@ -300,7 +300,7 @@ async function eliminar(d: DimensionEvaluacion) {
           <legend class="fieldset-legend text-xs">Nombre *</legend>
           <input ref="inputNombreDimension" v-model="form.nombre" type="text" placeholder="Ej: Ser, Saber, Hacer, Decidir" class="input input-bordered w-full" :disabled="guardando" />
         </fieldset>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset">
             <legend class="fieldset-legend text-xs">Puntaje máximo</legend>
             <input v-model.number="form.puntajeMaximo" type="number" min="1" class="input input-bordered w-full" :disabled="guardando" />

@@ -305,7 +305,7 @@ async function exportar() {
 
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <h2 class="text-2xl font-bold flex-1">Tutores</h2>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button class="btn btn-outline btn-sm" @click="abrirCrear">+ Solo perfil</button>
         <button class="btn btn-primary btn-sm" @click="abrirConCuenta">+ Con cuenta</button>
         <button class="btn btn-outline btn-sm" @click="exportar">Exportar</button>
@@ -325,7 +325,7 @@ async function exportar() {
     </label>
 
     <div class="card bg-base-100 shadow overflow-x-auto">
-      <table class="table table-sm">
+      <table class="table table-sm tabla-cards">
         <thead>
           <tr><th>Nombre</th><th>CI</th><th>Ocupación</th><th>Estudiantes vinculados</th><th>Cuenta</th><th>Acciones</th></tr>
         </thead>
@@ -337,10 +337,10 @@ async function exportar() {
             <td colspan="6" class="text-center text-base-content/40 py-8">No se encontraron tutores</td>
           </tr>
           <tr v-else v-for="t in tutoresFiltrados" :key="t.id" class="hover">
-            <td class="font-medium">{{ t.apellido }}, {{ t.nombre }}</td>
-            <td class="font-mono text-sm">{{ t.ci }}</td>
-            <td class="text-sm">{{ t.ocupacion ?? '—' }}</td>
-<td>
+            <td data-label="" class="font-medium">{{ t.apellido }}, {{ t.nombre }}</td>
+            <td data-label="CI" class="font-mono text-sm">{{ t.ci }}</td>
+            <td data-label="Ocupación" class="text-sm">{{ t.ocupacion ?? '—' }}</td>
+<td data-label="Vinculados">
   <div v-if="!t.estudiantes?.length" class="text-xs text-base-content/30">Ninguno</div>
   <ul v-else class="min-w-52 divide-y divide-base-300/60 rounded-2xl border border-base-300/70 bg-base-200/40" :aria-label="`Hijos de ${t.nombre} ${t.apellido}`">
     <li
@@ -365,7 +365,7 @@ async function exportar() {
     </li>
   </ul>
 </td>
-            <td>
+            <td data-label="Cuenta">
               <div v-if="t.usuario" class="flex items-center gap-2">
                 <span class="badge badge-sm badge-success font-mono">{{ t.usuario.username }}</span>
                 <input
@@ -379,8 +379,8 @@ async function exportar() {
               </div>
               <span v-else class="badge badge-sm badge-ghost">Sin cuenta</span>
             </td>
-            <td>
-              <div class="flex gap-1 flex-nowrap whitespace-nowrap">
+            <td data-label="">
+              <div class="flex flex-wrap gap-1 sm:flex-nowrap sm:whitespace-nowrap">
                 <button class="btn btn-ghost btn-sm min-h-11" @click="abrirEditar(t)">Editar</button>
                 <button class="btn btn-outline btn-sm min-h-11 btn-info" @click="abrirVincularEstudiante(t)">+ Estudiante</button>
                 <button v-if="!t.usuario" class="btn btn-outline btn-sm min-h-11 btn-warning" @click="abrirVincularCuenta(t)">Vincular cuenta</button>
@@ -401,7 +401,7 @@ async function exportar() {
       <h3 class="font-bold text-lg mb-4">{{ modoEdicion ? 'Editar tutor' : 'Nuevo tutor (solo perfil)' }}</h3>
       <div v-if="errorModal" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorModal }}</span></div>
       <form class="space-y-3" @submit.prevent="guardar">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Nombre *</legend>
             <input v-model="form.nombre" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Apellido *</legend>
@@ -409,13 +409,13 @@ async function exportar() {
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
           <input v-model="form.ci" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Ocupación</legend>
             <input v-model="form.ocupacion" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Grado de instrucción</legend>
             <input v-model="form.gradoInstruccion" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="form.telefono" type="tel" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Email</legend>
@@ -448,7 +448,7 @@ async function exportar() {
       <form v-else class="space-y-3" @submit.prevent="crearConCuenta">
         <div v-if="errorCuenta" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorCuenta }}</span></div>
         <div class="divider text-xs">Datos personales</div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Nombre *</legend>
             <input v-model="formCuenta.nombre" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Apellido *</legend>
@@ -456,7 +456,7 @@ async function exportar() {
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
           <input v-model="formCuenta.ci" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Ocupación</legend>
             <input v-model="formCuenta.ocupacion" type="text" class="input input-bordered w-full" :disabled="creandoCuenta" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Grado de instrucción</legend>

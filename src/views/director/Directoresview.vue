@@ -154,7 +154,7 @@ async function guardarEdicion() {
       </div>
       <form v-else class="space-y-3" @submit.prevent="crear">
         <div v-if="errorCrear" role="alert" class="alert alert-error py-2 text-sm"><span>{{ errorCrear }}</span></div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Nombre *</legend>
             <input v-model="formCrear.nombre" type="text" class="input input-bordered w-full" :disabled="creando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Apellido *</legend>
@@ -162,7 +162,7 @@ async function guardarEdicion() {
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI *</legend>
           <input v-model="formCrear.ci" type="text" class="input input-bordered w-full" :disabled="creando" /></fieldset>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="formCrear.telefono" type="tel" class="input input-bordered w-full" :disabled="creando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Email</legend>
@@ -194,7 +194,7 @@ async function guardarEdicion() {
       <h3 class="font-bold text-lg mb-4">Editar director</h3>
       <div v-if="errorEditar" role="alert" class="alert alert-error mb-4 py-2 text-sm"><span>{{ errorEditar }}</span></div>
       <form class="space-y-3" @submit.prevent="guardarEdicion">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Nombre</legend>
             <input v-model="formEditar.nombre" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Apellido</legend>
@@ -202,7 +202,7 @@ async function guardarEdicion() {
         </div>
         <fieldset class="fieldset"><legend class="fieldset-legend text-xs">CI</legend>
           <input v-model="formEditar.ci" type="text" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Teléfono</legend>
             <input v-model="formEditar.telefono" type="tel" class="input input-bordered w-full" :disabled="guardando" /></fieldset>
           <fieldset class="fieldset"><legend class="fieldset-legend text-xs">Email</legend>
