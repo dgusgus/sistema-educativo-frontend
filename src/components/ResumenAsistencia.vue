@@ -79,7 +79,22 @@ function clasePorcentaje(p: number): string {
       <span>{{ error }}</span>
     </div>
 
-    <div v-else-if="filas.length" class="overflow-x-auto">
+    <div v-else-if="filas.length">
+      <!-- Móvil: una tarjeta por materia (la tabla de 8 columnas se corta en 390 px) -->
+      <ul class="divide-y divide-base-200 rounded-box border border-base-300 sm:hidden">
+        <li v-for="(f, i) in filas" :key="i" class="flex items-center justify-between gap-3 px-3 py-2">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium">{{ f.materia }}<span v-if="f.trimestre" class="font-normal text-base-content/50"> · {{ f.trimestre }}</span></p>
+            <p class="text-xs text-base-content/60">P {{ f.presente }} · A {{ f.ausente }} · R {{ f.retraso }} · J {{ f.justificado }}</p>
+          </div>
+          <div class="shrink-0 text-right">
+            <span :class="clasePorcentaje(f.porcentaje)">{{ f.porcentaje.toFixed(0) }}%</span>
+            <span v-if="f.porcentaje < 80" class="badge badge-xs badge-error mt-0.5 block" title="Asistencia menor al 80%">En riesgo</span>
+          </div>
+        </li>
+      </ul>
+
+      <div class="hidden overflow-x-auto sm:block">
       <table class="table table-xs">
         <thead>
           <tr>
@@ -108,6 +123,7 @@ function clasePorcentaje(p: number): string {
           </tr>
         </tbody>
       </table>
+      </div>
       <p class="text-xs text-base-content/40 mt-1">P: presente · A: ausente · R: retraso · J: justificado</p>
     </div>
 
