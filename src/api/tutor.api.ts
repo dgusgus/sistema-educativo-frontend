@@ -1,6 +1,7 @@
 import api, { TIMEOUT_IMPORT } from '@/api/axios'
 import type { Tutor } from '@/types'
 import type { ResultadoImport } from '@/types/import'
+import type { Paginada } from '@/api/estudiante.api'
 
 export interface TutorPayload {
   ci:                string
@@ -34,6 +35,11 @@ export const tutorApi = {
   getMisVinculados: () =>
     api.get<{ estudiantes: Array<{ estudiante: EstudianteVinculado }> }>('/tutores/mis-vinculados').then(r => r.data),
 
+  // Una página (el servidor busca y ordena). Para la pantalla de Tutores.
+  getPage: (params: { pagina: number; limite: number; search?: string }) =>
+    api.get<Paginada<Tutor>>('/tutores', { params }).then(r => r.data),
+
+  // Lista COMPLETA sin paginar.
   getAll: (search?: string) =>
     api.get<Tutor[]>('/tutores', { params: search ? { search } : undefined }).then(r => r.data),
 

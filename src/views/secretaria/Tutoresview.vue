@@ -9,35 +9,25 @@ import { useToastStore } from '@/stores/toast.store'
 import type { Tutor } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
+import { useListaPaginada } from '@/composables/useListaPaginada'
 import { descargarBlob } from '@/api/boletin.api.js'
 
 const { confirmar } = useConfirm()
 const toast = useToastStore()
 
-const tutores  = ref<Tutor[]>([])
-const cargando = ref(true)
-const error    = ref<string | null>(null)
-const busqueda = ref('')
-
-onMounted(cargar)
-
-async function cargar() {
-  cargando.value = true
-  error.value = null
-  try {
-    tutores.value = await tutorApi.getAll()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al cargar tutores'
-  } finally {
-    cargando.value = false
-  }
-}
-
-const tutoresFiltrados = computed(() => {
-  const q = busqueda.value.toLowerCase().trim()
-  if (!q) return tutores.value
-  return tutores.value.filter(t => `${t.nombre} ${t.apellido} ${t.ci}`.toLowerCase().includes(q))
+// Paginación y búsqueda EN EL SERVIDOR (con ~430 tutores en el demo, traerlos todos era lento)
+const lista = useListaPaginada<Tutor>({
+  pedir: ({ pagina, limite, search }) => tutorApi.getPage({ pagina, limite, ...(search && { search }) }),
 })
+const tutores  = lista.items
+const cargando = lista.cargando
+const error    = lista.error
+const busqueda = lista.busqueda
+
+onMounted(() => lista.cargar())
+const cargar = () => lista.cargar()
+const tutoresFiltrados = computed(() => tutores.value)
 
 // ─── Crear/editar perfil ──────────────────────────────────────────────────────
 const modalPerfil = ref(false)
@@ -83,8 +73,8 @@ async function guardar() {
       if (idx !== -1) tutores.value[idx] = { ...tutores.value[idx], ...actualizado }
       toast.success('Tutor actualizado')
     } else {
-      const nuevo = await tutorApi.create(form.value)
-      tutores.value.unshift(nuevo)
+      await tutorApi.create(form.value)
+      await lista.cargar()
       toast.success('Tutor creado')
     }
     modalPerfil.value = false
@@ -126,17 +116,7 @@ async function crearConCuenta() {
     }
     const resultado = await usuarioApi.createConPerfil(payload)
     credenciales.value = resultado.credenciales
-    const perfil = resultado.perfiles.TUTOR
-    if (perfil) {
-      tutores.value.unshift({
-        id: perfil.id, ci: resultado.persona.ci, nombre: resultado.persona.nombre, apellido: resultado.persona.apellido,
-        telefono: resultado.persona.telefono ?? null, email: resultado.persona.email ?? null,
-        ocupacion: (perfil as { ocupacion?: string }).ocupacion ?? null,
-        gradoInstruccion: (perfil as { gradoInstruccion?: string }).gradoInstruccion ?? null,
-        usuario: { id: resultado.usuario.id, username: resultado.usuario.username, activo: true },
-        estudiantes: [],
-      })
-    }
+    void lista.cargar()
   } catch (e) {
     errorCuenta.value = e instanceof Error ? e.message : 'Error al crear tutor'
   } finally {
@@ -393,7 +373,11 @@ async function exportar() {
       </table>
     </div>
 
-    <p v-if="!cargando" class="text-xs text-base-content/40">{{ tutoresFiltrados.length }} tutor(es) encontrado(s)</p>
+    <PaginadorTabla
+      :pagina="lista.pagina.value" :total-paginas="lista.totalPaginas.value"
+      :desde="lista.desde.value" :hasta="lista.hasta.value" :total="lista.total.value"
+      :limite="lista.limite.value" :cargando="lista.cargando.value"
+      @ir="lista.irAPagina" @limite="lista.cambiarLimite" />
   </div>
 
   <!-- Modal crear/editar perfil -->
