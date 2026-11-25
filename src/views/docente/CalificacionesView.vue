@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AsignacionCabecera from '@/components/AsignacionCabecera.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores/docente.store'
 import { useGestionStore } from '@/stores/gestion.store'
@@ -254,25 +255,22 @@ function siguienteNota(e: KeyboardEvent) {
       </div>
 
       <!-- Info + selector de trimestre -->
-      <div v-if="asignacion" class="card bg-base-100 shadow">
-        <div class="card-body py-3 flex flex-wrap gap-4 items-center">
-          <div><p class="text-xs text-base-content/50">Materia</p><p class="font-semibold">{{ asignacion.materia.nombre }}</p></div>
-          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ nombreCursoCorto(asignacion.curso) }}</p></div>
-          <div><p class="text-xs text-base-content/50">Estudiantes</p><p class="font-semibold">{{ asignacion.totalEstudiantes }}</p></div>
-          <div class="ml-auto flex items-center gap-2">
-            <select v-model="trimestreId" class="select select-bordered select-sm" @change="cargarTodo">
-              <option :value="''" disabled>Trimestre</option>
-              <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id">
-                {{ t.nombre }} {{ t.cerrado ? '🔒' : '' }}
-              </option>
-            </select>
-            <button class="btn btn-primary btn-sm" :disabled="cargando || !trimestreId" @click="cargarTodo">
-              <span v-if="cargando" class="loading loading-spinner loading-xs"></span>
-              <span v-else>Cargar</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <AsignacionCabecera v-if="asignacion" :materia="asignacion.materia.nombre"
+        :curso="nombreCursoCorto(asignacion.curso)" :total-estudiantes="asignacion.totalEstudiantes">
+        <label class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none">
+          <span class="text-xs text-base-content/50">Trimestre</span>
+          <select v-model="trimestreId" class="select select-bordered select-sm w-full" @change="cargarTodo">
+            <option :value="''" disabled>Elegir</option>
+            <option v-for="t in gestion.trimestres" :key="t.id" :value="t.id">
+              {{ t.nombre }} {{ t.cerrado ? '🔒' : '' }}
+            </option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-sm" :disabled="cargando || !trimestreId" @click="cargarTodo">
+          <span v-if="cargando" class="loading loading-spinner loading-xs"></span>
+          <span v-else>Cargar</span>
+        </button>
+      </AsignacionCabecera>
 
       <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
 

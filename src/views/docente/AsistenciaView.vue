@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AsignacionCabecera from '@/components/AsignacionCabecera.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useDocenteStore, type Asignacion, type CursoAsignacion } from '@/stores/docente.store'
 import { useGestionStore } from '@/stores/gestion.store'
@@ -201,24 +202,17 @@ const stats = computed(() => {
       </div>
 
       <!-- Info de la asignación activa -->
-      <div v-if="asignacion" class="card bg-base-100 shadow">
-        <div class="card-body grid grid-cols-[auto_1fr_auto] items-center gap-3 py-3 sm:flex sm:flex-wrap sm:gap-4">
-          <div><p class="text-xs text-base-content/50">Materia</p><p class="font-semibold">{{ asignacion.materia.nombre }}</p></div>
-          <div><p class="text-xs text-base-content/50">Curso</p><p class="font-semibold">{{ nombreCursoCorto(asignacion.curso) }}</p></div>
-          <div><p class="text-xs text-base-content/50">Estudiantes</p><p class="font-semibold">{{ asignacion.totalEstudiantes }}</p></div>
-          <!-- Selector de fecha -->
-          <div class="col-span-3 flex w-full items-center gap-2 sm:col-span-1 sm:ml-auto sm:w-auto">
-            <label class="text-xs text-base-content/50">Fecha:</label>
-            <input v-model="fecha" type="date" :max="hoy"
-              class="input input-bordered input-sm min-w-0 flex-1"
-              @change="cambiarFecha" />
-            <button class="btn btn-primary btn-sm" :disabled="cargando" @click="cargar">
-              <span v-if="cargando" class="loading loading-spinner loading-xs"></span>
-              <span v-else>Cargar</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <AsignacionCabecera v-if="asignacion" :materia="asignacion.materia.nombre"
+        :curso="nombreCursoCorto(asignacion.curso)" :total-estudiantes="asignacion.totalEstudiantes">
+        <label class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none">
+          <span class="text-xs text-base-content/50">Fecha</span>
+          <input v-model="fecha" type="date" :max="hoy" class="input input-bordered input-sm w-full" @change="cambiarFecha" />
+        </label>
+        <button class="btn btn-primary btn-sm" :disabled="cargando" @click="cargar">
+          <span v-if="cargando" class="loading loading-spinner loading-xs"></span>
+          <span v-else>Cargar</span>
+        </button>
+      </AsignacionCabecera>
 
       <!-- Feedback -->
       <div v-if="error" role="alert" class="alert alert-error"><span>{{ error }}</span></div>
