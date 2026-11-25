@@ -14,6 +14,8 @@ import { useAccion } from '@/composables/useAccion'
 import { formatoFecha } from '@/lib/fechas'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
+import { usePaginaLocal } from '@/composables/usePaginaLocal'
 
 const gestion = useGestionStore()
 
@@ -91,6 +93,7 @@ const deudoresFiltrados = computed<DeudorCobranza[]>(() => {
     (!soloVencido.value || d.vencido > 0) &&
     (!q || d.estudiante.toLowerCase().includes(q) || d.ci.toLowerCase().includes(q) || d.contacto.nombre.toLowerCase().includes(q)))
 })
+const pagDeudores = usePaginaLocal(deudoresFiltrados, 25)
 
 function verCurso(id: number, a: Pestana = 'deudores') {
   cursoId.value = id
@@ -98,6 +101,8 @@ function verCurso(id: number, a: Pestana = 'deudores') {
 }
 
 // ── Matriz ───────────────────────────────────────────────────────────────────
+const filasMatriz = computed(() => datos.value?.matriz ?? [])
+const pagMatriz = usePaginaLocal(filasMatriz, 25)
 function textoCelda(c: CeldaMatriz | undefined): string {
   if (!c) return ''
   if (c.estado === 'PAGADO') return '✓'
@@ -119,6 +124,8 @@ const errorCobrado   = ref<string | null>(null)
 const desde  = ref('')
 const hasta  = ref('')
 const metodo = ref<'' | 'EFECTIVO' | 'TRANSFERENCIA' | 'QR'>('')
+const pagosCobrados = computed(() => recibidos.value?.pagos ?? [])
+const pagCobrado = usePaginaLocal(pagosCobrados, 25)
 
 async function cargarCobrado() {
   if (!gestion.gestionId) return
@@ -292,7 +299,7 @@ const PESTANAS: Array<{ id: Pestana; nombre: string }> = [
             <table class="table table-sm">
               <thead><tr><th>Estudiante</th><th>Curso</th><th>Tutor</th><th class="text-right">Saldo</th><th class="text-right">Vencido</th><th class="text-right">Mora</th><th>Debe</th></tr></thead>
               <tbody>
-                <tr v-for="d in deudoresFiltrados" :key="d.inscripcionId" class="hover">
+                <tr v-for="d in pagDeudores.visibles.value" :key="d.inscripcionId" class="hover">
                   <td class="font-medium whitespace-nowrap">{{ d.estudiante }}</td>
                   <td class="whitespace-nowrap text-sm">{{ d.curso }}</td>
                   <td class="text-sm">
@@ -320,6 +327,10 @@ const PESTANAS: Array<{ id: Pestana; nombre: string }> = [
               </tbody>
             </table>
           </div>
+            <PaginadorTabla
+              :pagina="pagDeudores.pagina.value" :total-paginas="pagDeudores.totalPaginas.value"
+              :desde="pagDeudores.desde.value" :hasta="pagDeudores.hasta.value" :total="pagDeudores.total.value"
+              :limite="pagDeudores.limite.value" @ir="pagDeudores.irAPagina" @limite="pagDeudores.cambiarLimite" />
         </div>
       </div>
 
@@ -348,13 +359,17 @@ const PESTANAS: Array<{ id: Pestana; nombre: string }> = [
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="f in datos.matriz" :key="f.inscripcionId">
+                  <tr v-for="f in pagMatriz.visibles.value" :key="f.inscripcionId">
                     <td class="sticky left-0 bg-base-100 font-medium whitespace-nowrap">{{ f.estudiante }}</td>
                     <td v-for="c in datos.conceptos" :key="c.id" class="text-center" :class="claseCelda(f.celdas[c.id])">{{ textoCelda(f.celdas[c.id]) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <PaginadorTabla
+              :pagina="pagMatriz.pagina.value" :total-paginas="pagMatriz.totalPaginas.value"
+              :desde="pagMatriz.desde.value" :hasta="pagMatriz.hasta.value" :total="pagMatriz.total.value"
+              :limite="pagMatriz.limite.value" @ir="pagMatriz.irAPagina" @limite="pagMatriz.cambiarLimite" />
           </template>
         </div>
       </div>
@@ -390,7 +405,7 @@ const PESTANAS: Array<{ id: Pestana; nombre: string }> = [
               <table class="table table-sm">
                 <thead><tr><th>Recibo</th><th>Fecha</th><th>Estudiante</th><th>Curso</th><th>Concepto</th><th class="text-right">Monto</th><th>Método</th><th>Cajero</th></tr></thead>
                 <tbody>
-                  <tr v-for="p in recibidos.pagos" :key="p.id" class="hover" :class="p.estado === 'ANULADO' ? 'opacity-50' : ''">
+                  <tr v-for="p in pagCobrado.visibles.value" :key="p.id" class="hover" :class="p.estado === 'ANULADO' ? 'opacity-50' : ''">
                     <td class="font-mono text-xs">{{ p.numeroRecibo ?? '—' }}</td>
                     <td class="text-sm whitespace-nowrap">{{ formatoFecha(p.fecha) }}</td>
                     <td class="whitespace-nowrap">{{ p.estudiante }}</td>
@@ -404,6 +419,10 @@ const PESTANAS: Array<{ id: Pestana; nombre: string }> = [
                 </tbody>
               </table>
             </div>
+            <PaginadorTabla
+              :pagina="pagCobrado.pagina.value" :total-paginas="pagCobrado.totalPaginas.value"
+              :desde="pagCobrado.desde.value" :hasta="pagCobrado.hasta.value" :total="pagCobrado.total.value"
+              :limite="pagCobrado.limite.value" @ir="pagCobrado.irAPagina" @limite="pagCobrado.cambiarLimite" />
           </template>
         </div>
       </div>

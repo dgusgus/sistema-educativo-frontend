@@ -5,6 +5,8 @@ import { directorApi, type DirectorConCuentaPayload } from '@/api/director.api'
 import { useToastStore } from '@/stores/toast.store'
 import type { Director } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
+import { usePaginaLocal } from '@/composables/usePaginaLocal'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 
@@ -34,6 +36,8 @@ const filtrados = computed(() => {
   if (!q) return directores.value
   return directores.value.filter(d => `${d.nombre} ${d.apellido} ${d.ci}`.toLowerCase().includes(q))
 })
+
+const pag = usePaginaLocal(filtrados, 25)
 
 // ─── Crear con cuenta (único flujo posible — Director siempre nace con cuenta) ─
 const modalCrear    = ref(false)
@@ -124,7 +128,7 @@ async function guardarEdicion() {
         <tbody>
           <tr v-if="cargando" v-for="i in 3" :key="i"><td colspan="6"><div class="skeleton h-4 w-full"></div></td></tr>
           <tr v-else-if="filtrados.length === 0"><td colspan="6" class="text-center text-base-content/40 py-8">No se encontraron directores</td></tr>
-          <tr v-else v-for="d in filtrados" :key="d.id" class="hover">
+          <tr v-else v-for="d in pag.visibles.value" :key="d.id" class="hover">
             <td class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
             <td class="font-mono text-sm">{{ d.ci }}</td>
             <td><span class="badge badge-sm badge-success font-mono">{{ d.usuario?.username }}</span></td>
@@ -138,6 +142,12 @@ async function guardarEdicion() {
         </tbody>
       </table>
     </div>
+
+    <PaginadorTabla
+      :pagina="pag.pagina.value" :total-paginas="pag.totalPaginas.value"
+      :desde="pag.desde.value" :hasta="pag.hasta.value" :total="pag.total.value"
+      :limite="pag.limite.value" :opciones-limite="[10, 25, 50]"
+      @ir="pag.irAPagina" @limite="pag.cambiarLimite" />
   </div>
 
   <!-- Modal crear -->

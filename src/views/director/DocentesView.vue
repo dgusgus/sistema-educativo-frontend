@@ -8,6 +8,8 @@ import { useToastStore } from '@/stores/toast.store'
 import { useConfirm } from '@/composables/useConfirm'
 import type { Docente, Materia } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
+import PaginadorTabla from '@/components/PaginadorTabla.vue'
+import { usePaginaLocal } from '@/composables/usePaginaLocal'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
 import DocentePerfilModal from '@/components/docentes/DocentePerfilModal.vue'
@@ -71,6 +73,8 @@ const docentesFiltrados = computed(() => {
   if (!q) return docentes.value
   return docentes.value.filter(d => `${d.nombre} ${d.apellido} ${d.ci}`.toLowerCase().includes(q))
 })
+
+const pag = usePaginaLocal(docentesFiltrados, 25)
 
 function tieneCuenta(d: Docente): boolean { return !!d.usuario }
 
@@ -203,7 +207,7 @@ async function exportar() {
               No se encontraron docentes
             </td>
           </tr>
-          <tr v-else v-for="d in docentesFiltrados" :key="d.id" class="hover">
+          <tr v-else v-for="d in pag.visibles.value" :key="d.id" class="hover">
             <td data-label="" class="font-medium">{{ d.apellido }}, {{ d.nombre }}</td>
             <td data-label="CI" class="font-mono text-sm">{{ d.ci }}</td>
             <td data-label="Especialidad" class="text-sm">{{ d.especialidad ?? '—' }}</td>
@@ -266,9 +270,11 @@ async function exportar() {
       </table>
     </div>
 
-    <p v-if="!cargando" class="text-xs text-base-content/40">
-      {{ docentesFiltrados.length }} docente(s) encontrado(s)
-    </p>
+    <PaginadorTabla
+      :pagina="pag.pagina.value" :total-paginas="pag.totalPaginas.value"
+      :desde="pag.desde.value" :hasta="pag.hasta.value" :total="pag.total.value"
+      :limite="pag.limite.value" :opciones-limite="[10, 25, 50]"
+      @ir="pag.irAPagina" @limite="pag.cambiarLimite" />
   </div>
 
 
