@@ -7,7 +7,7 @@
  * ya no se descarga todo para filtrar en el navegador. Cada modal es un componente en
  * components/estudiantes/ (antes eran ~450 líneas dentro de esta vista).
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import HistorialAcademicoModal from '@/components/HistorialAcademicoModal.vue'
 import ImportarExcelModal from '@/components/ImportarExcelModal.vue'
 import PaginadorTabla from '@/components/PaginadorTabla.vue'
@@ -125,6 +125,31 @@ async function exportar() {
   const blob = await estudianteApi.exportar(gestion.gestionId)
   descargarBlob(blob, `estudiantes_gestion_${gestion.anio}.xlsx`)
 }
+// El menú de acciones se dibuja con position:fixed para que el contenedor de la tabla
+// (overflow) no lo recorte cuando hay pocas filas; se abre hacia arriba si no cabe abajo.
+function posicionarMenu(ev: Event) {
+  const btn = ev.currentTarget as HTMLElement
+  const ul = btn.nextElementSibling as HTMLElement | null
+  if (!ul) return
+  requestAnimationFrame(() => {
+    const r = btn.getBoundingClientRect()
+    const h = ul.offsetHeight || 340
+    const w = ul.offsetWidth || 256
+    let top = r.bottom + 4
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4)
+    ul.style.position = 'fixed'
+    ul.style.top = `${top}px`
+    ul.style.left = `${Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8))}px`
+    ul.style.right = 'auto'
+    ul.style.bottom = 'auto'
+  })
+}
+function cerrarMenuAlDesplazar() {
+  const a = document.activeElement as HTMLElement | null
+  if (a?.closest('.dropdown')) a.blur()
+}
+onMounted(() => window.addEventListener('scroll', cerrarMenuAlDesplazar, true))
+onBeforeUnmount(() => window.removeEventListener('scroll', cerrarMenuAlDesplazar, true))
 </script>
 
 <template>
@@ -221,7 +246,8 @@ async function exportar() {
                 <button tabindex="0" role="button"
                   class="btn btn-ghost btn-circle min-h-11 min-w-11"
                   :aria-label="`Acciones para ${e.apellido}, ${e.nombre}`"
-                  aria-haspopup="menu">
+                  aria-haspopup="menu"
+                  @click="posicionarMenu" @focus="posicionarMenu">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" />
                   </svg>
